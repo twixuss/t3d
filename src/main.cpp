@@ -34,6 +34,11 @@ t3d::ShaderConstants *light_constants;
 #define LIGHT_CONSTANTS_SLOT 13
 
 
+struct AverageComputeData {
+	u32 sum;
+};
+#define AVERAGE_COMPUTE_SLOT 12
+
 t3d::Shader *shadow_map_shader;
 t3d::Shader *handle_shader;
 t3d::Shader *blit_shader;
@@ -249,10 +254,23 @@ Entity *selected_entity;
 Mesh handle_mesh;
 
 t3d::RenderTarget *hdr_target;
+List<t3d::RenderTarget *> downsampled_targets;
+
 t3d::ComputeShader *average_shader;
+t3d::ComputeBuffer *average_shader_buffer;
+
+struct ExposureConstants {
+	f32 exposure;
+};
+t3d::Shader *exposure_shader;
+t3d::ShaderConstants *exposure_constants;
+
+f32 adapted_exposure;
 
 s32 tl_main(Span<Span<utf8>> arguments) {
 	current_printer = console_printer;
+
+	downsampled_targets = {};
 
 	init_component_storages<
 #define c(name) name
@@ -273,8 +291,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 		t3d::set_vsync(true);
 
-		auto hdr_color = t3d::create_texture(t3d::CreateTexture_resize_with_window, 0, 0, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_nearest, t3d::TextureComparison_none);
-		auto hdr_depth = t3d::create_texture(t3d::CreateTexture_resize_with_window, 0, 0, 0, t3d::TextureFormat_depth,   t3d::TextureFiltering_nearest, t3d::TextureComparison_none);
+		auto hdr_color = t3d::create_texture(t3d::CreateTexture_resize_with_window, 0, 0, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_linear, t3d::TextureComparison_none);
+		auto hdr_depth = t3d::create_texture(t3d::CreateTexture_resize_with_window, 0, 0, 0, t3d::TextureFormat_depth,   t3d::TextureFiltering_none,   t3d::TextureComparison_none);
 		hdr_target = t3d::create_render_target(hdr_color, hdr_depth);
 
 		global_constants = t3d::create_shader_constants<GlobalConstants>();
@@ -285,6 +303,9 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 		light_constants = t3d::create_shader_constants<LightConstants>();
 		t3d::set_shader_constants(light_constants, LIGHT_CONSTANTS_SLOT);
+
+		average_shader_buffer = t3d::create_compute_buffer(sizeof(u32));
+		t3d::set_compute_buffer(average_shader_buffer, AVERAGE_COMPUTE_SLOT);
 
 		auto shader_header = u8R"(
 #ifdef GL_core_profile
@@ -324,26 +345,45 @@ float length_squared(float4 x){return dot(x,x);}
 #define pi 3.1415926535897932384626433832795
 
 
+float trowbridge_reitz_distribution(float roughness, float NH) {
+	float r2 = roughness*roughness;
+	return r2 / (pi * pow2(pow2(NH)*(r2-1)+1));
+}
+float beckmann_distribution(float roughness, float NH) {
+	float r2 = roughness*roughness;
+	return exp(-pow2(sqrt(1 - NH*NH)/NH)/r2)
+		/
+		(pi*r2*pow4(NH));
+}
+
+float schlick_geometry_direct(float roughness, float NV) {
+	float k = pow2(roughness + 1) / 8;
+	return NV / (NV * (1 - k) + k);
+}
+float smith_geometry_direct(float roughness, float NV, float NL) {
+	return schlick_geometry_direct(roughness, NV)
+         * schlick_geometry_direct(roughness, NL);
+}
+float3 fresnel_schlick(float3 F0, float NV) {
+	return F0 + (1 - F0) * pow5(1 - NV);
+}
+
+
 float3 pbr(float3 albedo, float3 N, float3 L, float3 V) {
 	float3 H = normalize(L + V);
-	float NV = dot(N, V);
-	float NL = saturate(dot(N, L));
+	float NV = max(0.001, dot(N, V));
+	float NL = max(0.001, dot(N, L));
 	float NH = dot(N, H);
 	float VH = dot(V, H);
 
 	float roughness = 0.01f;
-	float m2 = roughness*roughness;
-	float D =
-		exp(-pow2(sqrt(1 - NH*NH)/NH)/m2)
-		/
-		(pi*m2*pow4(NH));
 
 	float metalness = 0;
-	float3 r0 = mix(vec3(0.04), albedo, metalness);
+	float3 F0 = mix(vec3(0.04), albedo, metalness);
 
-	float3 F = r0 + (1 - r0) * pow5(1 - NV);
-
-	float G = min(1, min(2*NH*NV/VH,2*NH*NL/VH));
+	float D = trowbridge_reitz_distribution(roughness, NH);
+	float3 F = fresnel_schlick(F0, NV);
+	float G = smith_geometry_direct(roughness, NV, NL);
 
 	float3 specular = D * F * G / (pi * NV * NL);
 
@@ -419,8 +459,8 @@ void main() {
 
 	float light = sample_shadow_map(shadow_map, light_space, 0.001f);
 	light *= light_intensity / length_squared(vertex_to_light_direction);
-
 	fragment_color *= light * texture(light_texture, light_space.xy);
+
 	//fragment_color = vec4(light_space, 1);
 }
 #endif
@@ -484,6 +524,48 @@ void main() {
 out vec4 fragment_color;
 void main() {
 	fragment_color = texture(main_texture, vertex_uv);
+	if (isnan(fragment_color.x)) {
+		fragment_color = vec4(1,0,0,1);
+	}
+}
+#endif
+)"s));
+				exposure_constants = t3d::create_shader_constants<ExposureConstants>();
+				exposure_shader = t3d::create_shader(concatenate(shader_header, u8R"(
+#ifdef VERTEX_SHADER
+#define V2F out
+#else
+#define V2F in
+#endif
+
+layout (std140, binding=0) uniform _ {
+    float exposure;
+};
+
+layout(binding=0) uniform sampler2D main_texture;
+
+V2F vec2 vertex_uv;
+
+#ifdef VERTEX_SHADER
+
+void main() {
+	vec2 positions[] = vec2[](
+		vec2(-1, 3),
+		vec2(-1,-1),
+		vec2( 3,-1)
+	);
+	vec2 position = positions[gl_VertexID];
+	vertex_uv = position * 0.5 + 0.5;
+	gl_Position = vec4(position, 0, 1);
+}
+#endif
+#ifdef FRAGMENT_SHADER
+out vec4 fragment_color;
+void main() {
+	vec3 color = texture(main_texture, vertex_uv).rgb;
+	color =  1 - exp(-color / exposure * 0.1);
+	color = pow(color, vec3(1 / 2.2));
+	fragment_color = vec4(color, 1);
 }
 #endif
 )"s));
@@ -502,6 +584,23 @@ void main() {
 }
 #endif
 )"s));
+				average_shader = t3d::create_compute_shader(u8R"(
+layout(std430, binding = )" STRINGIZE(AVERAGE_COMPUTE_SLOT) R"() writeonly buffer sum_buffer {
+    uint dest_sum;
+};
+layout(binding=0, rgba16f) uniform image2D source_texture;
+layout (local_size_x = 16, local_size_y = 16) in;
+void main() {
+
+	//atomicAdd(dest_sum, 1);
+	dest_sum = 1;
+    //ivec2 uv = ivec2(gl_GlobalInvocationID.xy);
+	//vec4 texel = imageLoad(source_texture, uv);
+	//float average = (texel.x + texel.y + texel.z) * 0.3333f;
+	//
+	//atomicAdd(dest_sum, uint(average * 256));
+}
+)"s);
 				break;
 			}
 			/*
@@ -675,7 +774,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				LightConstants light_data = {};
 				light_data.world_to_light_matrix = light.world_to_light_matrix;
 				light_data.light_position = light_entity.position;
-				light_data.light_intensity = 30;
+				light_data.light_intensity = 100;
 				t3d::set_value(light_constants, light_data);
 
 
@@ -687,14 +786,6 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		m4 handle_matrix = m4::translation(selected_entity->position) * selected_entity->rotation * m4::scale(0.25f * distance(selected_entity->position, camera_position));
 
-		EntityConstants entity_data = {};
-		entity_data.local_to_camera_matrix = world_to_camera_matrix * handle_matrix;
-		t3d::set_value(entity_constants, entity_data);
-		t3d::set_shader(handle_shader);
-		draw_mesh(handle_mesh);
-
-		v2f handle_position = map(world_to_camera(handle_matrix * v4f{0,0,0,1}), {-1,1}, {1,-1}, {0,0}, (v2f)window.client_size);
-
 		// print("%\n", handle_position);
 
 		t3d::set_rasterizer(
@@ -703,10 +794,68 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				.set_depth_write(false)
 		);
 
-		t3d::set_render_target(0);
 		t3d::set_shader(blit_shader);
+
+		auto sample_from = hdr_target;
+		for (auto &target : downsampled_targets) {
+			t3d::set_render_target(target);
+			t3d::set_viewport(target->color->size);
+			t3d::set_texture(sample_from->color, 0);
+			t3d::draw(3);
+			sample_from = target;
+		}
+
+		struct f16 {
+			u16 sign : 1;
+			u16 exponent : 5;
+			u16 mantissa : 10;
+		};
+		f32 texels[64 * 64 * 3];
+
+		auto to_f32 = [](f16 f) {
+			union Result {
+				f32 value;
+				struct {
+					u32 sign : 1;
+					u32 exponent : 8;
+					u32 mantissa : 23;
+				};
+			} result;
+
+			result.sign = f.sign;
+			result.exponent = f.exponent + (127 - 15);
+			result.mantissa = f.mantissa << (23 - 10);
+
+			return result.value;
+		};
+
+		t3d::read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
+
+		f32 sum_luminance = 0;
+		for (auto texel : texels) {
+			sum_luminance += texel;
+		}
+		adapted_exposure = lerp(adapted_exposure, sum_luminance / count_of(texels), frame_time);
+
+		ExposureConstants exposure_data = {
+			.exposure = adapted_exposure,
+		};
+
+		t3d::set_shader(exposure_shader);
+		t3d::set_shader_constants(exposure_constants, 0);
+		t3d::set_value(exposure_constants, exposure_data);
+		t3d::set_render_target(0);
+		t3d::set_viewport(window.client_size);
 		t3d::set_texture(hdr_target->color, 0);
 		t3d::draw(3);
+
+		EntityConstants entity_data = {};
+		entity_data.local_to_camera_matrix = world_to_camera_matrix * handle_matrix;
+		t3d::set_value(entity_constants, entity_data);
+		t3d::set_shader(handle_shader);
+		draw_mesh(handle_mesh);
+
+		v2f handle_position = map(world_to_camera(handle_matrix * v4f{0,0,0,1}), {-1,1}, {1,-1}, {0,0}, (v2f)window.client_size);
 
 		t3d::present();
 
@@ -725,6 +874,27 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	};
 	info.on_size = [](Window &window) {
 		t3d::resize_render_targets(window.client_size);
+
+		v2u next_size = floor_to_power_of_2(window.client_size - 1);
+		u32 target_index = 0;
+		u32 const min_size = 64;
+		while (1) {
+			if (target_index < downsampled_targets.size) {
+				t3d::resize_texture(downsampled_targets[target_index]->color, next_size);
+			} else {
+				downsampled_targets.add(t3d::create_render_target(
+					t3d::create_texture(t3d::CreateTexture_default, next_size.x, next_size.y, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_linear, t3d::TextureComparison_none),
+					0
+				));
+			}
+
+			if (next_size.x == min_size && next_size.y == min_size) break;
+
+			if (next_size.x != min_size) next_size.x /= 2;
+			if (next_size.y != min_size) next_size.y /= 2;
+
+			++target_index;
+		}
 	};
 
 	Window *window = create_window(info);

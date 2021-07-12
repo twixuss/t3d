@@ -34,10 +34,19 @@ struct TextureImpl : Texture {
 	GLuint format;
 	GLuint internal_format;
 	GLuint type;
+	u32 bytes_per_texel;
 };
 
 struct RenderTargetImpl : RenderTarget {
 	GLuint frame_buffer;
+};
+
+struct ComputeShaderImpl : ComputeShader {
+	GLuint program;
+};
+struct ComputeBufferImpl : ComputeBuffer {
+	GLuint buffer;
+	u32 size;
 };
 
 struct SamplerKey {
@@ -59,6 +68,8 @@ struct State {
 	MaskedBlockList<RenderTargetImpl, 256> render_targets;
 	MaskedBlockList<TextureImpl, 256> textures;
 	MaskedBlockList<ShaderConstantsImpl, 256> shader_constants;
+	MaskedBlockList<ComputeShaderImpl, 256> compute_shaders;
+	MaskedBlockList<ComputeBufferImpl, 256> compute_buffers;
 	IndexBufferImpl *current_index_buffer;
 	RenderTargetImpl back_buffer;
 	RenderTargetImpl *currently_bound_render_target;
@@ -130,10 +141,11 @@ GLuint get_func(TextureComparison comparison) {
 
 GLuint get_format(TextureFormat format) {
 	switch (format) {
+		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
 		case TextureFormat_r_f32:    return GL_RED;
 		case TextureFormat_rgb_f16:  return GL_RGB;
 		case TextureFormat_rgba_u8n: return GL_RGBA;
-		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
+		case TextureFormat_rgba_f16: return GL_RGBA;
 	}
 	invalid_code_path();
 	return 0;
@@ -141,10 +153,11 @@ GLuint get_format(TextureFormat format) {
 
 GLuint get_internal_format(TextureFormat format) {
 	switch (format) {
+		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
 		case TextureFormat_r_f32:    return GL_R32F;
 		case TextureFormat_rgb_f16:  return GL_RGB16F;
 		case TextureFormat_rgba_u8n: return GL_RGBA8;
-		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
+		case TextureFormat_rgba_f16: return GL_RGBA16F;
 	}
 	invalid_code_path();
 	return 0;
@@ -152,10 +165,22 @@ GLuint get_internal_format(TextureFormat format) {
 
 GLuint get_type(TextureFormat format) {
 	switch (format) {
+		case TextureFormat_depth:    return GL_FLOAT;
 		case TextureFormat_r_f32:    return GL_FLOAT;
 		case TextureFormat_rgb_f16:  return GL_FLOAT;
 		case TextureFormat_rgba_u8n: return GL_UNSIGNED_BYTE;
-		case TextureFormat_depth:    return GL_FLOAT;
+		case TextureFormat_rgba_f16: return GL_FLOAT;
+	}
+	invalid_code_path();
+	return 0;
+}
+u32 get_bytes_per_texel(TextureFormat format) {
+	switch (format) {
+		case TextureFormat_depth:    return 4;
+		case TextureFormat_r_f32:    return 4;
+		case TextureFormat_rgb_f16:  return 6;
+		case TextureFormat_rgba_u8n: return 4;
+		case TextureFormat_rgba_f16: return 8;
 	}
 	invalid_code_path();
 	return 0;
@@ -170,6 +195,9 @@ void bind_render_target(RenderTargetImpl *render_target) {
 }
 
 GLuint get_sampler(TextureFiltering filtering, TextureComparison comparison) {
+	if (filtering == TextureFiltering_none)
+		return 0;
+
 	auto &result = state.samplers.get_or_insert({filtering, comparison});
 	if (!result) {
 		glGenSamplers(1, &result);
@@ -182,10 +210,18 @@ GLuint get_sampler(TextureFiltering filtering, TextureComparison comparison) {
 		auto filter = get_filter(filtering);
 		glSamplerParameteri(result, GL_TEXTURE_MIN_FILTER, filter);
 		glSamplerParameteri(result, GL_TEXTURE_MAG_FILTER, filter);
-		glSamplerParameteri(result, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glSamplerParameteri(result, GL_TEXTURE_WRAP_T, GL_CLAMP);
+		glSamplerParameteri(result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glSamplerParameteri(result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
 	return result;
+}
+
+void resize_texture_gl(Texture *_texture, u32 width, u32 height) {
+	auto texture = (TextureImpl *)_texture;
+	texture->size = {width, height};
+	glBindTexture(GL_TEXTURE_2D, texture->texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, texture->internal_format, width, height, 0, texture->format, texture->type, NULL);
+	glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 bool init(InitInfo init_info) {
@@ -235,9 +271,7 @@ bool init(InitInfo init_info) {
 	_resize_render_targets = [](u32 width, u32 height) {
 		for (auto texture : state.window_sized_textures) {
 			if (texture) {
-				glBindTexture(GL_TEXTURE_2D, texture->texture);
-				glTexImage2D(GL_TEXTURE_2D, 0, texture->internal_format, width, height, 0, texture->format, texture->type, NULL);
-				glBindTexture(GL_TEXTURE_2D, 0);
+				resize_texture_gl(texture, width, height);
 			}
 		}
 		state.window_size = {width, height};
@@ -259,11 +293,11 @@ bool init(InitInfo init_info) {
 	};
 	_create_shader = [](Span<utf8> source) -> Shader * {
 		auto &shader = state.shaders.add();
-		if (&shader) {
-			auto vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 330, true, (Span<char>)source);
-			auto fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 330, true, (Span<char>)source);
-			shader.program = create_program(vertex_shader, fragment_shader);
-		}
+		shader.program = create_program({
+			.vertex   = OpenGL::create_shader(GL_VERTEX_SHADER, 430, true, (Span<char>)source),
+			.fragment = OpenGL::create_shader(GL_FRAGMENT_SHADER, 430, true, (Span<char>)source)
+		});
+		assert(shader.program);
 		return &shader;
 	};
 	_create_shader_constants = [](umm size) -> ShaderConstants * {
@@ -347,6 +381,7 @@ bool init(InitInfo init_info) {
 		bind_render_target(render_target);
 	};
 	_create_render_target = [](Texture *_color, Texture *_depth) -> RenderTarget * {
+		assert(_color || _depth);
 		auto color = (TextureImpl *)_color;
 		auto depth = (TextureImpl *)_depth;
 
@@ -385,11 +420,18 @@ bool init(InitInfo init_info) {
 	_set_texture = [](Texture *_texture, u32 slot) {
 		auto texture = (TextureImpl *)_texture;
 		glActiveTexture(GL_TEXTURE0 + slot);
-		glBindTexture(GL_TEXTURE_2D, texture->texture);
-		glBindSampler(slot, texture->sampler);
+		if (_texture) {
+			glBindTexture(GL_TEXTURE_2D, texture->texture);
+			glBindSampler(slot, texture->sampler);
+		} else {
+			glBindTexture(GL_TEXTURE_2D, 0);
+			glBindSampler(slot, 0);
+		}
 	};
 	_create_texture = [](CreateTextureFlags flags, u32 width, u32 height, void *data, TextureFormat format, TextureFiltering filtering, TextureComparison comparison) -> Texture * {
 		auto &result = state.textures.add();
+
+		result.size = {width, height};
 
 		if (flags & CreateTexture_resize_with_window) {
 			state.window_sized_textures.add(&result);
@@ -400,6 +442,7 @@ bool init(InitInfo init_info) {
 		result.internal_format = get_internal_format(format);
 		result.format          = get_format(format);
 		result.type            = get_type(format);
+		result.bytes_per_texel = get_bytes_per_texel(format);
 
 		glGenTextures(1, &result.texture);
 		glBindTexture(GL_TEXTURE_2D, result.texture);
@@ -426,6 +469,61 @@ bool init(InitInfo init_info) {
 	};
 	_get_rasterizer = []() -> RasterizerState {
 		return state.rasterizer;
+	};
+	_create_compute_shader = [](Span<utf8> source) -> ComputeShader * {
+		auto &result = state.compute_shaders.add();
+		result.program = create_program({
+			.compute = OpenGL::create_shader(GL_COMPUTE_SHADER, 430, true, (Span<char>)source),
+		});
+		return &result;
+	};
+	_set_compute_shader = [](ComputeShader *_shader) {
+		assert(_shader);
+		auto &shader = *(ComputeShaderImpl *)_shader;
+		glUseProgram(shader.program);
+	};
+	_dispatch_compute_shader = [](u32 x, u32 y, u32 z) {
+		glDispatchCompute(x, y, z);
+	};
+	_resize_texture = resize_texture_gl;
+	_create_compute_buffer = [](u32 size) -> ComputeBuffer * {
+		auto &result = state.compute_buffers.add();
+		result.size = size;
+		glGenBuffers(1, &result.buffer);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, result.buffer);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, size, 0, GL_STATIC_COPY);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, result.buffer);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+
+		return &result;
+	};
+	_set_compute_buffer =  [](ComputeBuffer *_buffer, u32 slot) {
+		assert(_buffer);
+		auto &buffer = *(ComputeBufferImpl *)_buffer;
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.buffer);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 0, buffer.buffer);
+	};
+	_read_compute_buffer = [](ComputeBuffer *_buffer, void *data) {
+		assert(_buffer);
+		auto &buffer = *(ComputeBufferImpl *)_buffer;
+
+		//glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, buffer.buffer);
+		void* resultData = glMapBufferRange(GL_SHADER_STORAGE_BUFFER, 0, buffer.size, GL_MAP_READ_BIT);
+		memcpy(data, resultData, buffer.size);
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+	};
+	_set_compute_texture = [](Texture *_texture, u32 slot) {
+		assert(_texture);
+		auto &texture = *(TextureImpl *)_texture;
+		glBindImageTexture(slot, texture.texture, 0, GL_FALSE, 0, GL_READ_ONLY, texture.internal_format);
+	};
+	_read_texture = [](Texture *_texture, Span<u8> data) {
+		assert(_texture);
+		auto &texture = *(TextureImpl *)_texture;
+		glGetTextureImage(texture.texture, 0, texture.format, texture.type, data.size, data.data);
 	};
 
 	return true;

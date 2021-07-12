@@ -23,7 +23,9 @@ struct InitInfo {
 	bool debug = false;
 };
 
-struct Texture {};
+struct Texture {
+	v2u size;
+};
 struct RenderTarget {
 	Texture *color;
 	Texture *depth;
@@ -33,6 +35,7 @@ struct VertexBuffer {};
 struct IndexBuffer {};
 struct ShaderConstants {};
 struct ComputeShader {};
+struct ComputeBuffer {};
 
 struct ShaderValueLocation {
 	umm start;
@@ -66,9 +69,11 @@ enum TextureFormat : u8 {
 	TextureFormat_r_f32,
 	TextureFormat_rgb_f16,
 	TextureFormat_rgba_u8n,
+	TextureFormat_rgba_f16,
 };
 
 enum TextureFiltering : u8 {
+	TextureFiltering_none,    // texture will be unsamplable
 	TextureFiltering_nearest,
 	TextureFiltering_linear,
 };
@@ -117,7 +122,14 @@ A(void, set_shader_constants, (ShaderConstants *constants, u32 slot), (constants
 A(void, set_rasterizer, (RasterizerState state), (state)) \
 A(RasterizerState, get_rasterizer, (), ()) \
 A(ComputeShader *, create_compute_shader, (Span<utf8> source), (source)) \
-A(void, dispatch_compute_shader, (ComputeShader *shader, u32 x, u32 y, u32 z), (shader, x, y, z)) \
+A(void, set_compute_shader, (ComputeShader *shader), (shader)) \
+A(void, dispatch_compute_shader, (u32 x, u32 y, u32 z), (x, y, z)) \
+A(void, resize_texture, (Texture *texture, u32 w, u32 h), (texture, w, h)) \
+A(ComputeBuffer *, create_compute_buffer, (u32 size), (size)) \
+A(void, read_compute_buffer, (ComputeBuffer *buffer, void *data), (buffer, data)) \
+A(void, set_compute_buffer, (ComputeBuffer *buffer, u32 slot), (buffer, slot)) \
+A(void, set_compute_texture, (Texture *texture, u32 slot), (texture, slot)) \
+A(void, read_texture, (Texture *texture, Span<u8> data), (texture, data)) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)
@@ -153,6 +165,8 @@ inline Texture *load_texture(Span<filechar> path) {
 	void *pixels = stbi_load_from_memory(file.data, file.size, &width, &height, 0, 4);
 	return create_texture(CreateTexture_default, width, height, pixels, TextureFormat_rgba_u8n, TextureFiltering_linear, TextureComparison_none);
 }
+
+inline void resize_texture(Texture *texture, v2u size) { return _resize_texture(texture, size.x, size.y); }
 
 #ifndef T3D_IMPL
 #undef APIS
