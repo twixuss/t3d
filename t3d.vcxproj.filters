@@ -12,5 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\t3d.h" />
+    <ClInclude Include="src\tl.h" />
   </ItemGroup>
 </Project>

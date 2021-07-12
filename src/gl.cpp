@@ -2,6 +2,7 @@
 #include "../dep/tl/include/tl/console.h"
 #include "../dep/tl/include/tl/opengl.h"
 #include "../dep/tl/include/tl/masked_block_list.h"
+#include "../dep/tl/include/tl/hash_map.h"
 
 namespace t3d::gl {
 
@@ -9,8 +10,11 @@ using namespace OpenGL;
 
 struct ShaderImpl : Shader {
 	GLuint program;
+};
+
+struct ShaderConstantsImpl : ShaderConstants {
 	GLuint uniform_buffer;
-	void *uniform_data;
+	u32 values_size;
 };
 
 struct VertexBufferImpl : VertexBuffer {
@@ -24,21 +28,46 @@ struct IndexBufferImpl : IndexBuffer {
 	u32 count;
 };
 
-struct RenderTargetImpl : RenderTarget {
-	GLuint frame_buffer;
-	GLuint color_attachment;
-	GLuint depth_attachment;
+struct TextureImpl : Texture {
+	GLuint texture;
+	GLuint sampler;
+	GLuint format;
+	GLuint internal_format;
+	GLuint type;
 };
 
-static MaskedBlockList<ShaderImpl, 256> shaders;
-static MaskedBlockList<VertexBufferImpl, 256> vertex_buffers;
-static MaskedBlockList<IndexBufferImpl, 256> index_buffers;
-static MaskedBlockList<RenderTargetImpl, 256> render_targets;
+struct RenderTargetImpl : RenderTarget {
+	GLuint frame_buffer;
+};
 
-static IndexBufferImpl *current_index_buffer;
+struct SamplerKey {
+	TextureFiltering filtering;
+	TextureComparison comparison;
+	bool operator==(SamplerKey const &that) const {
+		return filtering == that.filtering && comparison == that.comparison;
+	}
+};
 
-static RenderTargetImpl back_buffer;
-static RenderTargetImpl *currently_bound_render_target;
+umm get_hash(SamplerKey key) {
+	return key.filtering ^ key.comparison;
+}
+
+struct State {
+	MaskedBlockList<ShaderImpl, 256> shaders;
+	MaskedBlockList<VertexBufferImpl, 256> vertex_buffers;
+	MaskedBlockList<IndexBufferImpl, 256> index_buffers;
+	MaskedBlockList<RenderTargetImpl, 256> render_targets;
+	MaskedBlockList<TextureImpl, 256> textures;
+	MaskedBlockList<ShaderConstantsImpl, 256> shader_constants;
+	IndexBufferImpl *current_index_buffer;
+	RenderTargetImpl back_buffer;
+	RenderTargetImpl *currently_bound_render_target;
+	StaticHashMap<SamplerKey, GLuint, 256> samplers;
+	v2u window_size;
+	List<TextureImpl *> window_sized_textures;
+	RasterizerState rasterizer;
+};
+static State state;
 
 u32 get_element_scalar_count(ElementType element) {
 	switch (element) {
@@ -82,12 +111,81 @@ u32 get_index_type_from_size(u32 size) {
 	return 0;
 }
 
+GLuint get_filter(TextureFiltering filter) {
+	switch (filter) {
+		case TextureFiltering_nearest: return GL_NEAREST;
+		case TextureFiltering_linear:  return GL_LINEAR;
+	}
+	invalid_code_path();
+	return 0;
+}
+GLuint get_func(TextureComparison comparison) {
+	switch (comparison) {
+		case TextureComparison_none: return GL_NONE;
+		case TextureComparison_less: return GL_LESS;
+	}
+	invalid_code_path();
+	return 0;
+}
+
+GLuint get_format(TextureFormat format) {
+	switch (format) {
+		case TextureFormat_r_f32:    return GL_RED;
+		case TextureFormat_rgb_f16:  return GL_RGB;
+		case TextureFormat_rgba_u8n: return GL_RGBA;
+		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
+	}
+	invalid_code_path();
+	return 0;
+}
+
+GLuint get_internal_format(TextureFormat format) {
+	switch (format) {
+		case TextureFormat_r_f32:    return GL_R32F;
+		case TextureFormat_rgb_f16:  return GL_RGB16F;
+		case TextureFormat_rgba_u8n: return GL_RGBA8;
+		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
+	}
+	invalid_code_path();
+	return 0;
+}
+
+GLuint get_type(TextureFormat format) {
+	switch (format) {
+		case TextureFormat_r_f32:    return GL_FLOAT;
+		case TextureFormat_rgb_f16:  return GL_FLOAT;
+		case TextureFormat_rgba_u8n: return GL_UNSIGNED_BYTE;
+		case TextureFormat_depth:    return GL_FLOAT;
+	}
+	invalid_code_path();
+	return 0;
+}
+
 void bind_render_target(RenderTargetImpl *render_target) {
-	if (render_target == currently_bound_render_target)
+	if (render_target == state.currently_bound_render_target)
 		return;
 
-	currently_bound_render_target = render_target;
+	state.currently_bound_render_target = render_target;
 	glBindFramebuffer(GL_FRAMEBUFFER, render_target->frame_buffer);
+}
+
+GLuint get_sampler(TextureFiltering filtering, TextureComparison comparison) {
+	auto &result = state.samplers.get_or_insert({filtering, comparison});
+	if (!result) {
+		glGenSamplers(1, &result);
+		if (comparison != TextureComparison_none) {
+			glSamplerParameteri(result, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+			auto func = get_func(comparison);
+			glSamplerParameteri(result, GL_TEXTURE_COMPARE_FUNC, func);
+		}
+
+		auto filter = get_filter(filtering);
+		glSamplerParameteri(result, GL_TEXTURE_MIN_FILTER, filter);
+		glSamplerParameteri(result, GL_TEXTURE_MAG_FILTER, filter);
+		glSamplerParameteri(result, GL_TEXTURE_WRAP_S, GL_CLAMP);
+		glSamplerParameteri(result, GL_TEXTURE_WRAP_T, GL_CLAMP);
+	}
+	return result;
 }
 
 bool init(InitInfo init_info) {
@@ -96,16 +194,22 @@ bool init(InitInfo init_info) {
 		return false;
 	}
 
+	new (&state) State();
+
+	state.window_size = init_info.window_size;
+
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
+
 	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LESS);
 
 	_clear = [](RenderTarget *_render_target, ClearFlags flags, v4f color, f32 depth) {
 		auto render_target = (RenderTargetImpl *)_render_target;
 		if (!render_target)
-			render_target = &back_buffer;
+			render_target = &state.back_buffer;
 
-		auto previously_bound_render_target = currently_bound_render_target;
+		auto previously_bound_render_target = state.currently_bound_render_target;
 		bind_render_target(render_target);
 
 		GLbitfield mask = 0;
@@ -122,43 +226,54 @@ bool init(InitInfo init_info) {
 		glDrawArrays(GL_TRIANGLES, start_vertex, vertex_count);
 	};
 	_draw_indexed = [](u32 index_count) {
-		assert(current_index_buffer, "Index buffer was not bound");
-		glDrawElements(GL_TRIANGLES, index_count, current_index_buffer->type, 0);
+		assert(state.current_index_buffer, "Index buffer was not bound");
+		glDrawElements(GL_TRIANGLES, index_count, state.current_index_buffer->type, 0);
 	};
 	_set_viewport = [](u32 x, u32 y, u32 w, u32 h) {
 		glViewport(x, y, w, h);
 	};
-	_resize = [](RenderTarget *render_target, u32 w, u32 h) {
-		if (render_target == 0) {
+	_resize_render_targets = [](u32 width, u32 height) {
+		for (auto texture : state.window_sized_textures) {
+			if (texture) {
+				glBindTexture(GL_TEXTURE_2D, texture->texture);
+				glTexImage2D(GL_TEXTURE_2D, 0, texture->internal_format, width, height, 0, texture->format, texture->type, NULL);
+				glBindTexture(GL_TEXTURE_2D, 0);
+			}
 		}
+		state.window_size = {width, height};
 	};
 	_set_shader = [](Shader *_shader) {
 		auto &shader = *(ShaderImpl *)_shader;
 		glUseProgram(shader.program);
-		glBindBuffer(GL_UNIFORM_BUFFER, shader.uniform_buffer);
 	};
-	_set_value = [](Shader *_shader, ShaderValueLocation dest, void const *source) {
-		auto &shader = *(ShaderImpl *)_shader;
-		glBindBuffer(GL_UNIFORM_BUFFER, shader.uniform_buffer);
+	_set_shader_constants = [](ShaderConstants *_constants, u32 slot) {
+		auto &constants = *(ShaderConstantsImpl *)_constants;
+		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
+		glBindBufferBase(GL_UNIFORM_BUFFER, slot, constants.uniform_buffer);
+	};
+	_set_value = [](ShaderConstants *_constants, ShaderValueLocation dest, void const *source) {
+		auto &constants = *(ShaderConstantsImpl *)_constants;
+		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
 		glBufferSubData(GL_UNIFORM_BUFFER, dest.start, dest.size, source);
 		glBindBuffer(GL_UNIFORM_BUFFER, 0);
 	};
-	_create_shader = [](Span<utf8> source, umm values_size) -> Shader * {
-		auto &shader = shaders.add();
+	_create_shader = [](Span<utf8> source) -> Shader * {
+		auto &shader = state.shaders.add();
 		if (&shader) {
 			auto vertex_shader = OpenGL::create_shader(GL_VERTEX_SHADER, 330, true, (Span<char>)source);
 			auto fragment_shader = OpenGL::create_shader(GL_FRAGMENT_SHADER, 330, true, (Span<char>)source);
 			shader.program = create_program(vertex_shader, fragment_shader);
-			{
-				glGenBuffers(1, &shader.uniform_buffer);
-				glBindBuffer(GL_UNIFORM_BUFFER, shader.uniform_buffer);
-				glBufferData(GL_UNIFORM_BUFFER, values_size, NULL, GL_STATIC_DRAW);
-				glBindBufferRange(GL_UNIFORM_BUFFER, 0, shader.uniform_buffer, 0, values_size);
-				glBindBuffer(GL_UNIFORM_BUFFER, 0);
-				shader.uniform_data = default_allocator.allocate(values_size, 16);
-			}
 		}
 		return &shader;
+	};
+	_create_shader_constants = [](umm size) -> ShaderConstants * {
+		auto &constants = state.shader_constants.add();
+		glGenBuffers(1, &constants.uniform_buffer);
+		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
+		glBufferData(GL_UNIFORM_BUFFER, size, NULL, GL_STATIC_DRAW);
+		glBindBuffer(GL_UNIFORM_BUFFER, 0);
+		constants.values_size = size;
+		return &constants;
 	};
 	_calculate_perspective_matrices = [](v3f position, v3f rotation, f32 aspect_ratio, f32 fov, f32 near_plane, f32 far_plane) {
 		CameraMatrices result;
@@ -168,7 +283,7 @@ bool init(InitInfo init_info) {
 		return result;
 	};
 	_create_vertex_buffer = [](Span<u8> buffer, Span<ElementType> vertex_descriptor) -> VertexBuffer * {
-		VertexBufferImpl &result = vertex_buffers.add();
+		VertexBufferImpl &result = state.vertex_buffers.add();
 		glGenBuffers(1, &result.buffer);
 		glGenVertexArrays(1, &result.array);
 
@@ -202,7 +317,7 @@ bool init(InitInfo init_info) {
 	};
 
 	_create_index_buffer = [](Span<u8> buffer, u32 index_size) -> IndexBuffer * {
-		IndexBufferImpl &result = index_buffers.add();
+		IndexBufferImpl &result = state.index_buffers.add();
 		result.type = get_index_type_from_size(index_size);
 		result.count = buffer.size / index_size;
 
@@ -217,7 +332,7 @@ bool init(InitInfo init_info) {
 
 	_set_index_buffer = [](IndexBuffer *_buffer) {
 		auto buffer = (IndexBufferImpl *)_buffer;
-		current_index_buffer = buffer;
+		state.current_index_buffer = buffer;
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buffer ? buffer->buffer : 0);
 	};
 
@@ -227,32 +342,90 @@ bool init(InitInfo init_info) {
 	_set_render_target = [](RenderTarget *_render_target) {
 		auto render_target = (RenderTargetImpl *)_render_target;
 		if (!render_target)
-			render_target = &back_buffer;
+			render_target = &state.back_buffer;
 
 		bind_render_target(render_target);
 	};
-	_create_render_target = [](CreateRenderTargetFlags flags, TextureFormat format, u32 width, u32 height) -> RenderTarget * {
-		auto &result = render_targets.add();
+	_create_render_target = [](Texture *_color, Texture *_depth) -> RenderTarget * {
+		auto color = (TextureImpl *)_color;
+		auto depth = (TextureImpl *)_depth;
 
-		glGenTextures(1, &result.depth_attachment);
-		glBindTexture(GL_TEXTURE_2D, result.depth_attachment);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
-		glBindTexture(GL_TEXTURE_2D, 0);
+		auto &result = state.render_targets.add();
+
+		result.color = color;
+		result.depth = depth;
 
 		glGenFramebuffers(1, &result.frame_buffer);
 		glBindFramebuffer(GL_FRAMEBUFFER, result.frame_buffer);
-		glDrawBuffer(GL_NONE);
-		glReadBuffer(GL_NONE);
-		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, result.depth_attachment, 0);
+		if (depth) {
+			if (!color) {
+				glDrawBuffer(GL_NONE);
+				glReadBuffer(GL_NONE);
+			}
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth->texture, 0);
+		}
+		if (color) {
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color->texture, 0);
+		}
 
-		assert(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE);
+		switch(glCheckFramebufferStatus(GL_FRAMEBUFFER)) {
+#define C(x) case x: print(#x "\n"); invalid_code_path(); break;
+			C(GL_FRAMEBUFFER_UNDEFINED)
+			C(GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT)
+			C(GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT)
+			C(GL_FRAMEBUFFER_UNSUPPORTED)
+			C(GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE)
+#undef C
+			case GL_FRAMEBUFFER_COMPLETE: break;
+		}
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		return &result;
+	};
+	_set_texture = [](Texture *_texture, u32 slot) {
+		auto texture = (TextureImpl *)_texture;
+		glActiveTexture(GL_TEXTURE0 + slot);
+		glBindTexture(GL_TEXTURE_2D, texture->texture);
+		glBindSampler(slot, texture->sampler);
+	};
+	_create_texture = [](CreateTextureFlags flags, u32 width, u32 height, void *data, TextureFormat format, TextureFiltering filtering, TextureComparison comparison) -> Texture * {
+		auto &result = state.textures.add();
+
+		if (flags & CreateTexture_resize_with_window) {
+			state.window_sized_textures.add(&result);
+			width  = state.window_size.x;
+			height = state.window_size.y;
+		}
+
+		result.internal_format = get_internal_format(format);
+		result.format          = get_format(format);
+		result.type            = get_type(format);
+
+		glGenTextures(1, &result.texture);
+		glBindTexture(GL_TEXTURE_2D, result.texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, result.internal_format, width, height, 0, result.format, result.type, data);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		result.sampler = get_sampler(filtering, comparison);
+
+		return &result;
+	};
+	_set_rasterizer = [](RasterizerState rasterizer) {
+		if (rasterizer.depth_test != state.rasterizer.depth_test) {
+			if (rasterizer.depth_test) {
+				glEnable(GL_DEPTH_TEST);
+			} else {
+				glDisable(GL_DEPTH_TEST);
+			}
+		}
+		//if (rasterizer.depth_write != state.rasterizer.depth_write) {
+		//	glDepthMask(rasterizer.depth_write);
+		//}
+
+		state.rasterizer = rasterizer;
+	};
+	_get_rasterizer = []() -> RasterizerState {
+		return state.rasterizer;
 	};
 
 	return true;

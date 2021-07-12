@@ -1,4 +1,5 @@
 #define T3D_IMPL
+#define STB_IMAGE_IMPLEMENTATION
 #include "../include/t3d.h"
 #include "../dep/tl/include/tl/console.h"
 

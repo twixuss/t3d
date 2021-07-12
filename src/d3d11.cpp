@@ -1,9 +1,9 @@
 #include "../include/t3d.h"
 
-TL::umm get_hash(TL::Span<t3d::ElementType> types) {
-	TL::umm hash = 0x13579BDF2468ACE;
+tl::umm get_hash(tl::Span<t3d::ElementType> types) {
+	tl::umm hash = 0x13579BDF2468ACE;
 	for (auto &type : types) {
-		hash = TL::rotate_left(hash, 1) | type;
+		hash = tl::rotate_left(hash, 1) | type;
 	}
 	return hash;
 }
@@ -315,6 +315,7 @@ bool init(InitInfo init_info) {
 		};
 		state->immediate_context->RSSetViewports(1, &v);
 	};
+	/*
 	_resize = [](RenderTarget *render_target, u32 w, u32 h) {
 		if (render_target == 0) {
 			state->back_buffer.color_target->Release();
@@ -323,6 +324,7 @@ bool init(InitInfo init_info) {
 			create_back_buffer(w, h);
 		}
 	};
+	*/
 	_set_shader = [](Shader *_shader) {
 		auto &shader = *(ShaderImpl *)_shader;
 		state->immediate_context->VSSetShader(shader.vertex_shader, 0, 0);
@@ -331,12 +333,12 @@ bool init(InitInfo init_info) {
 		state->immediate_context->PSSetShader(shader.pixel_shader, 0, 0);
 		state->immediate_context->PSSetConstantBuffers(0, 1, &shader.constant_buffer);
 	};
-	_set_value = [](Shader *_shader, ShaderValueLocation dest, void const *source) {
-		auto &shader = *(ShaderImpl *)_shader;
-		memcpy((u8 *)shader.constant_buffer_data + dest.start, source, dest.size);
-		state->immediate_context->UpdateSubresource(shader.constant_buffer, 0, 0, shader.constant_buffer_data, 0, 0);
-	};
-	_create_shader = [](Span<utf8> source, umm values_size) -> Shader * {
+	//_set_value = [](Shader *_shader, ShaderValueLocation dest, void const *source) {
+	//	auto &shader = *(ShaderImpl *)_shader;
+	//	memcpy((u8 *)shader.constant_buffer_data + dest.start, source, dest.size);
+	//	state->immediate_context->UpdateSubresource(shader.constant_buffer, 0, 0, shader.constant_buffer_data, 0, 0);
+	//};
+	_create_shader = [](Span<utf8> source) -> Shader * {
 		auto &shader = state->shaders.add();
 		if (&shader) {
 			ID3DBlob *vertex_shader_bytecode = compile_shader(source, "vertex_shader", "vertex_main", "vs_5_0");
@@ -349,18 +351,18 @@ bool init(InitInfo init_info) {
 				return false;
 			}
 
-			{
-				D3D11_BUFFER_DESC desc = {
-					.ByteWidth = (UINT)values_size,
-					.Usage = D3D11_USAGE_DEFAULT,
-					.BindFlags = D3D11_BIND_CONSTANT_BUFFER,
-				};
-				if (FAILED(state->device->CreateBuffer(&desc, 0, &shader.constant_buffer))) {
-					return false;
-				}
-
-				shader.constant_buffer_data = default_allocator.allocate(values_size, 16);
-			}
+			//{
+			//	D3D11_BUFFER_DESC desc = {
+			//		.ByteWidth = (UINT)values_size,
+			//		.Usage = D3D11_USAGE_DEFAULT,
+			//		.BindFlags = D3D11_BIND_CONSTANT_BUFFER,
+			//	};
+			//	if (FAILED(state->device->CreateBuffer(&desc, 0, &shader.constant_buffer))) {
+			//		return false;
+			//	}
+			//
+			//	shader.constant_buffer_data = default_allocator.allocate(values_size, 16);
+			//}
 		}
 		return &shader;
 	};
@@ -429,7 +431,8 @@ bool init(InitInfo init_info) {
 			target = &state->back_buffer;
 		state->immediate_context->OMSetRenderTargets(1, &target->color_target, target->depth_target);
 	};
-	_create_render_target = [](CreateRenderTargetFlags flags, TextureFormat _format, u32 width, u32 height) -> RenderTarget * {
+	/*
+	_create_render_target = [](CreateRenderTargetFlags flags, TextureFormat _format, TextureFiltering filtering, TextureComparison comparison, u32 width, u32 height) -> RenderTarget * {
 		auto &result = state->render_targets.add();
 
 		auto format = get_format(_format);
@@ -461,24 +464,7 @@ bool init(InitInfo init_info) {
 
 		return &result;
 	};
-
-	Shaders::Color::shader = _create_shader(u8R"(
-cbuffer _ : register(b0) {
-	float4 u_color;
-}
-void vertex_main(in uint id : SV_VertexID, out float4 position : SV_Position) {
-	float2 positions[] = {
-		{-0.5,-0.5},
-		{ 0.0, 0.5},
-		{ 0.5,-0.5},
-	};
-	position = float4(positions[id], 0, 1);
-}
-void pixel_main(in float4 position : SV_Position, out float4 color : SV_Target) {
-	color = u_color;
-}
-)"s, Shaders::Color::size);
-
+	*/
 
 	return true;
 }
