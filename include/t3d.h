@@ -105,7 +105,7 @@ A(void, draw_indexed, (u32 index_count), (index_count)) \
 A(void, set_viewport, (u32 x, u32 y, u32 w, u32 h), (x, y, w, h)) \
 A(void, resize_render_targets, (u32 w, u32 h), (w, h)) \
 A(void, set_shader, (Shader *shader), (shader)) \
-A(void, set_value, (ShaderConstants *constants, ShaderValueLocation dest, void const *source), (constants, dest, source)) \
+A(void, update_shader_constants, (ShaderConstants *constants, ShaderValueLocation dest, void const *source), (constants, dest, source)) \
 A(Shader *, create_shader, (Span<utf8> source), (source)) \
 A(CameraMatrices, calculate_perspective_matrices, (v3f position, v3f rotation, f32 aspect_ratio, f32 fov_radians, f32 near_plane, f32 far_plane), (position, rotation, aspect_ratio, fov_radians, near_plane, far_plane)) \
 A(VertexBuffer *, create_vertex_buffer, (Span<u8> buffer, Span<ElementType> vertex_descriptor), (buffer, vertex_descriptor)) \
@@ -139,21 +139,22 @@ APIS(A)
 APIS(A)
 #undef A
 
+extern T3D_API RenderTarget *back_buffer;
+extern T3D_API v2u min_texture_size;
+
 inline void draw(u32 vertex_count) { return _draw(vertex_count, 0); }
 inline void set_viewport(u32 w, u32 h) { return _set_viewport(0, 0, w, h); }
 inline void set_viewport(v2u size) { return _set_viewport(0, 0, size.x, size.y); }
 inline void resize_render_targets(v2u size) { return _resize_render_targets(size.x, size.y); }
 template <class T>
-inline void set_value(ShaderConstants *constants, ShaderValueLocation dest, T const &source) {
+inline void update_shader_constants(ShaderConstants *constants, ShaderValueLocation dest, T const &source) {
 	assert(sizeof(source) == dest.size);
-	return _set_value(constants, dest, &source);
+	return _update_shader_constants(constants, dest, &source);
 }
 template <class T>
-inline void set_value(ShaderConstants *constants, T const &source) {
-	return _set_value(constants, {0, sizeof(source)}, &source);
+inline void update_shader_constants(ShaderConstants *constants, T const &source) {
+	return _update_shader_constants(constants, {0, sizeof(source)}, &source);
 }
-template <class T>
-ShaderConstants *create_shader_constants() { return _create_shader_constants(sizeof(T)); }
 
 inline Texture *load_texture(Span<filechar> path) {
 	auto file = read_entire_file(path);
@@ -163,11 +164,39 @@ inline Texture *load_texture(Span<filechar> path) {
 
 	int width, height;
 	void *pixels = stbi_load_from_memory(file.data, file.size, &width, &height, 0, 4);
-	return create_texture(CreateTexture_default, width, height, pixels, TextureFormat_rgba_u8n, TextureFiltering_linear, TextureComparison_none);
+	return _create_texture(CreateTexture_default, width, height, pixels, TextureFormat_rgba_u8n, TextureFiltering_linear, TextureComparison_none);
 }
 
 inline void resize_texture(Texture *texture, v2u size) { return _resize_texture(texture, size.x, size.y); }
 
+template <class T>
+struct TypedShaderConstants {
+	ShaderConstants *constants;
+};
+
+template <class T>
+TypedShaderConstants<T> create_shader_constants() {
+	TypedShaderConstants<T> result = {
+		.constants = _create_shader_constants(sizeof(T)),
+	};
+	return result;
+}
+
+template <class T>
+inline void update_shader_constants(TypedShaderConstants<T> &constants, T const &value) {
+	return _update_shader_constants(constants.constants, {0, sizeof(T)}, &value);
+}
+
+template <class T, class U>
+inline void update_shader_constants(TypedShaderConstants<T> &constants, ShaderValueLocation dest, U const &source) {
+	assert(sizeof(source) == dest.size);
+	return _update_shader_constants(constants.constants, dest, &source);
+}
+
+template <class T>
+void set_shader_constants(TypedShaderConstants<T> const &constants, u32 slot) {
+	return _set_shader_constants(constants.constants, slot);
+}
 #ifndef T3D_IMPL
 #undef APIS
 #endif

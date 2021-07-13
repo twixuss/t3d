@@ -6,7 +6,7 @@
 
 namespace t3d::gl {
 
-using namespace OpenGL;
+using namespace tl::gl;
 
 struct ShaderImpl : Shader {
 	GLuint program;
@@ -72,6 +72,8 @@ struct State {
 	MaskedBlockList<ComputeBufferImpl, 256> compute_buffers;
 	IndexBufferImpl *current_index_buffer;
 	RenderTargetImpl back_buffer;
+	TextureImpl back_buffer_color;
+	TextureImpl back_buffer_depth;
 	RenderTargetImpl *currently_bound_render_target;
 	StaticHashMap<SamplerKey, GLuint, 256> samplers;
 	v2u window_size;
@@ -186,12 +188,12 @@ u32 get_bytes_per_texel(TextureFormat format) {
 	return 0;
 }
 
-void bind_render_target(RenderTargetImpl *render_target) {
-	if (render_target == state.currently_bound_render_target)
+void bind_render_target(RenderTargetImpl &render_target) {
+	if (&render_target == state.currently_bound_render_target)
 		return;
 
-	state.currently_bound_render_target = render_target;
-	glBindFramebuffer(GL_FRAMEBUFFER, render_target->frame_buffer);
+	state.currently_bound_render_target = &render_target;
+	glBindFramebuffer(GL_FRAMEBUFFER, render_target.frame_buffer);
 }
 
 GLuint get_sampler(TextureFiltering filtering, TextureComparison comparison) {
@@ -234,6 +236,10 @@ bool init(InitInfo init_info) {
 
 	state.window_size = init_info.window_size;
 
+	back_buffer = &state.back_buffer;
+	state.back_buffer.color = &state.back_buffer_color;
+	state.back_buffer.depth = &state.back_buffer_depth;
+
 	glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
@@ -241,9 +247,8 @@ bool init(InitInfo init_info) {
 	glDepthFunc(GL_LESS);
 
 	_clear = [](RenderTarget *_render_target, ClearFlags flags, v4f color, f32 depth) {
-		auto render_target = (RenderTargetImpl *)_render_target;
-		if (!render_target)
-			render_target = &state.back_buffer;
+		assert(_render_target);
+		auto &render_target = *(RenderTargetImpl *)_render_target;
 
 		auto previously_bound_render_target = state.currently_bound_render_target;
 		bind_render_target(render_target);
@@ -253,10 +258,10 @@ bool init(InitInfo init_info) {
 		if (flags & ClearFlags_depth) { mask |= GL_DEPTH_BUFFER_BIT; glClearDepth(depth); }
 		glClear(mask);
 
-		bind_render_target(previously_bound_render_target);
+		bind_render_target(*previously_bound_render_target);
 	};
 	_present = []() {
-		OpenGL::present();
+		gl::present();
 	};
 	_draw = [](u32 vertex_count, u32 start_vertex) {
 		glDrawArrays(GL_TRIANGLES, start_vertex, vertex_count);
@@ -274,7 +279,7 @@ bool init(InitInfo init_info) {
 				resize_texture_gl(texture, width, height);
 			}
 		}
-		state.window_size = {width, height};
+		state.window_size = state.back_buffer_color.size = state.back_buffer_depth.size = {width, height};
 	};
 	_set_shader = [](Shader *_shader) {
 		auto &shader = *(ShaderImpl *)_shader;
@@ -285,7 +290,7 @@ bool init(InitInfo init_info) {
 		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
 		glBindBufferBase(GL_UNIFORM_BUFFER, slot, constants.uniform_buffer);
 	};
-	_set_value = [](ShaderConstants *_constants, ShaderValueLocation dest, void const *source) {
+	_update_shader_constants = [](ShaderConstants *_constants, ShaderValueLocation dest, void const *source) {
 		auto &constants = *(ShaderConstantsImpl *)_constants;
 		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
 		glBufferSubData(GL_UNIFORM_BUFFER, dest.start, dest.size, source);
@@ -294,8 +299,8 @@ bool init(InitInfo init_info) {
 	_create_shader = [](Span<utf8> source) -> Shader * {
 		auto &shader = state.shaders.add();
 		shader.program = create_program({
-			.vertex   = OpenGL::create_shader(GL_VERTEX_SHADER, 430, true, (Span<char>)source),
-			.fragment = OpenGL::create_shader(GL_FRAGMENT_SHADER, 430, true, (Span<char>)source)
+			.vertex   = tl::gl::create_shader(GL_VERTEX_SHADER, 430, true, (Span<char>)source),
+			.fragment = tl::gl::create_shader(GL_FRAGMENT_SHADER, 430, true, (Span<char>)source)
 		});
 		assert(shader.program);
 		return &shader;
@@ -374,10 +379,8 @@ bool init(InitInfo init_info) {
 		wglSwapIntervalEXT(enable);
 	};
 	_set_render_target = [](RenderTarget *_render_target) {
-		auto render_target = (RenderTargetImpl *)_render_target;
-		if (!render_target)
-			render_target = &state.back_buffer;
-
+		assert(_render_target);
+		auto &render_target = *(RenderTargetImpl *)_render_target;
 		bind_render_target(render_target);
 	};
 	_create_render_target = [](Texture *_color, Texture *_depth) -> RenderTarget * {
@@ -418,11 +421,11 @@ bool init(InitInfo init_info) {
 		return &result;
 	};
 	_set_texture = [](Texture *_texture, u32 slot) {
-		auto texture = (TextureImpl *)_texture;
+		auto &texture = *(TextureImpl *)_texture;
 		glActiveTexture(GL_TEXTURE0 + slot);
 		if (_texture) {
-			glBindTexture(GL_TEXTURE_2D, texture->texture);
-			glBindSampler(slot, texture->sampler);
+			glBindTexture(GL_TEXTURE_2D, texture.texture);
+			glBindSampler(slot, texture.sampler);
 		} else {
 			glBindTexture(GL_TEXTURE_2D, 0);
 			glBindSampler(slot, 0);
@@ -473,7 +476,7 @@ bool init(InitInfo init_info) {
 	_create_compute_shader = [](Span<utf8> source) -> ComputeShader * {
 		auto &result = state.compute_shaders.add();
 		result.program = create_program({
-			.compute = OpenGL::create_shader(GL_COMPUTE_SHADER, 430, true, (Span<char>)source),
+			.compute = tl::gl::create_shader(GL_COMPUTE_SHADER, 430, true, (Span<char>)source),
 		});
 		return &result;
 	};

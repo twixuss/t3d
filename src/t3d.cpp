@@ -9,6 +9,9 @@ namespace t3d {
 APIS(A)
 #undef A
 
+RenderTarget *back_buffer;
+v2u min_texture_size;
+
 namespace d3d11 { bool init(InitInfo init_info); }
 namespace gl    { bool init(InitInfo init_info); }
 
