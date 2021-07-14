@@ -51,7 +51,7 @@ struct ComputeBufferImpl : ComputeBuffer {
 
 struct SamplerKey {
 	TextureFiltering filtering;
-	TextureComparison comparison;
+	Comparison comparison;
 	bool operator==(SamplerKey const &that) const {
 		return filtering == that.filtering && comparison == that.comparison;
 	}
@@ -79,6 +79,9 @@ struct State {
 	v2u window_size;
 	List<TextureImpl *> window_sized_textures;
 	RasterizerState rasterizer;
+	BlendFunction blend_function;
+	Blend blend_source;
+	Blend blend_destination;
 };
 static State state;
 
@@ -132,10 +135,11 @@ GLuint get_filter(TextureFiltering filter) {
 	invalid_code_path();
 	return 0;
 }
-GLuint get_func(TextureComparison comparison) {
+GLuint get_func(Comparison comparison) {
 	switch (comparison) {
-		case TextureComparison_none: return GL_NONE;
-		case TextureComparison_less: return GL_LESS;
+		case Comparison_none:  return GL_NONE;
+		case Comparison_equal: return GL_EQUAL;
+		case Comparison_less:  return GL_LESS;
 	}
 	invalid_code_path();
 	return 0;
@@ -188,6 +192,22 @@ u32 get_bytes_per_texel(TextureFormat format) {
 	return 0;
 }
 
+GLuint get_blend(Blend blend) {
+	switch (blend) {
+		case t3d::Blend_one: return GL_ONE;
+	}
+	invalid_code_path();
+	return 0;
+}
+
+GLuint get_equation(BlendFunction function) {
+	switch (function) {
+		case t3d::BlendFunction_add: return GL_FUNC_ADD;
+	}
+	invalid_code_path();
+	return 0;
+}
+
 void bind_render_target(RenderTargetImpl &render_target) {
 	if (&render_target == state.currently_bound_render_target)
 		return;
@@ -196,14 +216,14 @@ void bind_render_target(RenderTargetImpl &render_target) {
 	glBindFramebuffer(GL_FRAMEBUFFER, render_target.frame_buffer);
 }
 
-GLuint get_sampler(TextureFiltering filtering, TextureComparison comparison) {
+GLuint get_sampler(TextureFiltering filtering, Comparison comparison) {
 	if (filtering == TextureFiltering_none)
 		return 0;
 
 	auto &result = state.samplers.get_or_insert({filtering, comparison});
 	if (!result) {
 		glGenSamplers(1, &result);
-		if (comparison != TextureComparison_none) {
+		if (comparison != Comparison_none) {
 			glSamplerParameteri(result, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
 			auto func = get_func(comparison);
 			glSamplerParameteri(result, GL_TEXTURE_COMPARE_FUNC, func);
@@ -431,7 +451,7 @@ bool init(InitInfo init_info) {
 			glBindSampler(slot, 0);
 		}
 	};
-	_create_texture = [](CreateTextureFlags flags, u32 width, u32 height, void *data, TextureFormat format, TextureFiltering filtering, TextureComparison comparison) -> Texture * {
+	_create_texture = [](CreateTextureFlags flags, u32 width, u32 height, void *data, TextureFormat format, TextureFiltering filtering, Comparison comparison) -> Texture * {
 		auto &result = state.textures.add();
 
 		result.size = {width, height};
@@ -450,7 +470,16 @@ bool init(InitInfo init_info) {
 		glGenTextures(1, &result.texture);
 		glBindTexture(GL_TEXTURE_2D, result.texture);
 		glTexImage2D(GL_TEXTURE_2D, 0, result.internal_format, width, height, 0, result.format, result.type, data);
+
+		v2s size;
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &size.x);
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &size.y);
+		print("create_texture: %x%\n", size.x, size.y);
+
 		glBindTexture(GL_TEXTURE_2D, 0);
+
+
+
 
 		result.sampler = get_sampler(filtering, comparison);
 
@@ -464,6 +493,11 @@ bool init(InitInfo init_info) {
 				glDisable(GL_DEPTH_TEST);
 			}
 		}
+
+		if (rasterizer.depth_func != state.rasterizer.depth_func) {
+			glDepthFunc(get_func((Comparison)rasterizer.depth_func));
+		}
+
 		//if (rasterizer.depth_write != state.rasterizer.depth_write) {
 		//	glDepthMask(rasterizer.depth_write);
 		//}
@@ -527,6 +561,25 @@ bool init(InitInfo init_info) {
 		assert(_texture);
 		auto &texture = *(TextureImpl *)_texture;
 		glGetTextureImage(texture.texture, 0, texture.format, texture.type, data.size, data.data);
+	};
+	_set_blend = [](BlendFunction function, Blend source, Blend destination) {
+		if (function != state.blend_function) {
+			state.blend_function = function;
+
+			if (function == BlendFunction_disable) {
+				glDisable(GL_BLEND);
+			} else {
+				glEnable(GL_BLEND);
+				glBlendEquation(get_equation(function));
+			}
+		}
+		if (source != state.blend_source || destination != state.blend_destination) {
+			state.blend_source = source;
+			state.blend_destination = destination;
+			if (function != BlendFunction_disable) {
+				glBlendFunc(get_blend(source), get_blend(destination));
+			}
+		}
 	};
 
 	return true;

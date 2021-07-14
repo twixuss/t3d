@@ -78,9 +78,11 @@ enum TextureFiltering : u8 {
 	TextureFiltering_linear,
 };
 
-enum TextureComparison : u8 {
-	TextureComparison_none,
-	TextureComparison_less,
+enum Comparison : u8 {
+	Comparison_none,
+	Comparison_equal,
+	Comparison_less,
+	Comparison_count,
 };
 
 using ClearFlags = u8;
@@ -93,8 +95,20 @@ enum : ClearFlags {
 struct RasterizerState {
 	u8 depth_test  : 1;
 	u8 depth_write : 1;
-	RasterizerState &set_depth_test (bool value) { return depth_test  = value, *this; }
-	RasterizerState &set_depth_write(bool value) { return depth_write = value, *this; }
+	u8 depth_func  : CE::log2(CE::ceil_to_power_of_2(Comparison_count));
+	RasterizerState &set_depth_test (bool       value) { return depth_test  = value, *this; }
+	RasterizerState &set_depth_write(bool       value) { return depth_write = value, *this; }
+	RasterizerState &set_depth_func (Comparison value) { return depth_func  = value, *this; }
+};
+
+enum BlendFunction {
+	BlendFunction_disable,
+	BlendFunction_add,
+};
+
+enum Blend {
+	Blend_null,
+	Blend_one,
 };
 
 #define APIS(A) \
@@ -116,7 +130,7 @@ A(void, set_vsync, (bool enable), (enable)) \
 A(void, set_render_target, (RenderTarget *target), (target)) \
 A(RenderTarget *, create_render_target, (Texture *color, Texture *depth), (color, depth)) \
 A(void, set_texture, (Texture *texture, u32 slot), (texture, slot)) \
-A(Texture *, create_texture, (CreateTextureFlags flags, u32 width, u32 height, void *data, TextureFormat format, TextureFiltering filtering, TextureComparison comparison), (flags, width, height, data, format, filtering, comparison)) \
+A(Texture *, create_texture, (CreateTextureFlags flags, u32 width, u32 height, void *data, TextureFormat format, TextureFiltering filtering, Comparison comparison), (flags, width, height, data, format, filtering, comparison)) \
 A(ShaderConstants *, create_shader_constants, (umm size), (size))\
 A(void, set_shader_constants, (ShaderConstants *constants, u32 slot), (constants, slot)) \
 A(void, set_rasterizer, (RasterizerState state), (state)) \
@@ -130,6 +144,7 @@ A(void, read_compute_buffer, (ComputeBuffer *buffer, void *data), (buffer, data)
 A(void, set_compute_buffer, (ComputeBuffer *buffer, u32 slot), (buffer, slot)) \
 A(void, set_compute_texture, (Texture *texture, u32 slot), (texture, slot)) \
 A(void, read_texture, (Texture *texture, Span<u8> data), (texture, data)) \
+A(void, set_blend, (BlendFunction function, Blend source, Blend destination), (function, source, destination)) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)
@@ -164,7 +179,7 @@ inline Texture *load_texture(Span<filechar> path) {
 
 	int width, height;
 	void *pixels = stbi_load_from_memory(file.data, file.size, &width, &height, 0, 4);
-	return _create_texture(CreateTexture_default, width, height, pixels, TextureFormat_rgba_u8n, TextureFiltering_linear, TextureComparison_none);
+	return _create_texture(CreateTexture_default, width, height, pixels, TextureFormat_rgba_u8n, TextureFiltering_linear, Comparison_none);
 }
 
 inline void resize_texture(Texture *texture, v2u size) { return _resize_texture(texture, size.x, size.y); }
@@ -197,6 +212,7 @@ template <class T>
 void set_shader_constants(TypedShaderConstants<T> const &constants, u32 slot) {
 	return _set_shader_constants(constants.constants, slot);
 }
+
 #ifndef T3D_IMPL
 #undef APIS
 #endif
