@@ -1,3 +1,4 @@
+#pragma once
 #ifndef ENUMERATE_COMPONENTS
 #error You must define ENUMERATE_COMPONENTS before including "components_base.h".
 /*
@@ -47,6 +48,7 @@ ENUMERATE_COMPONENTS
 #define c(name) name
 #define sep ,
 
+// Make sure every component is listed before including this file
 template <class Component>
 inline static constexpr tl::u32 component_type_index = tl::type_index<Component,
 	ENUMERATE_COMPONENTS
@@ -67,8 +69,8 @@ inline constexpr tl::u32 get_component_type_index() {
 	return index;
 }
 
-template <class Component>
-void on_create(Component &component) {
+template <class Component, class ...Args>
+void on_create(Component &component, Args const &...args) {
 }
 
 

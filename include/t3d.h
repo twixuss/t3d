@@ -3,13 +3,13 @@
 #include <tl/vector.h>
 #include <tl/file.h>
 #include <tl/math.h>
-#include <stb_image.h>
+#include <tl/console.h>
 
 #define T3D_API
 
-namespace t3d {
-
 using namespace tl;
+
+namespace t3d {
 
 enum GraphicsApi {
 	GraphicsApi_null,
@@ -68,8 +68,10 @@ enum TextureFormat : u8 {
 	TextureFormat_depth,
 	TextureFormat_r_f32,
 	TextureFormat_rgb_f16,
+	TextureFormat_rgb_f32,
 	TextureFormat_rgba_u8n,
 	TextureFormat_rgba_f16,
+	TextureFormat_rgba_f32,
 };
 
 enum TextureFiltering : u8 {
@@ -80,6 +82,7 @@ enum TextureFiltering : u8 {
 
 enum Comparison : u8 {
 	Comparison_none,
+	Comparison_always,
 	Comparison_equal,
 	Comparison_less,
 	Comparison_count,
@@ -109,6 +112,29 @@ enum BlendFunction {
 enum Blend {
 	Blend_null,
 	Blend_one,
+};
+
+union CubeTexturePaths {
+	struct {
+		Span<filechar> left;
+		Span<filechar> right;
+		Span<filechar> top;
+		Span<filechar> bottom;
+		Span<filechar> front;
+		Span<filechar> back;
+	};
+	Span<filechar> paths[6];
+};
+
+union Viewport {
+	struct {
+		s32 x, y;
+		u32 w, h;
+	};
+	struct {
+		v2s position;
+		v2u size;
+	};
 };
 
 #define APIS(A) \
@@ -145,6 +171,7 @@ A(void, set_compute_buffer, (ComputeBuffer *buffer, u32 slot), (buffer, slot)) \
 A(void, set_compute_texture, (Texture *texture, u32 slot), (texture, slot)) \
 A(void, read_texture, (Texture *texture, Span<u8> data), (texture, data)) \
 A(void, set_blend, (BlendFunction function, Blend source, Blend destination), (function, source, destination)) \
+A(Texture *, create_cube_texture, (CreateTextureFlags flags, u32 width, u32 height, void *data[6], TextureFormat format, TextureFiltering filtering, Comparison comparison), (flags, width, height, data, format, filtering, comparison)) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)
@@ -171,15 +198,64 @@ inline void update_shader_constants(ShaderConstants *constants, T const &source)
 	return _update_shader_constants(constants, {0, sizeof(source)}, &source);
 }
 
+struct Pixels {
+	void *data;
+	v2u size;
+	TextureFormat format;
+	void (*free)(void *data);
+};
+
+T3D_API Pixels load_pixels(Span<filechar> path);
+
 inline Texture *load_texture(Span<filechar> path) {
-	auto file = read_entire_file(path);
-	if (!file.data) {
+	auto pixels = load_pixels(path);
+	if (!pixels.data) {
 		return 0;
 	}
+	defer { pixels.free(pixels.data); };
+	return _create_texture(CreateTexture_default, pixels.size.x, pixels.size.y, pixels.data, pixels.format, TextureFiltering_linear, Comparison_none);
+}
 
-	int width, height;
-	void *pixels = stbi_load_from_memory(file.data, file.size, &width, &height, 0, 4);
-	return _create_texture(CreateTexture_default, width, height, pixels, TextureFormat_rgba_u8n, TextureFiltering_linear, Comparison_none);
+inline Texture *load_texture(CubeTexturePaths paths) {
+	Pixels pixels[6];
+	void *datas[6];
+	for (u32 i = 0; i < 6; ++i) {
+		pixels[i] = load_pixels(paths.paths[i]);
+		if (!pixels[i].data) {
+			return 0;
+		}
+		if (i != 0) {
+			bool fail = false;
+			Span<char> reason;
+			if (pixels[i].size != pixels[0].size) {
+				fail = true;
+				reason = "sizes of faces do not match"s;
+			}
+			if (pixels[i].format != pixels[0].format) {
+				fail = true;
+				reason = "formats of faces do not match"s;
+			}
+			if (fail) {
+				print(Print_error, "Failed to load cube texture (%) with these paths:\n\t%\n\t%\n\t%\n\t%\n\t%\n\t%\n"
+					, reason
+					, paths.paths[0]
+					, paths.paths[1]
+					, paths.paths[2]
+					, paths.paths[3]
+					, paths.paths[4]
+					, paths.paths[5]
+				);
+				return 0;
+			}
+		}
+		datas[i] = pixels[i].data;
+	}
+	defer {
+		for (u32 i = 0; i < 6; ++i) {
+			pixels[i].free(pixels[i].data);
+		}
+	};
+	return _create_cube_texture(CreateTexture_default, pixels[0].size.x, pixels[0].size.y, datas, pixels[0].format, TextureFiltering_linear, Comparison_none);
 }
 
 inline void resize_texture(Texture *texture, v2u size) { return _resize_texture(texture, size.x, size.y); }

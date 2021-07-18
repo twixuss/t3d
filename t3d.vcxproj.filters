@@ -13,5 +13,12 @@
   <ItemGroup>
     <ClInclude Include="include\t3d.h" />
     <ClInclude Include="src\tl.h" />
+    <ClInclude Include="src\light.h" />
+    <ClInclude Include="src\mesh_renderer.h" />
+    <ClInclude Include="src\material.h" />
+    <ClInclude Include="src\component.h" />
+    <ClInclude Include="src\mesh.h" />
+    <ClInclude Include="src\basic_textures.h" />
+    <ClInclude Include="src\camera.h" />
   </ItemGroup>
 </Project>

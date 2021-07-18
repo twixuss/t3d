@@ -1,6 +1,9 @@
 #include "tl.h"
 #include "../dep/tl/include/tl/masked_block_list.h"
-#include "../include/components_base.h"
+#include "component.h"
+#include "light.h"
+#include "mesh_renderer.h"
+#include "camera.h"
 
 using namespace tl;
 
@@ -12,7 +15,12 @@ PreciseTimer frame_timer;
 
 
 struct GlobalConstants {
+	m4 camera_rotation_projection_matrix;
+
 	v3f camera_position;
+	f32 _dummy;
+
+	v3f camera_forward;
 };
 t3d::TypedShaderConstants<GlobalConstants> global_constants;
 #define GLOBAL_CONSTANTS_SLOT 15
@@ -27,8 +35,11 @@ t3d::TypedShaderConstants<EntityConstants> entity_constants;
 
 struct LightConstants {
 	m4 world_to_light_matrix;
+
 	v3f light_position;
 	f32 light_intensity;
+
+	u32 light_index;
 };
 t3d::TypedShaderConstants<LightConstants> light_constants;
 #define LIGHT_CONSTANTS_SLOT 13
@@ -40,14 +51,20 @@ struct AverageComputeData {
 #define AVERAGE_COMPUTE_SLOT 12
 
 t3d::Shader *shadow_map_shader;
-t3d::Shader *handle_shader;
 t3d::Shader *blit_shader;
 
-
-struct Material {
-	t3d::Shader *shader;
-	t3d::ShaderConstants *constants;
+struct BlitColorConstants {
+	v4f color;
 };
+t3d::TypedShaderConstants<BlitColorConstants> blit_color_constants;
+t3d::Shader *blit_color_shader;
+
+struct HandleConstants {
+	v3f color;
+	f32 selected;
+};
+t3d::TypedShaderConstants<HandleConstants> handle_constants;
+t3d::Shader *handle_shader;
 
 Material surface_material;
 struct SurfaceConstants {
@@ -56,73 +73,23 @@ struct SurfaceConstants {
 
 #define shader_value_location(struct, member) t3d::ShaderValueLocation{offsetof(struct, member), sizeof(struct::member)}
 
-struct Mesh {
-	t3d::VertexBuffer *vertex_buffer;
-	t3d::IndexBuffer *index_buffer;
-	u32 index_count;
-};
-
-Mesh load_mesh(Span<filechar> path) {
-	Mesh result;
-	if (auto parse_result = parse_glb_from_file(path)) {
-		auto mesh = parse_result.value;
-
-		result.vertex_buffer = t3d::create_vertex_buffer(
-			as_bytes(mesh.vertices),
-			{
-				t3d::Element_f32x3, // position
-				t3d::Element_f32x3, // normal
-				t3d::Element_f32x4, // color
-			}
-		);
-
-		result.index_buffer = t3d::create_index_buffer(as_bytes(mesh.indices), sizeof(u32));
-
-		result.index_count = mesh.indices.size;
-
-		free(mesh);
-	} else {
-		print("Failed to parse mesh");
-		invalid_code_path();
-	}
-	return result;
-}
-
-void draw_mesh(Mesh &mesh) {
-	t3d::set_vertex_buffer(mesh.vertex_buffer);
-	t3d::set_index_buffer(mesh.index_buffer);
-	t3d::draw_indexed(mesh.index_count);
-}
-
 u32 fps_counter;
 u32 fps_counter_result;
 f32 fps_timer;
 
-Mesh suzanne_mesh;
-Mesh floor_mesh;
-Mesh position_handle_mesh;
-
-u32 const shadow_map_resolution = 256;
+Mesh *suzanne_mesh;
+Mesh *floor_mesh;
+Mesh *handle_center_mesh;
+Mesh *handle_axis_x_mesh;
+Mesh *handle_axis_y_mesh;
+Mesh *handle_axis_z_mesh;
+Mesh *handle_plane_x_mesh;
+Mesh *handle_plane_y_mesh;
+Mesh *handle_plane_z_mesh;
 
 f32 camera_velocity;
 
-struct Light : Component {
-	t3d::RenderTarget *shadow_map;
-	t3d::Texture *texture;
-	m4 world_to_light_matrix;
-};
 
-template <>
-void on_create(Light &light) {
-	auto depth = t3d::create_texture(t3d::CreateTexture_default, shadow_map_resolution, shadow_map_resolution, 0, t3d::TextureFormat_depth, t3d::TextureFiltering_linear, t3d::Comparison_less);
-	light.shadow_map = t3d::create_render_target(0, depth);
-}
-
-
-struct MeshRenderer : Component {
-	Mesh mesh;
-	Material *material;
-};
 
 union quaternion {
 	struct { f32 x, y, z, w; };
@@ -249,6 +216,10 @@ T *get_component(u32 entity_index, u32 nth = 0) {
 	return get_component<T>(entities[entity_index], nth);
 }
 
+#define SHADOW_MAP_TEXTURE_SLOT 15
+#define LIGHT_TEXTURE_SLOT      14
+#define LIGHTMAP_TEXTURE_SLOT	13
+
 t3d::Shader *create_shader(Span<utf8> source) {
 	auto shader_header = u8R"(
 #ifdef GL_core_profile
@@ -262,7 +233,12 @@ float3 saturate(float3 a){return clamp(a,0,1);}
 float4 saturate(float4 a){return clamp(a,0,1);}
 
 layout(binding=)" STRINGIZE(GLOBAL_CONSTANTS_SLOT) R"(, std140) uniform global_uniforms {
+	mat4 camera_rotation_projection_matrix;
+
 	vec3 camera_position;
+	float _dummy;
+
+	vec3 camera_forward;
 };
 
 layout(binding=)" STRINGIZE(ENTITY_CONSTANTS_SLOT) R"(, std140) uniform entity_uniforms {
@@ -271,9 +247,16 @@ layout(binding=)" STRINGIZE(ENTITY_CONSTANTS_SLOT) R"(, std140) uniform entity_u
 
 layout(binding=)" STRINGIZE(LIGHT_CONSTANTS_SLOT) R"(, std140) uniform light_uniforms {
 	mat4 world_to_light_matrix;
+
 	vec3 light_position;
 	float light_intensity;
+
+	uint light_index;
 };
+
+layout(binding=)" STRINGIZE(SHADOW_MAP_TEXTURE_SLOT) R"() uniform sampler2DShadow shadow_map;
+layout(binding=)" STRINGIZE(LIGHT_TEXTURE_SLOT) R"() uniform sampler2D light_texture;
+layout(binding=)" STRINGIZE(LIGHTMAP_TEXTURE_SLOT) R"() uniform sampler2D lightmap_texture;
 
 #endif
 
@@ -349,13 +332,17 @@ float sample_shadow_map(sampler2DShadow shadow_map, float3 light_space, float bi
 	return light;
 }
 
+#ifdef VERTEX_SHADER
+#define V2F out
+#else
+#define V2F in
+#endif
+
 )"s;
 	return t3d::create_shader(concatenate(shader_header, source));
 }
 
 Entity *selected_entity;
-
-Mesh handle_mesh;
 
 t3d::RenderTarget *source_target;
 t3d::RenderTarget *destination_target;
@@ -467,16 +454,17 @@ void main() {
 out vec4 fragment_color;
 void main() {
 	vec3 color = texture(main_texture, vertex_uv).rgb;
-	color =  1 - exp(-color * exposure_offset);
-	color = -log(1 - min(color, 0.9999999));
+	color = 1 - exp(-color * exposure_offset);
+	color = -log(max(1 - color, 0.000000000001));
 	//color = min(color, vec3(256));
-	color = log(color + 1);
+	//color = log(color + 1);
 	//color = pow(color, vec3(1 / 2.2));
 	fragment_color = vec4(color, 1);
 }
 #endif
 )"s);
 	}
+
 
 	static void render(void *data, t3d::RenderTarget *source, t3d::RenderTarget *destination) {
 		auto &exposure = *(Exposure *)data;
@@ -499,29 +487,6 @@ void main() {
 			sample_from = target;
 		}
 		v3f texels[Exposure::min_texture_size * Exposure::min_texture_size];
-
-
-		struct f16 {
-			u16 sign : 1;
-			u16 exponent : 5;
-			u16 mantissa : 10;
-			operator f32() const {
-				union Result {
-					f32 value;
-					struct {
-						u32 sign : 1;
-						u32 exponent : 8;
-						u32 mantissa : 23;
-					};
-				} result;
-
-				result.sign     = sign;
-				result.exponent = exponent + (127 - 15);
-				result.mantissa = mantissa << (23 - 10);
-
-				return result.value;
-			}
-		};
 
 		t3d::read_texture(exposure.downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
 
@@ -566,7 +531,6 @@ void main() {
 				break;
 		}
 		exposure.exposure = pow(2, lerp(log2(exposure.exposure), log2(target_exposure), frame_time));
-		//print("%\n", exposure.exposure);
 
 		t3d::update_shader_constants(exposure.constants, {
 			.exposure_offset = +exposure.exposure * exposure.scale,
@@ -634,6 +598,7 @@ struct Bloom {
 layout (std140, binding=0) uniform _ {
 	vec2 texel_size;
 	float threshold;
+	float intensity;
 };
 
 layout(binding=0) uniform sampler2D main_texture;
@@ -658,7 +623,7 @@ vec4 get_sample(vec2 vertex_uv, float offset) {
 	return (texture(main_texture, vertex_uv + texel_size * vec2( offset, offset))
 		  + texture(main_texture, vertex_uv + texel_size * vec2(-offset, offset))
 		  + texture(main_texture, vertex_uv + texel_size * vec2( offset,-offset))
-		  + texture(main_texture, vertex_uv + texel_size * vec2(-offset,-offset))) * 0.2f;
+		  + texture(main_texture, vertex_uv + texel_size * vec2(-offset,-offset))) * 0.25f;
 }
 
 vec4 apply_filter(vec4 c) {
@@ -727,20 +692,20 @@ void main() {
 			t3d::set_render_target(target);
 			t3d::set_viewport(target->color->size);
 			t3d::set_texture(sample_from->color, 0);
-			t3d::update_shader_constants(bloom.constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = bloom.threshold});
+			t3d::update_shader_constants(bloom.constants, {.texel_size = 1.0f / (v2f)sample_from->color->size});
 			t3d::draw(3);
 		}
 
-		t3d::update_shader_constants(bloom.constants, {});
-
 		t3d::set_shader(blit_shader);
-		t3d::set_shader_constants(bloom.constants, 0);
 		t3d::set_render_target(destination);
 		t3d::set_viewport(destination->color->size);
-
 		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
 		t3d::set_texture(source->color, 0);
 		t3d::draw(3);
+
+		t3d::set_shader(blit_color_shader);
+		t3d::update_shader_constants(blit_color_constants, {.color = V4f(0.1f)});
+		t3d::set_shader_constants(blit_color_constants, 0);
 		t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
 		for (auto &target : bloom.downsampled_targets) {
 			t3d::set_texture(target->color, 0);
@@ -805,7 +770,6 @@ struct Dither {
 #else
 #define V2F in
 #endif
-
 layout (std140, binding=0) uniform _ {
 	float time;
 };
@@ -861,6 +825,199 @@ void main() {
 	static void free(void *data) {}
 };
 
+t3d::Texture *sky_box_texture;
+t3d::Shader *sky_box_shader;
+
+t3d::Texture *floor_lightmap;
+
+m4 world_to_camera_matrix;
+
+Window *window;
+
+t3d::Viewport render_viewport() {
+	return {
+		.size = window->client_size,
+	};
+}
+
+v3f world_to_camera(v4f point) {
+	auto p = world_to_camera_matrix * point;
+	return p.xyz / p.w;
+}
+v3f world_to_camera(v3f point) {
+	return world_to_camera(V4f(point, 1));
+}
+v2f world_to_window(v4f point) {
+	return map(world_to_camera(point).xy, {-1,1}, {1,-1}, {0,0}, (v2f)window->client_size);
+}
+v2f world_to_window(v3f point) {
+	return world_to_window(V4f(point, 1));
+}
+
+void update_frame() {
+
+	static v3f base_camera_rotation;
+	static v3f target_camera_rotation;
+	static f32 camera_rotation_lerp_t;
+
+	bool flying = mouse_held(1);
+
+	main_camera->fov = clamp(main_camera->fov - window->mouse_wheel * radians(10), radians(30.0f), radians(120.0f));
+
+	if (flying) {
+		target_camera_rotation.x -= window->mouse_delta.y * 0.01f * main_camera->fov;
+		target_camera_rotation.y -= window->mouse_delta.x * 0.01f * main_camera->fov;
+		if (window->mouse_delta.x || window->mouse_delta.y) {
+			base_camera_rotation = camera_rotation;
+			camera_rotation_lerp_t = 0;
+		}
+	}
+
+#if 1
+	camera_rotation_lerp_t = 1;
+#else
+	camera_rotation_lerp_t = min(1, camera_rotation_lerp_t + frame_time * 30);
+#endif
+	camera_rotation = lerp(base_camera_rotation, target_camera_rotation, V3f(camera_rotation_lerp_t));
+
+	v3f camera_position_delta = {};
+	if (flying) {
+		if (key_held(Key_d)) camera_position_delta.x += 1;
+		if (key_held(Key_a)) camera_position_delta.x -= 1;
+		if (key_held(Key_e)) camera_position_delta.y += 1;
+		if (key_held(Key_q)) camera_position_delta.y -= 1;
+		if (key_held(Key_s)) camera_position_delta.z += 1;
+		if (key_held(Key_w)) camera_position_delta.z -= 1;
+		if (camera_position_delta == v3f{}) {
+			camera_velocity = 1;
+		} else {
+			camera_velocity += frame_time;
+		}
+	}
+	camera_position += m3::rotation_r_zxy(camera_rotation) * camera_position_delta * frame_time * camera_velocity;
+
+	m4 camera_projection_matrix = m4::perspective_right_handed((f32)window->client_size.x / window->client_size.y, main_camera->fov, 0.1f, 100.0f);
+	m4 camera_translation_matrix = m4::translation(-camera_position);
+	m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_rotation);
+	world_to_camera_matrix = camera_projection_matrix * camera_rotation_matrix * camera_translation_matrix;
+
+	t3d::update_shader_constants(global_constants, {
+		.camera_rotation_projection_matrix = camera_projection_matrix * camera_rotation_matrix,
+		.camera_position = camera_position,
+		.camera_forward = m3::rotation_r_zxy(camera_rotation) * v3f{0,0,-1},
+	});
+
+	t3d::set_rasterizer(
+		t3d::get_rasterizer()
+			.set_depth_test(true)
+			.set_depth_write(true)
+			.set_depth_func(t3d::Comparison_less)
+	);
+	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+
+	for_each_component_of_type(Light, light) {
+		auto &light_entity = entities[light.entity_index];
+
+		t3d::set_render_target(light.shadow_map);
+		t3d::set_viewport(shadow_map_resolution, shadow_map_resolution);
+		t3d::clear(light.shadow_map, t3d::ClearFlags_depth, {}, 1);
+
+		t3d::set_shader(shadow_map_shader);
+
+		light.world_to_light_matrix = m4::perspective_right_handed(1, radians(90), 0.1f, 100.0f) * m4::rotation_r_yxz(-light_entity.rotation) * m4::translation(-light_entity.position);
+
+		for_each_component_of_type(MeshRenderer, mesh_renderer) {
+			auto &mesh_entity = entities[mesh_renderer.entity_index];
+			t3d::update_shader_constants(entity_constants, shader_value_location(EntityConstants, local_to_camera_matrix), light.world_to_light_matrix * m4::translation(mesh_entity.position));
+			draw_mesh(mesh_renderer.mesh);
+		};
+	};
+
+	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+	t3d::set_render_target(destination_target);
+	t3d::set_viewport(window->client_size);
+	t3d::clear(destination_target, t3d::ClearFlags_color | t3d::ClearFlags_depth, V4f(.1), 1);
+
+	u32 light_index = 0;
+	for_each_component_of_type(Light, light) {
+		defer {
+			++light_index;
+		};
+
+		auto &light_entity = entities[light.entity_index];
+
+		t3d::update_shader_constants(light_constants, {
+			.world_to_light_matrix = light.world_to_light_matrix,
+			.light_position = light_entity.position,
+			.light_intensity = 100,
+			.light_index = light_index,
+		});
+
+
+		t3d::set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
+		t3d::set_texture(light.texture, LIGHT_TEXTURE_SLOT);
+		for_each_component_of_type(MeshRenderer, mesh_renderer) {
+			auto &mesh_entity = entities[mesh_renderer.entity_index];
+
+			t3d::set_shader(mesh_renderer.material->shader);
+			t3d::set_shader_constants(mesh_renderer.material->constants, 0);
+
+
+			EntityConstants entity_data = {};
+			entity_data.local_to_camera_matrix = world_to_camera_matrix * m4::translation(mesh_entity.position) * m4::rotation_r_zxy(mesh_entity.rotation);
+			t3d::update_shader_constants(entity_constants, entity_data);
+			t3d::set_texture(mesh_renderer.lightmap, LIGHTMAP_TEXTURE_SLOT);
+			draw_mesh(mesh_renderer.mesh);
+		};
+		t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
+		t3d::set_rasterizer(t3d::get_rasterizer()
+			.set_depth_test(true)
+			.set_depth_write(false)
+			.set_depth_func(t3d::Comparison_equal)
+		);
+	};
+
+	t3d::set_rasterizer(t3d::get_rasterizer()
+		.set_depth_test(true)
+		.set_depth_write(false)
+		.set_depth_func(t3d::Comparison_equal)
+	);
+	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+
+	t3d::set_shader(sky_box_shader);
+	t3d::set_texture(sky_box_texture, 0);
+	t3d::draw(36);
+
+	swap(source_target, destination_target);
+
+	// print("%\n", handle_window_position);
+
+
+	if (false) {
+		t3d::set_rasterizer(
+			t3d::get_rasterizer()
+				.set_depth_test(false)
+				.set_depth_write(false)
+		);
+
+		t3d::set_render_target(destination_target);
+		t3d::set_viewport(t3d::back_buffer->color->size);
+		t3d::set_shader(blit_shader);
+		t3d::set_texture(source_target->color, 0);
+		t3d::draw(3);
+	} else {
+		for (auto &effect : post_effects) {
+			if (&effect == &post_effects.back()) {
+				effect.render(source_target, t3d::back_buffer);
+			} else {
+				effect.render(source_target, destination_target);
+			}
+			swap(source_target, destination_target);
+		}
+	}
+
+}
+
 s32 tl_main(Span<Span<utf8>> arguments) {
 	current_printer = console_printer;
 
@@ -906,8 +1063,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		t3d::set_compute_buffer(average_shader_buffer, AVERAGE_COMPUTE_SLOT);
 
 		auto &exposure = add_post_effect<Exposure>();
-		exposure.scale = 0.2f;
-		exposure.limit_min = 0;
+		exposure.scale = 0.5f;
+		exposure.limit_min = 1.0f / 16;
 		exposure.limit_max = 1024;
 		exposure.approach_kind = Exposure::Approach_log_lerp;
 		exposure.mask_kind = Exposure::Mask_one;
@@ -923,12 +1080,6 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 				surface_material.constants = t3d::create_shader_constants(sizeof(SurfaceConstants));
 				t3d::update_shader_constants(surface_material.constants, SurfaceConstants{.color = {1,1,1,1}});
 				surface_material.shader = create_shader(u8R"(
-#ifdef VERTEX_SHADER
-#define V2F out
-#else
-#define V2F in
-#endif
-
 layout (std140, binding=0) uniform _ {
 	vec4 u_color;
 };
@@ -939,15 +1090,14 @@ V2F vec3 vertex_world_position;
 V2F vec3 vertex_view_direction;
 V2F vec3 vertex_to_light_direction;
 V2F vec4 vertex_position_in_light_space;
-
-layout(binding=0) uniform sampler2DShadow shadow_map;
-layout(binding=1) uniform sampler2D light_texture;
+V2F vec2 vertex_uv;
 
 #ifdef VERTEX_SHADER
 
 layout(location=0) in vec3 position;
 layout(location=1) in vec3 normal;
 layout(location=2) in vec4 color;
+layout(location=3) in vec2 uv;
 
 void main() {
 	vec3 local_position = position;
@@ -957,6 +1107,7 @@ void main() {
 	vertex_position_in_light_space = world_to_light_matrix * vec4(vertex_world_position, 1);
 	vertex_view_direction = camera_position - vertex_world_position;
 	vertex_to_light_direction = light_position - vertex_world_position;
+	vertex_uv = uv;
 	gl_Position = local_to_camera_matrix * vec4(local_position, 1);
 }
 #endif
@@ -967,42 +1118,44 @@ void main() {
 
 	vec3 light_space = (vertex_position_in_light_space.xyz / vertex_position_in_light_space.w) * 0.5 + 0.5;
 
-	float light = sample_shadow_map(shadow_map, light_space, 0.002f);
+	float light = sample_shadow_map(shadow_map, light_space, 0.001f);
 	light *= light_intensity / length_squared(vertex_to_light_direction);
 	fragment_color *= light * texture(light_texture, light_space.xy);
 
-	//fragment_color = vec4(light_space.xy, 0, 1);
+	if (light_index == 0) {
+		fragment_color += texture(lightmap_texture, vertex_uv) / pi;
+	}
+
+	//fragment_color = texture(lightmap_texture, vertex_uv);
 }
 #endif
 )"s);
+				handle_constants = t3d::create_shader_constants<HandleConstants>();
 				handle_shader = create_shader(u8R"(
-#ifdef VERTEX_SHADER
-#define V2F out
-#else
-#define V2F in
-#endif
-
 layout (std140, binding=0) uniform _ {
-	vec4 u_color;
+	vec3 u_color;
+	float selected;
 };
 
 V2F vec4 vertex_color;
+V2F vec3 vertex_normal;
 
 #ifdef VERTEX_SHADER
 
 layout(location=0) in vec3 position;
-layout(location=2) in vec4 color;
+layout(location=1) in vec3 normal;
 
 void main() {
 	vec3 local_position = position;
-	vertex_color = color;
+	vertex_color = vec4(u_color, 1);
+	vertex_normal = normal;
 	gl_Position = local_to_camera_matrix * vec4(local_position, 1);
 }
 #endif
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
-	fragment_color = vertex_color;
+	fragment_color = mix(mix(vec4(0.5f), vertex_color * 0.5, dot(vertex_normal, -camera_forward) * 0.5 + 0.5), vertex_color, selected);
 }
 #endif
 )"s);
@@ -1037,6 +1190,42 @@ void main() {
 }
 #endif
 )"s);
+				blit_color_constants = t3d::create_shader_constants<BlitColorConstants>();
+				blit_color_shader = t3d::create_shader(u8R"(
+#ifdef VERTEX_SHADER
+#define V2F out
+#else
+#define V2F in
+#endif
+
+layout (std140, binding=0) uniform _ {
+	vec4 u_color;
+};
+
+layout(binding=0) uniform sampler2D main_texture;
+
+V2F vec2 vertex_uv;
+
+#ifdef VERTEX_SHADER
+
+void main() {
+	vec2 positions[] = vec2[](
+		vec2(-1, 3),
+		vec2(-1,-1),
+		vec2( 3,-1)
+	);
+	vec2 position = positions[gl_VertexID];
+	vertex_uv = position * 0.5 + 0.5;
+	gl_Position = vec4(position, 0, 1);
+}
+#endif
+#ifdef FRAGMENT_SHADER
+out vec4 fragment_color;
+void main() {
+	fragment_color = texture(main_texture, vertex_uv) * u_color;
+}
+#endif
+)"s);
 				shadow_map_shader = create_shader(u8R"(
 #ifdef VERTEX_SHADER
 
@@ -1049,6 +1238,46 @@ void main() {
 #endif
 #ifdef FRAGMENT_SHADER
 void main() {
+}
+#endif
+)"s);
+				sky_box_shader = create_shader(u8R"(
+layout(binding=0) uniform samplerCube sky_box;
+
+V2F vec3 vertex_uv;
+
+#ifdef VERTEX_SHADER
+
+void main() {
+	vec3 positions[] = vec3[](
+		vec3( 1, 1, 1),
+		vec3( 1, 1,-1),
+		vec3( 1,-1, 1),
+		vec3( 1,-1,-1),
+		vec3(-1, 1, 1),
+		vec3(-1, 1,-1),
+		vec3(-1,-1, 1),
+		vec3(-1,-1,-1)
+	);
+	uint indices[] = uint[](
+		5, 4, 7, 7, 4, 6,
+		1, 5, 3, 3, 5, 7,
+		0, 1, 2, 2, 1, 3,
+		4, 0, 6, 6, 0, 2,
+		1, 0, 5, 5, 0, 4,
+		7, 6, 3, 3, 6, 2
+	);
+	vec3 local_position = positions[indices[gl_VertexID]];
+	vertex_uv = local_position;
+	gl_Position = camera_rotation_projection_matrix * vec4(local_position, 1);
+}
+#endif
+#ifdef FRAGMENT_SHADER
+out vec4 fragment_color;
+void main() {
+	fragment_color = texture(sky_box, vertex_uv);
+	//fragment_color = pow(fragment_color, vec4(1/2.2));
+	gl_FragDepth = 1;
 }
 #endif
 )"s);
@@ -1136,6 +1365,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			*/
 		}
 
+		u32 white_pixel = ~0;
+		white_texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &white_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+
+		u32 black_pixel = 0xFF000000;
+		black_texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &black_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+
 		auto &suzanne         = entities.add();
 		auto &floor           = entities.add();
 
@@ -1149,9 +1384,17 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			auto &mr = add_component<MeshRenderer>(floor);
 			mr.mesh = load_mesh(TL_FILE_STRING("../data/floor.glb"ts));
 			mr.material = &surface_material;
+			mr.lightmap = t3d::load_texture(TL_FILE_STRING("../data/floor_lightmap.png"ts));
 		}
 
-		handle_mesh = load_mesh(TL_FILE_STRING("../data/position handle.glb"ts));
+		auto handle_meshes = parse_glb_from_file(TL_FILE_STRING("../data/handle.glb"ts)).get();
+		handle_center_mesh  = create_mesh(*handle_meshes.get_node(u8"Center"s).mesh);
+		handle_axis_x_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisX"s ).mesh);
+		handle_axis_y_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisY"s ).mesh);
+		handle_axis_z_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisZ"s ).mesh);
+		handle_plane_x_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneX"s).mesh);
+		handle_plane_y_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneY"s).mesh);
+		handle_plane_z_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneZ"s).mesh);
 
 		auto light_texture = t3d::load_texture(TL_FILE_STRING("../data/spotlight_mask.png"ts));
 
@@ -1170,145 +1413,149 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			add_component<Light>(light).texture = light_texture;
 		}
 
+		auto &camera_entity = entities.add();
+		auto &camera = add_component<Camera>(camera_entity);
 
+		sky_box_texture = t3d::load_texture({
+			.left   = TL_FILE_STRING("../data/sky_x+.hdr"ts),
+			.right  = TL_FILE_STRING("../data/sky_x-.hdr"ts),
+			.top    = TL_FILE_STRING("../data/sky_y+.hdr"ts),
+			.bottom = TL_FILE_STRING("../data/sky_y-.hdr"ts),
+			.front  = TL_FILE_STRING("../data/sky_z-.hdr"ts),
+			.back   = TL_FILE_STRING("../data/sky_z+.hdr"ts),
+		});
 	};
 	info.on_draw = [](Window &window) {
-		camera_rotation.x -= window.mouse_delta.y * 0.01f;
-		camera_rotation.y -= window.mouse_delta.x * 0.01f;
-
-		v3f camera_position_delta = {};
-		if (key_held(Key_d)) camera_position_delta.x += 1;
-		if (key_held(Key_a)) camera_position_delta.x -= 1;
-		if (key_held(Key_e)) camera_position_delta.y += 1;
-		if (key_held(Key_q)) camera_position_delta.y -= 1;
-		if (key_held(Key_s)) camera_position_delta.z += 1;
-		if (key_held(Key_w)) camera_position_delta.z -= 1;
-		if (camera_position_delta == v3f{}) {
-			camera_velocity = 1;
-		} else {
-			camera_velocity += frame_time;
-		}
-		camera_position += m3::rotation_r_zxy(camera_rotation) * camera_position_delta * frame_time * camera_velocity;
-
-		m4 camera_projection_matrix = m4::perspective_right_handed((f32)window.client_size.x / window.client_size.y, radians(90), 0.1f, 100.0f);
-		m4 camera_translation_matrix = m4::translation(-camera_position);
-		m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_rotation);
-		m4 world_to_camera_matrix = camera_projection_matrix * camera_rotation_matrix * camera_translation_matrix;
-
-		auto world_to_camera = [&](v4f point) {
-			auto p = world_to_camera_matrix * point;
-			return p.xy / p.w;
-		};
-		auto world_to_camera3 = [&](v3f point) {
-			return world_to_camera(V4f(point, 1));
-		};
-
-		GlobalConstants global_data = {};
-		global_data.camera_position = camera_position;
-		t3d::update_shader_constants(global_constants, global_data);
-
-		t3d::set_rasterizer(
-			t3d::get_rasterizer()
-				.set_depth_test(true)
-				.set_depth_write(true)
-				.set_depth_func(t3d::Comparison_less)
-		);
-		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-
-		for_each_component_of_type(Light, light) {
-			auto &light_entity = entities[light.entity_index];
-
-			t3d::set_render_target(light.shadow_map);
-			t3d::set_viewport(shadow_map_resolution, shadow_map_resolution);
-			t3d::clear(light.shadow_map, t3d::ClearFlags_depth, {}, 1);
-
-			t3d::set_shader(shadow_map_shader);
-
-			light.world_to_light_matrix = m4::perspective_right_handed(1, radians(90), 0.1f, 100.0f) * m4::rotation_r_yxz(-light_entity.rotation) * m4::translation(-light_entity.position);
-
-			for_each_component_of_type(MeshRenderer, mesh_renderer) {
-				auto &mesh_entity = entities[mesh_renderer.entity_index];
-				t3d::update_shader_constants(entity_constants, shader_value_location(EntityConstants, local_to_camera_matrix), light.world_to_light_matrix * m4::translation(mesh_entity.position));
-				draw_mesh(mesh_renderer.mesh);
-			};
-		};
+		update_frame();
 
 		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-		t3d::set_render_target(destination_target);
-		t3d::set_viewport(window.client_size);
-		t3d::clear(destination_target, t3d::ClearFlags_color | t3d::ClearFlags_depth, V4f(.1), 1);
 
-		for_each_component_of_type(Light, light) {
-			auto &light_entity = entities[light.entity_index];
+		f32 const handle_size_scale = 0.25f;
+		f32 const handle_grab_thickness = 0.1f;
+		f32 handle_size = handle_size_scale * main_camera->fov / (pi * 0.5f);
+		m4 handle_matrix = m4::translation(selected_entity->position) * m4::rotation_r_zxy(selected_entity->rotation) * m4::scale(handle_size * dot(selected_entity->position - camera_position, m3::rotation_r_zxy(camera_rotation) * v3f{0,0,-1}));
 
-			LightConstants light_data = {};
-			light_data.world_to_light_matrix = light.world_to_light_matrix;
-			light_data.light_position = light_entity.position;
-			light_data.light_intensity = 10;
-			t3d::update_shader_constants(light_constants, light_data);
+		v3f handle_world_x = (handle_matrix * v4f{1,0,0,1}).xyz;
+		v3f handle_world_y = (handle_matrix * v4f{0,1,0,1}).xyz;
+		v3f handle_world_z = (handle_matrix * v4f{0,0,1,1}).xyz;
+		Array<v3f, 3> handle_world_axes = { handle_world_x, handle_world_y, handle_world_z };
 
+		v2f handle_window_position = world_to_window(handle_matrix * v4f{0,0,0,1});
+		v2f handle_window_x = world_to_window(handle_world_x);
+		v2f handle_window_y = world_to_window(handle_world_y);
+		v2f handle_window_z = world_to_window(handle_world_z);
+		Array<v2f, 3> handle_window_axes = { handle_window_x, handle_window_y, handle_window_z };
 
-			t3d::set_texture(light.shadow_map->depth, 0);
-			t3d::set_texture(light.texture, 1);
-			for_each_component_of_type(MeshRenderer, mesh_renderer) {
-				auto &mesh_entity = entities[mesh_renderer.entity_index];
-
-				t3d::set_shader(mesh_renderer.material->shader);
-				t3d::set_shader_constants(mesh_renderer.material->constants, 0);
-
-
-				EntityConstants entity_data = {};
-				entity_data.local_to_camera_matrix = world_to_camera_matrix * m4::translation(mesh_entity.position) * m4::rotation_r_zxy(mesh_entity.rotation);
-				t3d::update_shader_constants(entity_constants, entity_data);
-				draw_mesh(mesh_renderer.mesh);
-			};
-			t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
-			t3d::set_rasterizer(t3d::get_rasterizer()
-				.set_depth_test(true)
-				.set_depth_write(false)
-				.set_depth_func(t3d::Comparison_equal)
-			);
+		Array<v2f, 3> handle_window_planes = {
+			world_to_window((handle_matrix * v4f{0,   0.4f,0.4f,1}).xyz),
+			world_to_window((handle_matrix * v4f{0.4f,0,   0.4f,1}).xyz),
+			world_to_window((handle_matrix * v4f{0.4f,0.4f,0,   1}).xyz),
 		};
 
-		swap(source_target, destination_target);
 
-		m4 handle_matrix = m4::translation(selected_entity->position) * m4::rotation_r_zxy(selected_entity->rotation) * m4::scale(0.25f * distance(selected_entity->position, camera_position));
+		f32 closest_dist = max_value<f32>;
+		u32 closest_element = -1;
+		for (u32 axis_index = 0; axis_index != 3; ++axis_index) {
+			f32 dist = distance(line_begin_end(handle_window_axes[axis_index], handle_window_position), (v2f)window.mouse_position);
+			if (dist < closest_dist) {
+				closest_dist = dist;
+				closest_element = axis_index;
+			}
 
-		// print("%\n", handle_position);
-
-
-		if (false) {
-			t3d::set_rasterizer(
-				t3d::get_rasterizer()
-					.set_depth_test(false)
-					.set_depth_write(false)
-			);
-
-			t3d::set_render_target(destination_target);
-			t3d::set_viewport(t3d::back_buffer->color->size);
-			t3d::set_shader(blit_shader);
-			t3d::set_texture(source_target->color, 0);
-			t3d::draw(3);
-		} else {
-			for (auto &effect : post_effects) {
-				if (&effect == &post_effects.back()) {
-					effect.render(source_target, t3d::back_buffer);
-				} else {
-					effect.render(source_target, destination_target);
-				}
-				swap(source_target, destination_target);
+			dist = distance(handle_window_planes[axis_index], (v2f)window.mouse_position);
+			if (dist < closest_dist) {
+				closest_dist = dist;
+				closest_element = axis_index + 3;
 			}
 		}
 
-		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+		static u32 dragging_element = -1;
+		static v3f dragging_offset;
+
+		m4 camera_to_world_matrix = inverse(world_to_camera_matrix);
+
+		auto get_drag_cursor_world_position = [&]() {
+			if (dragging_element < 3) {
+				v2f closest_in_window = closest_point_unclamped(line_begin_end(handle_window_position, handle_window_axes[dragging_element]), (v2f)window.mouse_position);
+
+				v4f end = camera_to_world_matrix * V4f(map(closest_in_window, {}, (v2f)window.client_size, {-1,1}, {1,-1}),1, 1);
+				ray<v3f> cursor_ray = ray_origin_end(camera_position, end.xyz / end.w);
+
+				cursor_ray.direction = normalize(cursor_ray.direction);
+				return closest_point(line_begin_end(selected_entity->position, handle_world_axes[dragging_element]), as_line(cursor_ray));
+			} else {
+				v3f plane_normal = handle_world_axes[dragging_element - 3] - selected_entity->position;
+
+				v4f end = camera_to_world_matrix * V4f(map((v2f)window.mouse_position, {}, (v2f)window.client_size, {-1,1}, {1,-1}),1, 1);
+				ray<v3f> cursor_ray = ray_origin_end(camera_position, end.xyz / end.w);
+
+				auto d = dot(selected_entity->position, -plane_normal);
+				auto t = -(d + dot(cursor_ray.origin, plane_normal)) / dot(cursor_ray.direction, plane_normal);
+				return cursor_ray.origin + t * cursor_ray.direction;
+			}
+		};
+
+		v3f handle_color = V3f(0.5f);
+		if (closest_dist < window.client_size.y * handle_grab_thickness) {
+			handle_color.s[closest_element % 3] = 1;
+			if (mouse_down(0)) {
+				dragging_element = closest_element;
+				dragging_offset = selected_entity->position - get_drag_cursor_world_position();
+			}
+		} else {
+			closest_element = -1;
+		}
+
+		if (mouse_up(0)) {
+			dragging_element = -1;
+		}
+
+
+
+		if (dragging_element != -1) {
+			selected_entity->position = get_drag_cursor_world_position() + dragging_offset;
+		}
+
+
+		t3d::clear(t3d::back_buffer, t3d::ClearFlags_depth, {}, 1);
+
+		t3d::set_rasterizer({
+			.depth_test = true,
+			.depth_write = true,
+			.depth_func = t3d::Comparison_less,
+		});
 
 		EntityConstants entity_data = {};
-		entity_data.local_to_camera_matrix = world_to_camera_matrix * handle_matrix;
+		v3f camera_to_handle_direction = normalize(selected_entity->position - camera_position);
+		entity_data.local_to_camera_matrix =
+			world_to_camera_matrix
+			* m4::translation(camera_position + camera_to_handle_direction)
+			* m4::rotation_r_zxy(selected_entity->rotation)
+			* m4::scale(handle_size * dot(camera_to_handle_direction, m3::rotation_r_zxy(camera_rotation) * v3f{0,0,-1}));
 		t3d::update_shader_constants(entity_constants, entity_data);
 		t3d::set_shader(handle_shader);
-		draw_mesh(handle_mesh);
+		t3d::set_shader_constants(handle_constants, 0);
 
-		v2f handle_position = map(world_to_camera(handle_matrix * v4f{0,0,0,1}), {-1,1}, {1,-1}, {0,0}, (v2f)window.client_size);
+		t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(closest_element != -1)});
+		draw_mesh(handle_center_mesh);
+
+		t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(closest_element == 0)});
+		draw_mesh(handle_axis_x_mesh);
+
+		t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(closest_element == 1)});
+		draw_mesh(handle_axis_y_mesh);
+
+		t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(closest_element == 2)});
+		draw_mesh(handle_axis_z_mesh);
+
+		t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(closest_element == 3)});
+		draw_mesh(handle_plane_x_mesh);
+
+		t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(closest_element == 4)});
+		draw_mesh(handle_plane_y_mesh);
+
+		t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(closest_element == 5)});
+		draw_mesh(handle_plane_z_mesh);
 
 		t3d::present();
 
@@ -1332,7 +1579,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}
 	};
 
-	Window *window = create_window(info);
+	window = create_window(info);
 	assert_always(window);
 
 	frame_timer = create_precise_timer();

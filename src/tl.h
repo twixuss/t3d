@@ -8,4 +8,4 @@
 #include "../dep/tl/include/tl/mesh.h"
 #include "../dep/tl/include/tl/opengl.h"
 #include "../include/t3d.h"
-#include "components.h"
+#include "component_list.h"

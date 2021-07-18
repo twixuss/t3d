@@ -34,6 +34,7 @@ struct TextureImpl : Texture {
 	GLuint format;
 	GLuint internal_format;
 	GLuint type;
+	GLuint target;
 	u32 bytes_per_texel;
 };
 
@@ -137,9 +138,10 @@ GLuint get_filter(TextureFiltering filter) {
 }
 GLuint get_func(Comparison comparison) {
 	switch (comparison) {
-		case Comparison_none:  return GL_NONE;
-		case Comparison_equal: return GL_EQUAL;
-		case Comparison_less:  return GL_LESS;
+		case Comparison_none:   return GL_NONE;
+		case Comparison_always: return GL_ALWAYS;
+		case Comparison_equal:  return GL_EQUAL;
+		case Comparison_less:   return GL_LESS;
 	}
 	invalid_code_path();
 	return 0;
@@ -150,8 +152,10 @@ GLuint get_format(TextureFormat format) {
 		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
 		case TextureFormat_r_f32:    return GL_RED;
 		case TextureFormat_rgb_f16:  return GL_RGB;
+		case TextureFormat_rgb_f32:  return GL_RGB;
 		case TextureFormat_rgba_u8n: return GL_RGBA;
 		case TextureFormat_rgba_f16: return GL_RGBA;
+		case TextureFormat_rgba_f32: return GL_RGBA;
 	}
 	invalid_code_path();
 	return 0;
@@ -162,8 +166,10 @@ GLuint get_internal_format(TextureFormat format) {
 		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
 		case TextureFormat_r_f32:    return GL_R32F;
 		case TextureFormat_rgb_f16:  return GL_RGB16F;
+		case TextureFormat_rgb_f32:  return GL_RGB32F;
 		case TextureFormat_rgba_u8n: return GL_RGBA8;
 		case TextureFormat_rgba_f16: return GL_RGBA16F;
+		case TextureFormat_rgba_f32: return GL_RGBA32F;
 	}
 	invalid_code_path();
 	return 0;
@@ -174,8 +180,10 @@ GLuint get_type(TextureFormat format) {
 		case TextureFormat_depth:    return GL_FLOAT;
 		case TextureFormat_r_f32:    return GL_FLOAT;
 		case TextureFormat_rgb_f16:  return GL_FLOAT;
+		case TextureFormat_rgb_f32:  return GL_FLOAT;
 		case TextureFormat_rgba_u8n: return GL_UNSIGNED_BYTE;
 		case TextureFormat_rgba_f16: return GL_FLOAT;
+		case TextureFormat_rgba_f32: return GL_FLOAT;
 	}
 	invalid_code_path();
 	return 0;
@@ -185,8 +193,10 @@ u32 get_bytes_per_texel(TextureFormat format) {
 		case TextureFormat_depth:    return 4;
 		case TextureFormat_r_f32:    return 4;
 		case TextureFormat_rgb_f16:  return 6;
+		case TextureFormat_rgb_f32:  return 12;
 		case TextureFormat_rgba_u8n: return 4;
 		case TextureFormat_rgba_f16: return 8;
+		case TextureFormat_rgba_f32: return 16;
 	}
 	invalid_code_path();
 	return 0;
@@ -239,11 +249,11 @@ GLuint get_sampler(TextureFiltering filtering, Comparison comparison) {
 }
 
 void resize_texture_gl(Texture *_texture, u32 width, u32 height) {
-	auto texture = (TextureImpl *)_texture;
-	texture->size = {width, height};
-	glBindTexture(GL_TEXTURE_2D, texture->texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, texture->internal_format, width, height, 0, texture->format, texture->type, NULL);
-	glBindTexture(GL_TEXTURE_2D, 0);
+	auto &texture = *(TextureImpl *)_texture;
+	texture.size = {width, height};
+	glBindTexture(texture.target, texture.texture);
+	glTexImage2D(texture.target, 0, texture.internal_format, width, height, 0, texture.format, texture.type, NULL);
+	glBindTexture(texture.target, 0);
 }
 
 bool init(InitInfo init_info) {
@@ -444,10 +454,10 @@ bool init(InitInfo init_info) {
 		auto &texture = *(TextureImpl *)_texture;
 		glActiveTexture(GL_TEXTURE0 + slot);
 		if (_texture) {
-			glBindTexture(GL_TEXTURE_2D, texture.texture);
+			glBindTexture(texture.target, texture.texture);
 			glBindSampler(slot, texture.sampler);
 		} else {
-			glBindTexture(GL_TEXTURE_2D, 0);
+			glBindTexture(texture.target, 0);
 			glBindSampler(slot, 0);
 		}
 	};
@@ -466,20 +476,12 @@ bool init(InitInfo init_info) {
 		result.format          = get_format(format);
 		result.type            = get_type(format);
 		result.bytes_per_texel = get_bytes_per_texel(format);
+		result.target = GL_TEXTURE_2D;
 
 		glGenTextures(1, &result.texture);
 		glBindTexture(GL_TEXTURE_2D, result.texture);
 		glTexImage2D(GL_TEXTURE_2D, 0, result.internal_format, width, height, 0, result.format, result.type, data);
-
-		v2s size;
-		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH,  &size.x);
-		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &size.y);
-		print("create_texture: %x%\n", size.x, size.y);
-
 		glBindTexture(GL_TEXTURE_2D, 0);
-
-
-
 
 		result.sampler = get_sampler(filtering, comparison);
 
@@ -494,8 +496,10 @@ bool init(InitInfo init_info) {
 			}
 		}
 
-		if (rasterizer.depth_func != state.rasterizer.depth_func) {
-			glDepthFunc(get_func((Comparison)rasterizer.depth_func));
+		if (rasterizer.depth_test) {
+			if (rasterizer.depth_func != state.rasterizer.depth_func) {
+				glDepthFunc(get_func((Comparison)rasterizer.depth_func));
+			}
 		}
 
 		//if (rasterizer.depth_write != state.rasterizer.depth_write) {
@@ -580,6 +584,34 @@ bool init(InitInfo init_info) {
 				glBlendFunc(get_blend(source), get_blend(destination));
 			}
 		}
+	};
+	_create_cube_texture = [](CreateTextureFlags flags, u32 width, u32 height, void *data[6], TextureFormat format, TextureFiltering filtering, Comparison comparison) -> Texture * {
+		auto &result = state.textures.add();
+
+		result.size = {width, height};
+
+		if (flags & CreateTexture_resize_with_window) {
+			state.window_sized_textures.add(&result);
+			width  = state.window_size.x;
+			height = state.window_size.y;
+		}
+
+		result.internal_format = get_internal_format(format);
+		result.format          = get_format(format);
+		result.type            = get_type(format);
+		result.bytes_per_texel = get_bytes_per_texel(format);
+		result.target          = GL_TEXTURE_CUBE_MAP;
+
+		glGenTextures(1, &result.texture);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, result.texture);
+		for (u32 i = 0; i < 6; ++i) {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, result.internal_format, width, height, 0, result.format, result.type, data[i]);
+		}
+		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+		result.sampler = get_sampler(filtering, comparison);
+
+		return &result;
 	};
 
 	return true;
