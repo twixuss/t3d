@@ -13,8 +13,8 @@ APIS(A)
 RenderTarget *back_buffer;
 v2u min_texture_size;
 
-namespace d3d11 { bool init(InitInfo init_info); }
-namespace gl    { bool init(InitInfo init_info); }
+namespace d3d11 { bool init(InitInfo init_info); void free(); }
+namespace gl    { bool init(InitInfo init_info); void free(); }
 
 static bool init_api(GraphicsApi api, InitInfo init_info) {
 	switch (api) {
@@ -32,8 +32,18 @@ APIS(A)
 	return result;
 }
 
+GraphicsApi current_api;
+
 bool init(GraphicsApi api, InitInfo init_info) {
-	return init_api(api, init_info) && check_api();
+	return current_api = api, init_api(api, init_info) && check_api();
+}
+
+void free() {
+	switch (current_api) {
+		case t3d::GraphicsApi_d3d11: return d3d11::free();
+		case t3d::GraphicsApi_opengl: return gl::free();
+	}
+	current_api = {};
 }
 
 Pixels load_pixels(Span<filechar> path) {

@@ -304,17 +304,17 @@ bool init(InitInfo init_info) {
 	_draw_indexed = [](u32 index_count) {
 		state->immediate_context->DrawIndexed(index_count, 0, 0);
 	};
-	_set_viewport = [](u32 x, u32 y, u32 w, u32 h) {
-		D3D11_VIEWPORT v = {
-			.TopLeftX = (FLOAT)x,
-			.TopLeftY = (FLOAT)y,
-			.Width = (FLOAT)w,
-			.Height = (FLOAT)h,
-			.MinDepth = 0,
-			.MaxDepth = 1,
-		};
-		state->immediate_context->RSSetViewports(1, &v);
-	};
+	//_set_viewport = [](u32 x, u32 y, u32 w, u32 h) {
+	//	D3D11_VIEWPORT v = {
+	//		.TopLeftX = (FLOAT)x,
+	//		.TopLeftY = (FLOAT)y,
+	//		.Width = (FLOAT)w,
+	//		.Height = (FLOAT)h,
+	//		.MinDepth = 0,
+	//		.MaxDepth = 1,
+	//	};
+	//	state->immediate_context->RSSetViewports(1, &v);
+	//};
 	/*
 	_resize = [](RenderTarget *render_target, u32 w, u32 h) {
 		if (render_target == 0) {
@@ -467,6 +467,10 @@ bool init(InitInfo init_info) {
 	*/
 
 	return true;
+}
+
+void free() {
+
 }
 
 }

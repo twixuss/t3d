@@ -31,8 +31,11 @@ union ComponentIndex {
 	};
 };
 
+struct Entity;
+
 struct Component {
 	tl::u32 entity_index;
+	Entity &entity() const;
 };
 
 
@@ -69,7 +72,7 @@ inline constexpr tl::u32 get_component_type_index() {
 	return index;
 }
 
-template <class Component, class ...Args>
+template <class Component, class ...Args, class = EnableIf<std::is_base_of_v<::Component, Component>>>
 void on_create(Component &component, Args const &...args) {
 }
 
@@ -90,6 +93,7 @@ struct ComponentStorage {
 	tl::Allocator allocator = tl::current_allocator;
 	tl::umm bytes_per_entry = 0;
 	tl::List<Block *> blocks;
+	void (*free_entry)(void *entry);
 
 	struct Added {
 		void *pointer;
@@ -120,7 +124,7 @@ struct ComponentStorage {
 					block->unfull_mask_count -= 1;
 
 				result.pointer = (tl::u8 *)block->values() + value_index * bytes_per_entry;
-				result.index = block_index * values_per_block;
+				result.index = block_index * values_per_block + value_index;
 				return result;
 			}
 		}
@@ -136,15 +140,38 @@ struct ComponentStorage {
 
 		return result;
 	}
+
+	void remove_at(ComponentIndexBase index) {
+		auto block_index = index / values_per_block;
+		auto value_index = index % values_per_block;
+
+		auto mask_index = value_index / bits_in_mask;
+		auto bit_index  = value_index % bits_in_mask;
+
+		auto &block = blocks[block_index];
+
+		auto mask = block->masks()[mask_index];
+		bounds_check(mask & ((Mask)1 << bit_index), "attempt to remove non-existant component");
+		mask &= ~((Mask)1 << bit_index);
+		block->masks()[mask_index] = mask;
+
+		free_entry((u8 *)block->values() + value_index * bytes_per_entry);
+	}
 };
 
 ComponentStorage component_storages[component_type_count];
+
+template <class Component>
+void free_component(void *data) {
+	((Component *)data)->free();
+}
 
 template <class Component>
 void init_component_storage(tl::u32 index) {
 	auto &storage = component_storages[index];
 	tl::construct(storage);
 	storage.bytes_per_entry = sizeof(Component);
+	storage.free_entry = free_component<Component>;
 }
 
 
@@ -183,5 +210,14 @@ struct ComponentStorageIterator {
 	}
 };
 
-#define for_each_component_of_type(type, name) ComponentStorageIterator<type> CONCAT(_component_iterator_, __LINE__) = [&](type &name)
-#define for_all_components() ComponentStorageIterator<type> CONCAT(_component_iterator_, __LINE__) = [&](type &name)
+void free_component_storages() {
+	for (auto &storage : component_storages) {
+		for (auto &block : storage.blocks) {
+			storage.allocator.free(block);
+		}
+		free(storage.blocks);
+	}
+}
+
+#define for_each_component_of_type(type, name) ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
+#define for_all_components() ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)

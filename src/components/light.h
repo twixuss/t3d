@@ -8,6 +8,10 @@ struct Light : Component {
 	t3d::RenderTarget *shadow_map;
 	t3d::Texture *texture;
 	m4 world_to_light_matrix;
+
+	void free() {
+
+	}
 };
 
 template <>

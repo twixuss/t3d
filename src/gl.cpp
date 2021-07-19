@@ -288,7 +288,9 @@ bool init(InitInfo init_info) {
 		if (flags & ClearFlags_depth) { mask |= GL_DEPTH_BUFFER_BIT; glClearDepth(depth); }
 		glClear(mask);
 
-		bind_render_target(*previously_bound_render_target);
+		if (previously_bound_render_target) {
+			bind_render_target(*previously_bound_render_target);
+		}
 	};
 	_present = []() {
 		gl::present();
@@ -300,8 +302,8 @@ bool init(InitInfo init_info) {
 		assert(state.current_index_buffer, "Index buffer was not bound");
 		glDrawElements(GL_TRIANGLES, index_count, state.current_index_buffer->type, 0);
 	};
-	_set_viewport = [](u32 x, u32 y, u32 w, u32 h) {
-		glViewport(x, y, w, h);
+	_set_viewport = [](Viewport viewport) {
+		glViewport(viewport.x, viewport.y, viewport.w, viewport.h);
 	};
 	_resize_render_targets = [](u32 width, u32 height) {
 		for (auto texture : state.window_sized_textures) {
@@ -615,6 +617,41 @@ bool init(InitInfo init_info) {
 	};
 
 	return true;
+}
+
+void free() {
+	/*
+	MaskedBlockList<ShaderImpl, 256> shaders;
+	MaskedBlockList<VertexBufferImpl, 256> vertex_buffers;
+	MaskedBlockList<IndexBufferImpl, 256> index_buffers;
+	MaskedBlockList<RenderTargetImpl, 256> render_targets;
+	MaskedBlockList<TextureImpl, 256> textures;
+	MaskedBlockList<ShaderConstantsImpl, 256> shader_constants;
+	MaskedBlockList<ComputeShaderImpl, 256> compute_shaders;
+	MaskedBlockList<ComputeBufferImpl, 256> compute_buffers;
+	IndexBufferImpl *current_index_buffer;
+	RenderTargetImpl back_buffer;
+	TextureImpl back_buffer_color;
+	TextureImpl back_buffer_depth;
+	RenderTargetImpl *currently_bound_render_target;
+	StaticHashMap<SamplerKey, GLuint, 256> samplers;
+	v2u window_size;
+	List<TextureImpl *> window_sized_textures;
+	RasterizerState rasterizer;
+	BlendFunction blend_function;
+	Blend blend_source;
+	Blend blend_destination;
+	*/
+	free(state.shaders);
+	free(state.vertex_buffers);
+	free(state.index_buffers);
+	free(state.render_targets);
+	free(state.textures);
+	free(state.shader_constants);
+	free(state.compute_shaders);
+	free(state.compute_buffers);
+	free(state.samplers);
+	free(state.window_sized_textures);
 }
 
 }

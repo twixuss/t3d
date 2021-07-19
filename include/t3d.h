@@ -126,6 +126,7 @@ union CubeTexturePaths {
 	Span<filechar> paths[6];
 };
 
+// position is bottom left
 union Viewport {
 	struct {
 		s32 x, y;
@@ -135,6 +136,12 @@ union Viewport {
 		v2s position;
 		v2u size;
 	};
+	v2s top_left() const {
+		return { x, y + (s32)h };
+	}
+	v2s bottom_right() const {
+		return { x + (s32)w, y };
+	}
 };
 
 #define APIS(A) \
@@ -142,7 +149,7 @@ A(void, clear, (RenderTarget *render_target, ClearFlags flags, v4f color, f32 de
 A(void, present, (), ()) \
 A(void, draw, (u32 vertex_count, u32 start_vertex), (vertex_count, start_vertex)) \
 A(void, draw_indexed, (u32 index_count), (index_count)) \
-A(void, set_viewport, (u32 x, u32 y, u32 w, u32 h), (x, y, w, h)) \
+A(void, set_viewport, (Viewport viewport), (viewport)) \
 A(void, resize_render_targets, (u32 w, u32 h), (w, h)) \
 A(void, set_shader, (Shader *shader), (shader)) \
 A(void, update_shader_constants, (ShaderConstants *constants, ShaderValueLocation dest, void const *source), (constants, dest, source)) \
@@ -185,8 +192,8 @@ extern T3D_API RenderTarget *back_buffer;
 extern T3D_API v2u min_texture_size;
 
 inline void draw(u32 vertex_count) { return _draw(vertex_count, 0); }
-inline void set_viewport(u32 w, u32 h) { return _set_viewport(0, 0, w, h); }
-inline void set_viewport(v2u size) { return _set_viewport(0, 0, size.x, size.y); }
+inline void set_viewport(u32 w, u32 h) { return _set_viewport({.position = {}, .size = {w, h}}); }
+inline void set_viewport(v2u size) { return _set_viewport({.position={}, .size=size}); }
 inline void resize_render_targets(v2u size) { return _resize_render_targets(size.x, size.y); }
 template <class T>
 inline void update_shader_constants(ShaderConstants *constants, ShaderValueLocation dest, T const &source) {
@@ -294,5 +301,6 @@ void set_shader_constants(TypedShaderConstants<T> const &constants, u32 slot) {
 #endif
 
 bool init(GraphicsApi api, InitInfo init_info);
+void free();
 
 }

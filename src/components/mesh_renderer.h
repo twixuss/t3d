@@ -8,6 +8,10 @@ struct MeshRenderer : Component {
 	Mesh *mesh;
 	Material *material;
 	t3d::Texture *lightmap;
+
+	void free() {
+
+	}
 };
 
 template <>

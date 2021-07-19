@@ -13,12 +13,39 @@
   <ItemGroup>
     <ClInclude Include="include\t3d.h" />
     <ClInclude Include="src\tl.h" />
-    <ClInclude Include="src\light.h" />
-    <ClInclude Include="src\mesh_renderer.h" />
     <ClInclude Include="src\material.h" />
     <ClInclude Include="src\component.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\basic_textures.h" />
-    <ClInclude Include="src\camera.h" />
+    <ClInclude Include="src\post_effect.h" />
+    <ClInclude Include="src\blit.h" />
+    <ClInclude Include="src\time.h" />
+    <ClInclude Include="src\viewport.h" />
+    <ClInclude Include="src\components\camera.h">
+      <Filter>components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\components\light.h">
+      <Filter>components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\components\mesh_renderer.h">
+      <Filter>components</Filter>
+    </ClInclude>
+    <ClInclude Include="src\post_effects\bloom.h">
+      <Filter>post_effects</Filter>
+    </ClInclude>
+    <ClInclude Include="src\post_effects\dither.h">
+      <Filter>post_effects</Filter>
+    </ClInclude>
+    <ClInclude Include="src\post_effects\exposure.h">
+      <Filter>post_effects</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="components">
+      <UniqueIdentifier>{5da97176-8237-4fb2-8163-e62ae1091f4b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="post_effects">
+      <UniqueIdentifier>{1475799a-b887-488d-bf69-0cb81aa5c637}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

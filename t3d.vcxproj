@@ -31,13 +31,20 @@
   <ItemGroup>
     <ClInclude Include="include\t3d.h" />
     <ClInclude Include="src\basic_textures.h" />
-    <ClInclude Include="src\camera.h" />
+    <ClInclude Include="src\blit.h" />
     <ClInclude Include="src\component.h" />
-    <ClInclude Include="src\light.h" />
+    <ClInclude Include="src\components\camera.h" />
+    <ClInclude Include="src\components\light.h" />
+    <ClInclude Include="src\components\mesh_renderer.h" />
     <ClInclude Include="src\material.h" />
     <ClInclude Include="src\mesh.h" />
-    <ClInclude Include="src\mesh_renderer.h" />
+    <ClInclude Include="src\post_effect.h" />
+    <ClInclude Include="src\post_effects\bloom.h" />
+    <ClInclude Include="src\post_effects\dither.h" />
+    <ClInclude Include="src\post_effects\exposure.h" />
+    <ClInclude Include="src\time.h" />
     <ClInclude Include="src\tl.h" />
+    <ClInclude Include="src\viewport.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -99,25 +106,25 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)include/;</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)include/;</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)include/;</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)include/;</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
