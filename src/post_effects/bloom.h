@@ -1,6 +1,5 @@
 #pragma once
 #include <t3d.h>
-#include "viewport.h"
 
 struct Bloom {
 	inline static constexpr u32 min_texture_size = 1;

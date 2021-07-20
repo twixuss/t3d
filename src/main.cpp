@@ -1,3 +1,10 @@
+#include <source_location>
+#include <tl/common.h>
+tl::umm get_hash(struct ManipulatorStateKey const &);
+bool operator==(std::source_location a, std::source_location b) {
+	return a.line() == b.line() && a.column() == b.column() && tl::as_span(a.file_name()) == tl::as_span(b.file_name());
+}
+
 #include "tl.h"
 #include "../dep/tl/include/tl/masked_block_list.h"
 #include "component.h"
@@ -460,8 +467,6 @@ float sample_shadow_map(sampler2DShadow shadow_map, float3 light_space, float bi
 
 Entity *selected_entity;
 
-Camera *current_camera;
-
 t3d::ComputeShader *average_shader;
 t3d::ComputeBuffer *average_shader_buffer;
 
@@ -481,10 +486,13 @@ enum InputEventKind {
 
 struct InputEvent {
 	InputEventKind kind = {};
+	struct MouseDown { u8 button; v2s position; };
+	struct MouseUp   { u8 button; v2s position; };
+	struct MouseMove { v2s position; };
 	union {
-		struct { u8 button; } mouse_down;
-		struct { u8 button; } mouse_up;
-		struct { v2s position; } mouse_move;
+		MouseDown mouse_down;
+		MouseUp   mouse_up;
+		MouseMove mouse_move;
 	};
 };
 
@@ -548,12 +556,24 @@ T *create_editor_window() {
 
 void render_scene(struct SceneViewWindow *);
 
+Entity *current_camera_entity;
+Camera *current_camera;
+t3d::Viewport current_viewport;
+
+v3f world_to_viewport(v4f point) {
+	return map(current_camera->world_to_camera(point), {-1,-1,-1}, {1,1,1}, {0,0,0}, V3f((v2f)current_viewport.size, 1));
+}
+v3f world_to_viewport(v3f point) {
+	return world_to_viewport(V4f(point, 1));
+}
+v2s get_mouse_position_in_current_viewport() {
+	return v2s{window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y} - current_viewport.position;
+}
+
 struct SceneViewWindow : EditorWindow {
 	Entity *camera_entity;
 	Camera *camera;
 	bool flying;
-	u32 dragging_element = -1;
-	v3f dragging_offset;
 
 	void resize(t3d::Viewport viewport) {
 		this->viewport = viewport;
@@ -566,42 +586,48 @@ struct SceneViewWindow : EditorWindow {
 		t3d::resize_texture(camera->destination_target->depth, viewport.size);
 	}
 	void render() {
+		current_camera_entity = camera_entity;
+		current_camera = camera;
+		current_viewport = viewport;
 		render_scene(this);
+		current_camera_entity = 0;
+		current_camera = 0;
+		current_viewport = {};
 	}
 	void free() {
 		destroy(*camera_entity);
 	}
 
-	v3f world_to_viewport(v4f point) {
-		return map(camera->world_to_camera(point), {-1,-1,-1}, {1,1,1}, {0,0,-1}, V3f((v2f)viewport.size, 1));
+	v3f get_drag_position(v2s mouse_position) {
+		return {};
 	}
-	v3f world_to_viewport(v3f point) {
-		return world_to_viewport(V4f(point, 1));
-	}
+
 	InputResponse on_input(InputEvent event) {
 		switch (event.kind) {
-			case InputEvent_mouse_down: return on_mouse_down(event.mouse_down.button);
-			case InputEvent_mouse_up  : return on_mouse_up  (event.mouse_up  .button);
-			case InputEvent_mouse_move: return on_mouse_move(event.mouse_move.position);
+			case InputEvent_mouse_down: return on_mouse_down(event.mouse_down);
+			case InputEvent_mouse_up  : return on_mouse_up  (event.mouse_up  );
+			case InputEvent_mouse_move: return on_mouse_move(event.mouse_move);
 		}
 		invalid_code_path();
 		return {};
 	}
-	InputResponse on_mouse_down(u8 button) {
-		if (button == 1) {
+	InputResponse on_mouse_down(InputEvent::MouseDown event) {
+		event.position -= viewport.position;
+		if (event.button == 1) {
 			flying = true;
 			return {.kind = InputResponse_begin_drag, .sender = this};
 		}
+
 		return {};
 	}
-	InputResponse on_mouse_up(u8 button) {
-		if (button == 1) {
+	InputResponse on_mouse_up(InputEvent::MouseUp event) {
+		if (event.button == 1) {
 			flying = false;
 			return {InputResponse_end_grab};
 		}
 		return {};
 	}
-	InputResponse on_mouse_move(v2s mouse_position) {
+	InputResponse on_mouse_move(InputEvent::MouseMove event) {
 		return {};
 	}
 };
@@ -679,17 +705,17 @@ struct SplitView : InputHandler {
 
 	InputResponse on_input(InputEvent event) {
 		switch (event.kind) {
-			case InputEvent_mouse_down: return on_mouse_down(event.mouse_down.button);
-			case InputEvent_mouse_up  : return on_mouse_up  (event.mouse_up  .button);
-			case InputEvent_mouse_move: return on_mouse_move(event.mouse_move.position);
+			case InputEvent_mouse_down: return on_mouse_down(event.mouse_down);
+			case InputEvent_mouse_up  : return on_mouse_up  (event.mouse_up);
+			case InputEvent_mouse_move: return on_mouse_move(event.mouse_move);
 		}
 		invalid_code_path();
 		return {};
 	}
 
-	InputResponse on_mouse_down(u8 button) {
+	InputResponse on_mouse_down(InputEvent::MouseDown event) {
 		v2s mouse_position = {::window->mouse_position.x, (s32)::window->client_size.y - ::window->mouse_position.y};
-		if (button == 0) {
+		if (event.button == 0) {
 			f32 const grab_distance = 4;
 			if (axis_is_x) {
 				s32 bar_position = viewport.y + viewport.h * split_t;
@@ -714,11 +740,11 @@ struct SplitView : InputHandler {
 			} else {
 				target = window;
 			}
-			return target->on_input({.kind = InputEvent_mouse_down, .mouse_down = {.button = button}});
+			return target->on_input({.kind = InputEvent_mouse_down, .mouse_down = {.button = event.button}});
 		}
 	}
-	InputResponse on_mouse_up(u8 button) {
-		if (button == 0) {
+	InputResponse on_mouse_up(InputEvent::MouseUp event) {
+		if (event.button == 0) {
 			if (is_sizing) {
 				is_sizing = false;
 				return {InputResponse_end_grab};
@@ -732,16 +758,21 @@ struct SplitView : InputHandler {
 		//}
 		return {};
 	}
-	InputResponse on_mouse_move(v2s mouse_position) {
-		InputHandler *target = part2;
+	InputResponse on_mouse_move(InputEvent::MouseMove event) {
+		InputHandler *target = 0;
 		if (is_split) {
-			if (in_bounds(mouse_position, aabb_min_size(part1->viewport.position, (v2s)part1->viewport.size))) {
+			if (in_bounds(event.position, aabb_min_size(part1->viewport.position, (v2s)part1->viewport.size))) {
 				target = part1;
+			} else if (in_bounds(event.position, aabb_min_size(part2->viewport.position, (v2s)part2->viewport.size))) {
+				target = part2;
 			}
 		} else {
 			target = window;
 		}
-		return target->on_input({.kind = InputEvent_mouse_move, .mouse_move = {.position = mouse_position}});
+		if (target)
+			return target->on_input({.kind = InputEvent_mouse_move, .mouse_move = {.position = event.position}});
+		else 
+			return {};
 	}
 };
 
@@ -752,6 +783,197 @@ SplitView *create_split_view() {
 }
 
 SplitView *main_view;
+
+struct ManipulatedTransform {
+	v3f position;
+	quaternion rotation;
+};
+
+using ManipulateFlags = u8;
+enum : ManipulateFlags {
+	Manipulate_position = 0x1,
+};
+
+struct ManipulatorDrawRequest {
+	ManipulateFlags flags;
+	u8 highlighted_part_index;
+	v3f position;
+	quaternion rotation;
+	f32 size;
+};
+
+List<ManipulatorDrawRequest> manipulator_draw_requests;
+
+inline static constexpr u8 null_manipulator_part = -1;
+
+struct ManipulatorState {
+	u8 dragging_part_index = null_manipulator_part;
+	v3f drag_offset;
+	f32 original_scale;
+};
+
+struct ManipulatorStateKey {
+	u32 id;
+	Camera *camera;
+	std::source_location location;
+};
+
+umm get_hash(ManipulatorStateKey const &key) {
+	return key.id * 954277 + key.location.column() * 152753 + key.location.line() * 57238693 + (u32)key.location.file_name();
+}
+bool operator==(ManipulatorStateKey const &a, ManipulatorStateKey const &b) {
+	return a.id == b.id && a.camera == b.camera && a.location == b.location;
+}
+
+StaticHashMap<ManipulatorStateKey, ManipulatorState, 256> manipulator_states;
+
+ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, ManipulateFlags flags, u32 id = 0, std::source_location source_location = std::source_location::current()) {
+	ManipulatedTransform manipulated_transform = {
+		.position = position,
+		.rotation = rotation,
+	};
+
+	assert(flags == Manipulate_position, "other modes are not implemented");
+	
+	auto &state = manipulator_states.get_or_insert({.id = id, .camera = current_camera, .location = source_location});
+
+	auto mouse_position = get_mouse_position_in_current_viewport();
+
+	f32 const handle_size_scale = 0.25f;
+	f32 const handle_grab_thickness = 0.05f;
+	f32 handle_size = handle_size_scale * current_camera->fov / (pi * 0.5f);
+
+	f32 handle_size_scaled_by_distance = handle_size * dot(position - current_camera_entity->position, current_camera_entity->rotation * v3f{0,0,-1});
+
+	//m4 handle_matrix = m4::translation(position) * m4::rotation_r_zxy(rotation) * m4::scale(handle_size * dot(position - current_camera_entity.position, m4::rotation_r_zxy(current_camera_entity.rotation) * v3f{0,0,-1}));
+	m4 handle_matrix = m4::translation(position) * (m4)-rotation * m4::scale(handle_size_scaled_by_distance);
+
+	v3f handle_viewport_position = world_to_viewport(handle_matrix * v4f{0,0,0,1});
+	u8 closest_element = null_manipulator_part;
+	if (handle_viewport_position.z < 1) {
+		Array<v3f, 3> handle_world_axis_tips = {
+			(handle_matrix * v4f{1,0,0,1}).xyz,
+			(handle_matrix * v4f{0,1,0,1}).xyz,
+			(handle_matrix * v4f{0,0,1,1}).xyz
+		};
+
+		Array<v2f, 3> handle_viewport_axis_tips = {
+			world_to_viewport(handle_world_axis_tips[0]).xy,
+			world_to_viewport(handle_world_axis_tips[1]).xy,
+			world_to_viewport(handle_world_axis_tips[2]).xy
+		};
+
+		Array<v2f, 12> handle_viewport_plane_points = {
+			world_to_viewport((handle_matrix * v4f{0,   0.4f,0.4f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0,   0.4f,0.8f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0,   0.8f,0.4f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0,   0.8f,0.8f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.4f,0,   0.4f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.4f,0,   0.8f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.8f,0,   0.4f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.8f,0,   0.8f,1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.4f,0.4f,0,   1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.4f,0.8f,0,   1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.8f,0.4f,0,   1}).xyz).xy,
+			world_to_viewport((handle_matrix * v4f{0.8f,0.8f,0,   1}).xyz).xy,
+		};
+
+		Array<line_segment<v2f>, 12> handle_viewport_plane_lines = {
+			line_segment_begin_end(handle_viewport_plane_points[0], handle_viewport_plane_points[1]),
+			line_segment_begin_end(handle_viewport_plane_points[2], handle_viewport_plane_points[3]),
+			line_segment_begin_end(handle_viewport_plane_points[0], handle_viewport_plane_points[2]),
+			line_segment_begin_end(handle_viewport_plane_points[1], handle_viewport_plane_points[3]),
+
+			line_segment_begin_end(handle_viewport_plane_points[4], handle_viewport_plane_points[5]),
+			line_segment_begin_end(handle_viewport_plane_points[6], handle_viewport_plane_points[7]),
+			line_segment_begin_end(handle_viewport_plane_points[4], handle_viewport_plane_points[6]),
+			line_segment_begin_end(handle_viewport_plane_points[5], handle_viewport_plane_points[7]),
+
+			line_segment_begin_end(handle_viewport_plane_points[ 8], handle_viewport_plane_points[ 9]),
+			line_segment_begin_end(handle_viewport_plane_points[10], handle_viewport_plane_points[11]),
+			line_segment_begin_end(handle_viewport_plane_points[ 8], handle_viewport_plane_points[10]),
+			line_segment_begin_end(handle_viewport_plane_points[ 9], handle_viewport_plane_points[11]),
+		};
+
+		f32 closest_dist = max_value<f32>;
+		for (u32 axis_index = 0; axis_index != 3; ++axis_index) {
+			f32 dist = distance(line_segment_begin_end(handle_viewport_axis_tips[axis_index], handle_viewport_position.xy), (v2f)mouse_position);
+			if (dist < closest_dist) {
+				closest_dist = dist;
+				closest_element = axis_index;
+			}
+
+			Array<line_segment<v2f>, 4> plane_lines = {
+				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 0], handle_viewport_plane_points[axis_index*4 + 1]),
+				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 2], handle_viewport_plane_points[axis_index*4 + 3]),
+				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 0], handle_viewport_plane_points[axis_index*4 + 2]),
+				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 1], handle_viewport_plane_points[axis_index*4 + 3]),
+			};
+			for (u32 line_index = 0; line_index != 4; ++line_index) {
+				dist = min(dist, distance(plane_lines[line_index], (v2f)mouse_position));
+			}
+			if (dist < closest_dist) {
+				closest_dist = dist;
+				closest_element = axis_index + 3;
+			}
+		}
+		if (closest_dist > window->client_size.y * handle_grab_thickness) {
+			closest_element = null_manipulator_part;
+		}
+
+		bool begin_drag = false;
+		if (closest_element != null_manipulator_part && mouse_down(0)) {
+			begin_drag = true;
+			state.dragging_part_index = closest_element;
+			state.original_scale = handle_size_scaled_by_distance;
+		}
+
+		m4 camera_to_world_matrix = inverse(current_camera->world_to_camera_matrix);
+
+		if (state.dragging_part_index != null_manipulator_part) {
+			v3f new_position;
+			if (state.dragging_part_index < 3) {
+				v2f closest_in_viewport = closest_point(line_begin_end(handle_viewport_position.xy, handle_viewport_axis_tips[state.dragging_part_index]), (v2f)mouse_position);
+
+				v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, {}, (v2f)current_viewport.size, {-1,-1}, {1,1}),1, 1);
+				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
+
+				cursor_ray.direction = normalize(cursor_ray.direction);
+				new_position = closest_point(line_begin_end(position, handle_world_axis_tips[state.dragging_part_index]), as_line(cursor_ray));
+			} else {
+				v3f plane_normal = handle_world_axis_tips[state.dragging_part_index - 3] - position;
+
+				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)current_viewport.size, {-1,-1}, {1,1}),1, 1);
+				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
+
+				auto d = dot(position, -plane_normal);
+				auto t = -(d + dot(cursor_ray.origin, plane_normal)) / dot(cursor_ray.direction, plane_normal);
+				new_position = cursor_ray.origin + t * cursor_ray.direction;
+			}
+			if (begin_drag) {
+				state.drag_offset = manipulated_transform.position - new_position;
+			} else {
+				manipulated_transform.position = new_position + state.drag_offset * (handle_size_scaled_by_distance / state.original_scale);
+			}
+		}
+	}
+	print("%\n", handle_viewport_position.z);
+	
+	if (mouse_up(0)) {
+		state.dragging_part_index = null_manipulator_part;
+	}
+
+
+	manipulator_draw_requests.add({
+		.flags = flags,
+		.highlighted_part_index = (state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element,
+		.position = position,
+		.rotation = rotation,
+		.size = handle_size,
+	});
+
+	return manipulated_transform;
+}
 
 void render_scene(SceneViewWindow *view) {
 	timed_function();
@@ -783,7 +1005,7 @@ void render_scene(SceneViewWindow *view) {
 		if (key_held(Key_q)) camera_position_delta.y -= 1;
 		if (key_held(Key_s)) camera_position_delta.z += 1;
 		if (key_held(Key_w)) camera_position_delta.z -= 1;
-		if (camera_position_delta == v3f{}) {
+		if (all_true(camera_position_delta == v3f{})) {
 			camera_velocity = 1;
 		} else {
 			camera_velocity += frame_time;
@@ -908,121 +1130,24 @@ void render_scene(SceneViewWindow *view) {
 		.depth_func = t3d::Comparison_less,
 	});
 
-	f32 const handle_size_scale = 0.25f;
-	f32 const handle_grab_thickness = 0.05f;
-	f32 handle_size = handle_size_scale * camera.fov / (pi * 0.5f);
+	selected_entity->position = manipulate_transform(selected_entity->position, selected_entity->rotation, Manipulate_position).position;
 
-	//m4 handle_matrix = m4::translation(selected_entity->position) * m4::rotation_r_zxy(selected_entity->rotation) * m4::scale(handle_size * dot(selected_entity->position - camera_entity.position, m4::rotation_r_zxy(camera_entity.rotation) * v3f{0,0,-1}));
-	m4 handle_matrix = m4::translation(selected_entity->position) * (m4)-selected_entity->rotation * m4::scale(handle_size * dot(selected_entity->position - camera_entity.position, camera_entity.rotation * v3f{0,0,-1}));
-
-	v3f handle_viewport_position = view->world_to_viewport(handle_matrix * v4f{0,0,0,1});
-	if (handle_viewport_position.z < 1) {
-		Array<v3f, 3> handle_world_axis_tips = {
-			(handle_matrix * v4f{1,0,0,1}).xyz,
-			(handle_matrix * v4f{0,1,0,1}).xyz,
-			(handle_matrix * v4f{0,0,1,1}).xyz
-		};
-
-		Array<v2f, 3> handle_viewport_axis_tips = {
-			view->world_to_viewport(handle_world_axis_tips[0]).xy,
-			view->world_to_viewport(handle_world_axis_tips[1]).xy,
-			view->world_to_viewport(handle_world_axis_tips[2]).xy
-		};
-
-		Array<v2f, 12> handle_viewport_plane_points = {
-			view->world_to_viewport((handle_matrix * v4f{0,   0.4f,0.4f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0,   0.4f,0.8f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0,   0.8f,0.4f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0,   0.8f,0.8f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.4f,0,   0.4f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.4f,0,   0.8f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.8f,0,   0.4f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.8f,0,   0.8f,1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.4f,0.4f,0,   1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.4f,0.8f,0,   1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.8f,0.4f,0,   1}).xyz).xy,
-			view->world_to_viewport((handle_matrix * v4f{0.8f,0.8f,0,   1}).xyz).xy,
-		};
-
-		Array<line_segment<v2f>, 12> handle_viewport_plane_lines = {
-			line_segment_begin_end(handle_viewport_plane_points[0], handle_viewport_plane_points[1]),
-			line_segment_begin_end(handle_viewport_plane_points[2], handle_viewport_plane_points[3]),
-			line_segment_begin_end(handle_viewport_plane_points[0], handle_viewport_plane_points[2]),
-			line_segment_begin_end(handle_viewport_plane_points[1], handle_viewport_plane_points[3]),
-
-			line_segment_begin_end(handle_viewport_plane_points[4], handle_viewport_plane_points[5]),
-			line_segment_begin_end(handle_viewport_plane_points[6], handle_viewport_plane_points[7]),
-			line_segment_begin_end(handle_viewport_plane_points[4], handle_viewport_plane_points[6]),
-			line_segment_begin_end(handle_viewport_plane_points[5], handle_viewport_plane_points[7]),
-
-			line_segment_begin_end(handle_viewport_plane_points[ 8], handle_viewport_plane_points[ 9]),
-			line_segment_begin_end(handle_viewport_plane_points[10], handle_viewport_plane_points[11]),
-			line_segment_begin_end(handle_viewport_plane_points[ 8], handle_viewport_plane_points[10]),
-			line_segment_begin_end(handle_viewport_plane_points[ 9], handle_viewport_plane_points[11]),
-		};
-
-		f32 closest_dist = max_value<f32>;
-		u32 closest_element = -1;
-		for (u32 axis_index = 0; axis_index != 3; ++axis_index) {
-			f32 dist = distance(line_segment_begin_end(handle_viewport_axis_tips[axis_index], handle_viewport_position.xy), (v2f)mouse_position);
-			if (dist < closest_dist) {
-				closest_dist = dist;
-				closest_element = axis_index;
-			}
-
-			Array<line_segment<v2f>, 4> plane_lines = {
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 0], handle_viewport_plane_points[axis_index*4 + 1]),
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 2], handle_viewport_plane_points[axis_index*4 + 3]),
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 0], handle_viewport_plane_points[axis_index*4 + 2]),
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 1], handle_viewport_plane_points[axis_index*4 + 3]),
-			};
-			for (u32 line_index = 0; line_index != 4; ++line_index) {
-				dist = min(dist, distance(plane_lines[line_index], (v2f)mouse_position));
-			}
-			if (dist < closest_dist) {
-				closest_dist = dist;
-				closest_element = axis_index + 3;
-			}
-		}
-
-		m4 camera_to_world_matrix = inverse(camera.world_to_camera_matrix);
-
-		auto get_drag_cursor_world_position = [&]() {
-			if (view->dragging_element < 3) {
-				v2f closest_in_viewport = closest_point(line_begin_end(handle_viewport_position.xy, handle_viewport_axis_tips[view->dragging_element]), (v2f)mouse_position);
-
-				v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, {}, (v2f)view->viewport.size, {-1,-1}, {1,1}),1, 1);
-				ray<v3f> cursor_ray = ray_origin_end(camera_entity.position, end.xyz / end.w);
-
-				cursor_ray.direction = normalize(cursor_ray.direction);
-				return closest_point(line_begin_end(selected_entity->position, handle_world_axis_tips[view->dragging_element]), as_line(cursor_ray));
-			} else {
-				v3f plane_normal = handle_world_axis_tips[view->dragging_element - 3] - selected_entity->position;
-
-				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)view->viewport.size, {-1,-1}, {1,1}),1, 1);
-				ray<v3f> cursor_ray = ray_origin_end(camera_entity.position, end.xyz / end.w);
-
-				auto d = dot(selected_entity->position, -plane_normal);
-				auto t = -(d + dot(cursor_ray.origin, plane_normal)) / dot(cursor_ray.direction, plane_normal);
-				return cursor_ray.origin + t * cursor_ray.direction;
-			}
-		};
+	for (auto &request : manipulator_draw_requests) {
+		assert(request.flags == Manipulate_position, "other modes are not implemented");
 
 		EntityConstants entity_data = {};
-		v3f camera_to_handle_direction = normalize(selected_entity->position - camera_entity.position);
+		v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
 		entity_data.local_to_camera_matrix =
 			camera.world_to_camera_matrix
 			* m4::translation(camera_entity.position + camera_to_handle_direction)
-			//* m4::rotation_r_zxy(selected_entity->rotation)
-			* (m4)-selected_entity->rotation
-			//* m4::scale(handle_size * dot(camera_to_handle_direction, m4::rotation_r_zxy(camera_entity.rotation) * v3f{0,0,-1}));
-			* m4::scale(handle_size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}));
+			* (m4)-request.rotation
+			* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}));
 		t3d::update_shader_constants(entity_constants, entity_data);
 		t3d::set_shader(handle_shader);
 		t3d::set_shader_constants(handle_constants, 0);
 
 
-		u32 selected_element = view->dragging_element == -1 ? closest_element : view->dragging_element;
+		u32 selected_element = request.highlighted_part_index;
 
 		t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != -1)});
 		draw_mesh(handle_center_mesh);
@@ -1044,30 +1169,13 @@ void render_scene(SceneViewWindow *view) {
 
 		t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5)});
 		draw_mesh(handle_plane_z_mesh);
-
-		if (view->dragging_element == -1) {
-			if (closest_dist < window->client_size.y * handle_grab_thickness) {
-				if (mouse_down(0)) {
-					view->dragging_element = closest_element;
-					view->dragging_offset = selected_entity->position - get_drag_cursor_world_position();
-				}
-			} else {
-				closest_element = -1;
-			}
-		} else {
-			if (mouse_up(0)) {
-				view->dragging_element = -1;
-			} else {
-				v3f new_position = get_drag_cursor_world_position() + view->dragging_offset;
-				if (is_nan(new_position.x) || is_nan(new_position.y) || is_nan(new_position.z)) new_position = {};
-				selected_entity->position = new_position;
-			}
-		}
 	}
-
+	manipulator_draw_requests.clear();
 }
 
 void run() {
+	manipulator_draw_requests = {};
+	manipulator_states = {};
 
 	init_component_storages<
 #define c(name) name
@@ -1086,7 +1194,7 @@ void run() {
 			.debug = true,
 		}));
 
-		t3d::set_vsync(false);
+		//t3d::set_vsync(false);
 
 		global_constants = t3d::create_shader_constants<GlobalConstants>();
 		t3d::set_shader_constants(global_constants, GLOBAL_CONSTANTS_SLOT);
@@ -1468,6 +1576,15 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		print("%\n%\n", m4::rotation_r_zxy(1,2,3), transpose(m4::rotation_r_yxz(-1,-2,-3)));
 	};
 	info.on_draw = [](Window &window) {
+		static v2u old_window_size;
+		if (old_window_size != window.client_size) {
+			old_window_size = window.client_size;
+
+			main_view->resize({.position = {}, .size = window.client_size});
+
+			t3d::resize_render_targets(window.client_size);
+		}
+
 		if (key_down(Key_f1)) {
 			Profiler::enabled = true;
 			Profiler::reset();
@@ -1482,7 +1599,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		static v2s old_mouse_position;
 		v2s mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
-		if (window.mouse_position != old_mouse_position) {
+		if (any_true(window.mouse_position != old_mouse_position)) {
 			main_view->on_input({.kind = InputEvent_mouse_move, .mouse_move = {.position = mouse_position}});
 			old_mouse_position = mouse_position;
 		}
@@ -1546,11 +1663,6 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		clear_temporary_storage();
 	};
-	info.on_size = [](Window &window) {
-		main_view->resize({.position = {}, .size = window.client_size});
-
-		t3d::resize_render_targets(window.client_size);
-	};
 
 	window = create_window(info);
 	defer { free(window); };
@@ -1559,23 +1671,25 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 	static InputHandler *grabbed = 0;
 	on_mouse_down = [](u8 button){
+		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
 		auto response = main_view->on_input({
 			.kind = InputEvent_mouse_down,
-			.mouse_down = {.button = button}
+			.mouse_down = {.button = button, .position = mouse_position}
 		});
 		if (response.kind == InputResponse_begin_drag) {
 			grabbed = response.sender;
 		}
 	};
 	on_mouse_up   = [](u8 button){
+		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
 		main_view->on_input({
 			.kind = InputEvent_mouse_up,
-			.mouse_up = {.button = button}
+			.mouse_up = {.button = button, .position = mouse_position}
 		});
 		if (grabbed) {
 			grabbed->on_input({
 				.kind = InputEvent_mouse_up,
-				.mouse_up = {.button = button}
+				.mouse_up = {.button = button, .position = mouse_position}
 			});
 		}
 	};

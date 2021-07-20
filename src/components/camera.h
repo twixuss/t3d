@@ -30,7 +30,7 @@ struct Camera : Component {
 	}
 	v3f world_to_camera(v4f point) {
 		auto p = world_to_camera_matrix * point;
-		return p.xyz / p.w;
+		return {p.xyz / p.w};
 	}
 	v3f world_to_camera(v3f point) {
 		return world_to_camera(V4f(point, 1));

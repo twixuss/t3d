@@ -2,7 +2,6 @@
 #include <t3d.h>
 #include "../src/time.h" // TODO without  ../src/  crt's time.h will be included
 #include "blit.h"
-#include "viewport.h"
 
 struct Exposure {
 	inline static constexpr u32 min_texture_size = 16;

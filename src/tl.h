@@ -10,5 +10,6 @@
 #include <tl/tracking_allocator.h>
 #include <tl/file_printer.h>
 #include <tl/profiler.h>
+#include <tl/hash_map.h>
 #include "../include/t3d.h"
 #include "component_list.h"
