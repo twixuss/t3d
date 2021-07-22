@@ -39,6 +39,18 @@
     <ClInclude Include="src\post_effects\exposure.h">
       <Filter>post_effects</Filter>
     </ClInclude>
+    <ClInclude Include="src\entity.h" />
+    <ClInclude Include="src\editor\scene_view.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\editor\window.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\manipulator.h">
+      <Filter>editor</Filter>
+    </ClInclude>
+    <ClInclude Include="src\current.h" />
+    <ClInclude Include="src\debug.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">
@@ -46,6 +58,9 @@
     </Filter>
     <Filter Include="post_effects">
       <UniqueIdentifier>{1475799a-b887-488d-bf69-0cb81aa5c637}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="editor">
+      <UniqueIdentifier>{4612238a-4b0c-4e64-9aa6-3748c0616b5a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

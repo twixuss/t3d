@@ -36,6 +36,12 @@
     <ClInclude Include="src\components\camera.h" />
     <ClInclude Include="src\components\light.h" />
     <ClInclude Include="src\components\mesh_renderer.h" />
+    <ClInclude Include="src\current.h" />
+    <ClInclude Include="src\debug.h" />
+    <ClInclude Include="src\editor\scene_view.h" />
+    <ClInclude Include="src\editor\window.h" />
+    <ClInclude Include="src\entity.h" />
+    <ClInclude Include="src\manipulator.h" />
     <ClInclude Include="src\material.h" />
     <ClInclude Include="src\mesh.h" />
     <ClInclude Include="src\post_effect.h" />

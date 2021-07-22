@@ -112,6 +112,13 @@ enum BlendFunction {
 enum Blend {
 	Blend_null,
 	Blend_one,
+	Blend_source_alpha,
+	Blend_one_minus_source_alpha,
+};
+
+enum Topology {
+	Topology_triangle_list,
+	Topology_line_list,
 };
 
 union CubeTexturePaths {
@@ -179,6 +186,8 @@ A(void, set_compute_texture, (Texture *texture, u32 slot), (texture, slot)) \
 A(void, read_texture, (Texture *texture, Span<u8> data), (texture, data)) \
 A(void, set_blend, (BlendFunction function, Blend source, Blend destination), (function, source, destination)) \
 A(Texture *, create_cube_texture, (CreateTextureFlags flags, u32 width, u32 height, void *data[6], TextureFormat format, TextureFiltering filtering, Comparison comparison), (flags, width, height, data, format, filtering, comparison)) \
+A(void, set_topology, (Topology topology), (topology)) \
+A(void, update_vertex_buffer, (VertexBuffer *buffer, Span<u8> data), (buffer, data)) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)
@@ -234,7 +243,7 @@ inline Texture *load_texture(CubeTexturePaths paths) {
 		if (i != 0) {
 			bool fail = false;
 			Span<char> reason;
-			if (pixels[i].size != pixels[0].size) {
+			if (any_true(pixels[i].size != pixels[0].size)) {
 				fail = true;
 				reason = "sizes of faces do not match"s;
 			}

@@ -83,6 +83,7 @@ struct State {
 	BlendFunction blend_function;
 	Blend blend_source;
 	Blend blend_destination;
+	GLuint topology = GL_TRIANGLES;
 };
 static State state;
 
@@ -204,7 +205,9 @@ u32 get_bytes_per_texel(TextureFormat format) {
 
 GLuint get_blend(Blend blend) {
 	switch (blend) {
-		case t3d::Blend_one: return GL_ONE;
+		case t3d::Blend_one:                    return GL_ONE;
+		case t3d::Blend_source_alpha:           return GL_SRC_ALPHA;
+		case t3d::Blend_one_minus_source_alpha: return GL_ONE_MINUS_SRC_ALPHA;
 	}
 	invalid_code_path();
 	return 0;
@@ -213,6 +216,15 @@ GLuint get_blend(Blend blend) {
 GLuint get_equation(BlendFunction function) {
 	switch (function) {
 		case t3d::BlendFunction_add: return GL_FUNC_ADD;
+	}
+	invalid_code_path();
+	return 0;
+}
+
+GLuint get_topology(Topology topology) {
+	switch (topology) {
+		case Topology_triangle_list: return GL_TRIANGLES;
+		case Topology_line_list:     return GL_LINES;
 	}
 	invalid_code_path();
 	return 0;
@@ -296,11 +308,11 @@ bool init(InitInfo init_info) {
 		gl::present();
 	};
 	_draw = [](u32 vertex_count, u32 start_vertex) {
-		glDrawArrays(GL_TRIANGLES, start_vertex, vertex_count);
+		glDrawArrays(state.topology, start_vertex, vertex_count);
 	};
 	_draw_indexed = [](u32 index_count) {
 		assert(state.current_index_buffer, "Index buffer was not bound");
-		glDrawElements(GL_TRIANGLES, index_count, state.current_index_buffer->type, 0);
+		glDrawElements(state.topology, index_count, state.current_index_buffer->type, 0);
 	};
 	_set_viewport = [](Viewport viewport) {
 		glViewport(viewport.x, viewport.y, viewport.w, viewport.h);
@@ -615,7 +627,15 @@ bool init(InitInfo init_info) {
 
 		return &result;
 	};
-
+	_set_topology = [](Topology topology) {
+		state.topology = get_topology(topology);
+	};
+	_update_vertex_buffer = [](VertexBuffer *_buffer, Span<u8> data) {
+		auto &buffer = *(VertexBufferImpl *)_buffer;
+		glBindBuffer(GL_ARRAY_BUFFER, buffer.buffer);
+		glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	};
 	return true;
 }
 

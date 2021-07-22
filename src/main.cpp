@@ -11,6 +11,8 @@ bool operator==(std::source_location a, std::source_location b) {
 #include "components/light.h"
 #include "components/mesh_renderer.h"
 #include "components/camera.h"
+#include "editor/window.h"
+#include "editor/scene_view.h"
 
 using namespace tl;
 
@@ -19,6 +21,7 @@ bool is_editor;
 
 struct GlobalConstants {
 	m4 camera_rotation_projection_matrix;
+	m4 world_to_camera_matrix;
 
 	v3f camera_position;
 	f32 _dummy;
@@ -31,6 +34,9 @@ t3d::TypedShaderConstants<GlobalConstants> global_constants;
 
 struct EntityConstants {
 	m4 local_to_camera_matrix;
+	m4 local_to_world_position_matrix;
+	m4 local_to_world_normal_matrix;
+	m4 object_rotation_matrix;
 };
 t3d::TypedShaderConstants<EntityConstants> entity_constants;
 #define ENTITY_CONSTANTS_SLOT 14
@@ -56,8 +62,13 @@ struct AverageComputeData {
 t3d::Shader *shadow_map_shader;
 
 struct HandleConstants {
+	m4 matrix = m4::identity();
+
 	v3f color;
 	f32 selected;
+	
+	v3f to_camera;
+	f32 is_rotation;
 };
 t3d::TypedShaderConstants<HandleConstants> handle_constants;
 t3d::Shader *handle_shader;
@@ -75,10 +86,14 @@ f32 fps_timer;
 
 Mesh *suzanne_mesh;
 Mesh *floor_mesh;
-Mesh *handle_center_mesh;
+Mesh *handle_sphere_mesh;
+Mesh *handle_circle_mesh;
 Mesh *handle_axis_x_mesh;
 Mesh *handle_axis_y_mesh;
 Mesh *handle_axis_z_mesh;
+Mesh *handle_arrow_x_mesh;
+Mesh *handle_arrow_y_mesh;
+Mesh *handle_arrow_z_mesh;
 Mesh *handle_plane_x_mesh;
 Mesh *handle_plane_y_mesh;
 Mesh *handle_plane_z_mesh;
@@ -86,257 +101,12 @@ Mesh *handle_plane_z_mesh;
 f32 camera_velocity;
 
 
-
-union quaternion {
-	struct { f32 x, y, z, w; };
-	v3f xyz;
-	f32 s[4];
-	quaternion operator-() const {
-		return {-x, -y, -z, w};
-	}
-	v3f operator*(v3f v) const {
-		return v + 2 * cross(xyz, w * v + cross(xyz, v));// / (x*x+y*y+z*z+w*w);
-	}
-	explicit operator m3() const {
-		return {
-			1 - 2 * (y*y + z*z),     2 * (x*y - z*w),     2 * (x*z + y*w),
-				2 * (x*y + z*w), 1 - 2 * (x*x + z*z),     2 * (y*z - x*w),
-				2 * (x*z - y*w),     2 * (y*z + x*w), 1 - 2 * (x*x + y*y),
-		};
-	}
-	explicit operator m4() const {
-		return to_m4(operator m3());
-	}
-	static quaternion identity() {
-		return {0,0,0,1};
-	}
-	quaternion operator*(quaternion b) const {
-		quaternion r;
-		r.w = w * b.w - dot(xyz, b.xyz);
-		r.xyz = w * b.xyz + b.w * xyz + cross(xyz, b.xyz);
-		return r;
-	}
-	quaternion &operator*=(quaternion b) { return *this = *this * b, *this; }
-};
-
-quaternion Quaternion(v3f xyz, f32 w) {
-	return {xyz.x, xyz.y, xyz.z, w};
+m4 local_to_world_position(v3f position, quaternion rotation, v3f scale) {
+	return m4::translation(position) * (m4)rotation * m4::scale(scale);
 }
 
-quaternion normalize(quaternion q) {
-	f32 il = 1 / length(v4f{q.x,q.y,q.z,q.w});
-	return {q.x*il,q.y*il,q.z*il,q.w*il};
-}
-
-quaternion quaternion_from_axis_angle(v3f axis, f32 angle) {
-	f32 half_angle = angle * 0.5f;
-	f32 s = tl::sin(half_angle);
-	return {
-		axis.x * s,
-		axis.y * s,
-		axis.z * s,
-		tl::cos(half_angle),
-	};
-}
-quaternion quaternion_from_euler(f32 ax, f32 ay, f32 az) {
-	v3f half_angle = v3f{ax, ay, az} * 0.5f;
-	v2f csx = cos_sin(half_angle.x);
-	v2f csy = cos_sin(half_angle.y);
-	v2f csz = cos_sin(half_angle.z);
-
-	f32 a = csx.x;
-	f32 b = csx.y;
-	f32 c = csy.x;
-	f32 d = csy.y;
-	f32 e = csz.x;
-	f32 f = csz.y;
-
-	return {
-		e*c*b + a*d*f,
-		-c*b*f + e*a*d,
-		c*a*f + -e*d*b,
-		c*a*e + d*b*f
-	};
-
-	/*
-	forceinline v3f cross(v3f a, v3f b) {
-		return {
-			a.y * b.z - a.z * b.y,
-			a.z * b.x - a.x * b.z,
-			a.x * b.y - a.y * b.x
-		};
-	}
-	*/
-
-	return Quaternion(
-		v3f{csy.x*csx.y,csx.x*csy.y,-csy.y*csx.y},
-		csy.x * csx.x
-	) * quaternion {
-		0,
-		0,
-		csz.y,
-		csz.x,
-	};
-
-	return quaternion {
-		0,
-		csy.y,
-		0,
-		csy.x,
-	} * quaternion {
-		csx.y,
-		0,
-		0,
-		csx.x,
-	} * quaternion {
-		0,
-		0,
-		csz.y,
-		csz.x,
-	};
-
-	return quaternion_from_axis_angle({0,1,0}, ay) * quaternion_from_axis_angle({1,0,0}, ax) * quaternion_from_axis_angle({0,0,1}, az);
-
-	v2f z = cos_sin(ax * -0.5f);
-	v2f x = cos_sin(ay * -0.5f);
-	v2f y = cos_sin(az * -0.5f);
-
-	quaternion q;
-	q.x = y.x * x.x * z.y - y.y * x.y * z.x;
-	q.y = y.x * x.y * z.x + y.y * x.x * z.y;
-	q.z = y.y * x.x * z.x - y.x * x.y * z.y;
-	q.w = y.y * x.y * z.y + y.x * x.x * z.x;
-	return q;
-}
-quaternion quaternion_from_euler(v3f v) {
-	return quaternion_from_euler(v.x, v.y, v.z);
-}
-quaternion quaternion_look_at(v3f from, v3f to, v3f up) {
-	v3f the_forward = {0,0,-1};
-	v3f forward = normalize(to - from);
-
-	f32 d = dot(the_forward, forward);
-
-	if (absolute(d - (-1.0f)) < 0.000001f) {
-		return normalize(quaternion{up.x, up.y, up.z, pi});
-	}
-	if (absolute(d - (1.0f)) < 0.000001f) {
-		return quaternion::identity();
-	}
-
-	f32 rotAngle = (f32)acos(d);
-	v3f rotAxis = cross(the_forward, forward);
-	rotAxis = normalize(rotAxis);
-	return quaternion_from_axis_angle(rotAxis, rotAngle);
-}
-v3f to_euler_angles(quaternion q) {
-	// Store the Euler angles in radians
-    v3f pitchYawRoll;
-
-    f32 sqw = q.w * q.w;
-    f32 sqx = q.x * q.x;
-    f32 sqy = q.y * q.y;
-    f32 sqz = q.z * q.z;
-
-    // If quaternion is normalised the unit is one, otherwise it is the correction factor
-    f32 unit = sqx + sqy + sqz + sqw;
-    f32 test = q.x * q.y + q.z * q.w;
-
-    if (test > 0.4999f * unit)                              // 0.4999f OR 0.5f - EPSILON
-    {
-        // Singularity at north pole
-        pitchYawRoll.y = 2 * tl::atan2(q.x, q.w);  // Yaw
-        pitchYawRoll.x = pi * 0.5f;                         // Pitch
-        pitchYawRoll.z = 0;                                // Roll
-    }
-    else if (test < -0.4999f * unit)                        // -0.4999f OR -0.5f + EPSILON
-    {
-        // Singularity at south pole
-        pitchYawRoll.y = -2 * tl::atan2(q.x, q.w); // Yaw
-        pitchYawRoll.x = -pi * 0.5f;                        // Pitch
-        pitchYawRoll.z = 0;                                // Roll
-    }
-    else
-    {
-        pitchYawRoll.y = tl::atan2(2 * q.y * q.w - 2 * q.x * q.z, sqx - sqy - sqz + sqw);       // Yaw
-        pitchYawRoll.x = asin(2 * test / unit);                                             // Pitch
-        pitchYawRoll.z = tl::atan2(2 * q.x * q.w - 2 * q.y * q.z, -sqx + sqy - sqz + sqw);      // Roll
-    }
-
-	return {
-		-tl::atan2(2*(q.w*q.x + q.y*q.z), 1 - 2*(q.x*q.x + q.y*q.y)),
-		-asinf(2*(q.w*q.y - q.z*q.x)),
-		-tl::atan2(2*(q.w*q.z + q.x*q.y), 1 - 2*(q.y*q.y + q.z*q.z)),
-	};
-    return pitchYawRoll;
-}
-
-struct Entity {
-	v3f position = {};
-	//v3f rotation = {};
-	quaternion rotation = quaternion::identity();
-	StaticList<ComponentIndex, 16> components;
-	List<utf8> debug_name;
-};
-
-MaskedBlockList<Entity, 256> entities;
-
-Entity &Component::entity() const {
-	return entities[entity_index];
-}
-
-void destroy(Entity &entity) {
-	for (auto &component_index : entity.components) {
-		auto &storage = component_storages[component_index.type];
-		storage.remove_at(component_index.index);
-	}
-	free(entity.debug_name);
-	entities.remove(entity);
-}
-
-template <class T>
-T &add_component(Entity &entity, u32 entity_index) {
-	static constexpr u32 component_type = get_component_type_index<T>();
-
-	auto added = component_storages[component_type].add();
-	T &component = construct(*(T *)added.pointer);
-
-	ComponentIndex component_index = {
-		.type = component_type,
-		.index = added.index,
-		.entity_index = entity_index,
-	};
-	entity.components.add(component_index);
-
-	component.entity_index = entity_index;
-	on_create<T>(component);
-
-	return component;
-}
-template <class T>
-T &add_component(Entity &entity) {
-	auto found = index_of(entities, &entity);
-	assert(found);
-	return add_component<T>(entity, found.value);
-}
-template <class T>
-T &add_component(u32 entity_index) {
-	return add_component<T>(entities[entity_index], entity_index);
-}
-
-
-template <class T>
-T *get_component(Entity &entity, u32 nth = 0) {
-	static constexpr u32 component_type = get_component_type_index<T>();
-	for (auto component : entity.components) {
-		if (component.type == component_type) {
-			return component_storages[component_type].get(component.index);
-		}
-	}
-}
-template <class T>
-T *get_component(u32 entity_index, u32 nth = 0) {
-	return get_component<T>(entities[entity_index], nth);
+m4 local_to_world_normal(quaternion rotation, v3f scale) {
+	return (m4)rotation * m4::scale(1.0f / scale);
 }
 
 #define SHADOW_MAP_TEXTURE_SLOT 15
@@ -357,6 +127,7 @@ float4 saturate(float4 a){return clamp(a,0,1);}
 
 layout(binding=)" STRINGIZE(GLOBAL_CONSTANTS_SLOT) R"(, std140) uniform global_uniforms {
 	mat4 camera_rotation_projection_matrix;
+	mat4 world_to_camera_matrix;
 
 	vec3 camera_position;
 	float _dummy;
@@ -366,6 +137,9 @@ layout(binding=)" STRINGIZE(GLOBAL_CONSTANTS_SLOT) R"(, std140) uniform global_u
 
 layout(binding=)" STRINGIZE(ENTITY_CONSTANTS_SLOT) R"(, std140) uniform entity_uniforms {
 	mat4 local_to_camera_matrix;
+	mat4 local_to_world_position_matrix;
+	mat4 local_to_world_normal_matrix;
+	mat4 object_rotation_matrix;
 };
 
 layout(binding=)" STRINGIZE(LIGHT_CONSTANTS_SLOT) R"(, std140) uniform light_uniforms {
@@ -475,172 +249,6 @@ t3d::Shader *sky_box_shader;
 
 t3d::Texture *floor_lightmap;
 
-Window *window;
-
-enum InputEventKind {
-	InputEvent_none,
-	InputEvent_mouse_down,
-	InputEvent_mouse_up,
-	InputEvent_mouse_move,
-};
-
-struct InputEvent {
-	InputEventKind kind = {};
-	struct MouseDown { u8 button; v2s position; };
-	struct MouseUp   { u8 button; v2s position; };
-	struct MouseMove { v2s position; };
-	union {
-		MouseDown mouse_down;
-		MouseUp   mouse_up;
-		MouseMove mouse_move;
-	};
-};
-
-enum InputResponseKind {
-	InputResponse_none,
-	InputResponse_begin_drag,
-	InputResponse_end_grab,
-};
-
-struct InputResponse {
-	InputResponseKind kind;
-	struct InputHandler *sender;
-};
-
-struct InputHandler {
-	InputResponse (*_on_input)(void *data, InputEvent event);
-	InputResponse on_input(InputEvent event) {
-		return _on_input(this, event);
-	}
-};
-
-template <class T> InputResponse input_handler_on_input(void *data, InputEvent event) { return ((T *)data)->on_input(event); }
-
-enum EditorWindowKind : u16 {
-	EditorWindow_none,
-	EditorWindow_scene_view,
-};
-
-struct EditorWindow : InputHandler {
-	EditorWindowKind kind;
-	t3d::Viewport viewport;
-	void (*_resize)(void *data, t3d::Viewport viewport);
-	void resize(t3d::Viewport viewport) {
-		_resize(this, viewport);
-	}
-
-	void (*_render)(void *data);
-	void render() {
-		_render(this);
-	}
-
-	void (*_free)(void *data);
-	void free() {
-		_free(this);
-	}
-};
-
-template <class T> void editor_window_resize(void *data, t3d::Viewport viewport) { ((T *)data)->resize(viewport); }
-template <class T> void editor_window_render(void *data) { ((T *)data)->render(); }
-template <class T> void editor_window_free(void *data) { ((T *)data)->free(); }
-
-template <class T>
-T *create_editor_window() {
-	auto result = default_allocator.allocate<T>();
-	result->_resize   = editor_window_resize<T>;
-	result->_render   = editor_window_render<T>;
-	result->_free     = editor_window_free<T>;
-	result->_on_input = input_handler_on_input<T>;
-	return result;
-}
-
-void render_scene(struct SceneViewWindow *);
-
-Entity *current_camera_entity;
-Camera *current_camera;
-t3d::Viewport current_viewport;
-
-v3f world_to_viewport(v4f point) {
-	return map(current_camera->world_to_camera(point), {-1,-1,-1}, {1,1,1}, {0,0,0}, V3f((v2f)current_viewport.size, 1));
-}
-v3f world_to_viewport(v3f point) {
-	return world_to_viewport(V4f(point, 1));
-}
-v2s get_mouse_position_in_current_viewport() {
-	return v2s{window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y} - current_viewport.position;
-}
-
-struct SceneViewWindow : EditorWindow {
-	Entity *camera_entity;
-	Camera *camera;
-	bool flying;
-
-	void resize(t3d::Viewport viewport) {
-		this->viewport = viewport;
-		for (auto &effect : camera->post_effects) {
-			effect.resize(viewport.size);
-		}
-		t3d::resize_texture(camera->source_target->color, viewport.size);
-		t3d::resize_texture(camera->source_target->depth, viewport.size);
-		t3d::resize_texture(camera->destination_target->color, viewport.size);
-		t3d::resize_texture(camera->destination_target->depth, viewport.size);
-	}
-	void render() {
-		current_camera_entity = camera_entity;
-		current_camera = camera;
-		current_viewport = viewport;
-		render_scene(this);
-		current_camera_entity = 0;
-		current_camera = 0;
-		current_viewport = {};
-	}
-	void free() {
-		destroy(*camera_entity);
-	}
-
-	v3f get_drag_position(v2s mouse_position) {
-		return {};
-	}
-
-	InputResponse on_input(InputEvent event) {
-		switch (event.kind) {
-			case InputEvent_mouse_down: return on_mouse_down(event.mouse_down);
-			case InputEvent_mouse_up  : return on_mouse_up  (event.mouse_up  );
-			case InputEvent_mouse_move: return on_mouse_move(event.mouse_move);
-		}
-		invalid_code_path();
-		return {};
-	}
-	InputResponse on_mouse_down(InputEvent::MouseDown event) {
-		event.position -= viewport.position;
-		if (event.button == 1) {
-			flying = true;
-			return {.kind = InputResponse_begin_drag, .sender = this};
-		}
-
-		return {};
-	}
-	InputResponse on_mouse_up(InputEvent::MouseUp event) {
-		if (event.button == 1) {
-			flying = false;
-			return {InputResponse_end_grab};
-		}
-		return {};
-	}
-	InputResponse on_mouse_move(InputEvent::MouseMove event) {
-		return {};
-	}
-};
-
-SceneViewWindow *create_scene_view() {
-	auto result = create_editor_window<SceneViewWindow>();
-	result->kind = EditorWindow_scene_view;
-	result->camera_entity = &entities.add();
-	result->camera_entity->debug_name = format(u8"scene_camera_%", result);
-	result->camera = &add_component<Camera>(*result->camera_entity);
-	return result;
-}
-
 struct SplitView : InputHandler {
 	bool is_split;
 	bool is_sizing;
@@ -705,12 +313,30 @@ struct SplitView : InputHandler {
 
 	InputResponse on_input(InputEvent event) {
 		switch (event.kind) {
+			case InputEvent_key_down:   return on_key_down  (event.key_down);
 			case InputEvent_mouse_down: return on_mouse_down(event.mouse_down);
-			case InputEvent_mouse_up  : return on_mouse_up  (event.mouse_up);
+			case InputEvent_mouse_up:   return on_mouse_up  (event.mouse_up);
 			case InputEvent_mouse_move: return on_mouse_move(event.mouse_move);
 		}
 		invalid_code_path();
 		return {};
+	}
+
+	InputResponse on_key_down(InputEvent::KeyDown event) {
+		InputHandler *target = 0;
+		if (is_split) {
+			if (in_bounds(event.position, aabb_min_size(part1->viewport.position, (v2s)part1->viewport.size))) {
+				target = part1;
+			} else if (in_bounds(event.position, aabb_min_size(part2->viewport.position, (v2s)part2->viewport.size))) {
+				target = part2;
+			}
+		} else {
+			target = window;
+		}
+		if (target)
+			return target->on_input({.kind = InputEvent_key_down, .key_down = event});
+		else 
+			return {};
 	}
 
 	InputResponse on_mouse_down(InputEvent::MouseDown event) {
@@ -784,197 +410,6 @@ SplitView *create_split_view() {
 
 SplitView *main_view;
 
-struct ManipulatedTransform {
-	v3f position;
-	quaternion rotation;
-};
-
-using ManipulateFlags = u8;
-enum : ManipulateFlags {
-	Manipulate_position = 0x1,
-};
-
-struct ManipulatorDrawRequest {
-	ManipulateFlags flags;
-	u8 highlighted_part_index;
-	v3f position;
-	quaternion rotation;
-	f32 size;
-};
-
-List<ManipulatorDrawRequest> manipulator_draw_requests;
-
-inline static constexpr u8 null_manipulator_part = -1;
-
-struct ManipulatorState {
-	u8 dragging_part_index = null_manipulator_part;
-	v3f drag_offset;
-	f32 original_scale;
-};
-
-struct ManipulatorStateKey {
-	u32 id;
-	Camera *camera;
-	std::source_location location;
-};
-
-umm get_hash(ManipulatorStateKey const &key) {
-	return key.id * 954277 + key.location.column() * 152753 + key.location.line() * 57238693 + (u32)key.location.file_name();
-}
-bool operator==(ManipulatorStateKey const &a, ManipulatorStateKey const &b) {
-	return a.id == b.id && a.camera == b.camera && a.location == b.location;
-}
-
-StaticHashMap<ManipulatorStateKey, ManipulatorState, 256> manipulator_states;
-
-ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, ManipulateFlags flags, u32 id = 0, std::source_location source_location = std::source_location::current()) {
-	ManipulatedTransform manipulated_transform = {
-		.position = position,
-		.rotation = rotation,
-	};
-
-	assert(flags == Manipulate_position, "other modes are not implemented");
-	
-	auto &state = manipulator_states.get_or_insert({.id = id, .camera = current_camera, .location = source_location});
-
-	auto mouse_position = get_mouse_position_in_current_viewport();
-
-	f32 const handle_size_scale = 0.25f;
-	f32 const handle_grab_thickness = 0.05f;
-	f32 handle_size = handle_size_scale * current_camera->fov / (pi * 0.5f);
-
-	f32 handle_size_scaled_by_distance = handle_size * dot(position - current_camera_entity->position, current_camera_entity->rotation * v3f{0,0,-1});
-
-	//m4 handle_matrix = m4::translation(position) * m4::rotation_r_zxy(rotation) * m4::scale(handle_size * dot(position - current_camera_entity.position, m4::rotation_r_zxy(current_camera_entity.rotation) * v3f{0,0,-1}));
-	m4 handle_matrix = m4::translation(position) * (m4)-rotation * m4::scale(handle_size_scaled_by_distance);
-
-	v3f handle_viewport_position = world_to_viewport(handle_matrix * v4f{0,0,0,1});
-	u8 closest_element = null_manipulator_part;
-	if (handle_viewport_position.z < 1) {
-		Array<v3f, 3> handle_world_axis_tips = {
-			(handle_matrix * v4f{1,0,0,1}).xyz,
-			(handle_matrix * v4f{0,1,0,1}).xyz,
-			(handle_matrix * v4f{0,0,1,1}).xyz
-		};
-
-		Array<v2f, 3> handle_viewport_axis_tips = {
-			world_to_viewport(handle_world_axis_tips[0]).xy,
-			world_to_viewport(handle_world_axis_tips[1]).xy,
-			world_to_viewport(handle_world_axis_tips[2]).xy
-		};
-
-		Array<v2f, 12> handle_viewport_plane_points = {
-			world_to_viewport((handle_matrix * v4f{0,   0.4f,0.4f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0,   0.4f,0.8f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0,   0.8f,0.4f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0,   0.8f,0.8f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.4f,0,   0.4f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.4f,0,   0.8f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.8f,0,   0.4f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.8f,0,   0.8f,1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.4f,0.4f,0,   1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.4f,0.8f,0,   1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.8f,0.4f,0,   1}).xyz).xy,
-			world_to_viewport((handle_matrix * v4f{0.8f,0.8f,0,   1}).xyz).xy,
-		};
-
-		Array<line_segment<v2f>, 12> handle_viewport_plane_lines = {
-			line_segment_begin_end(handle_viewport_plane_points[0], handle_viewport_plane_points[1]),
-			line_segment_begin_end(handle_viewport_plane_points[2], handle_viewport_plane_points[3]),
-			line_segment_begin_end(handle_viewport_plane_points[0], handle_viewport_plane_points[2]),
-			line_segment_begin_end(handle_viewport_plane_points[1], handle_viewport_plane_points[3]),
-
-			line_segment_begin_end(handle_viewport_plane_points[4], handle_viewport_plane_points[5]),
-			line_segment_begin_end(handle_viewport_plane_points[6], handle_viewport_plane_points[7]),
-			line_segment_begin_end(handle_viewport_plane_points[4], handle_viewport_plane_points[6]),
-			line_segment_begin_end(handle_viewport_plane_points[5], handle_viewport_plane_points[7]),
-
-			line_segment_begin_end(handle_viewport_plane_points[ 8], handle_viewport_plane_points[ 9]),
-			line_segment_begin_end(handle_viewport_plane_points[10], handle_viewport_plane_points[11]),
-			line_segment_begin_end(handle_viewport_plane_points[ 8], handle_viewport_plane_points[10]),
-			line_segment_begin_end(handle_viewport_plane_points[ 9], handle_viewport_plane_points[11]),
-		};
-
-		f32 closest_dist = max_value<f32>;
-		for (u32 axis_index = 0; axis_index != 3; ++axis_index) {
-			f32 dist = distance(line_segment_begin_end(handle_viewport_axis_tips[axis_index], handle_viewport_position.xy), (v2f)mouse_position);
-			if (dist < closest_dist) {
-				closest_dist = dist;
-				closest_element = axis_index;
-			}
-
-			Array<line_segment<v2f>, 4> plane_lines = {
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 0], handle_viewport_plane_points[axis_index*4 + 1]),
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 2], handle_viewport_plane_points[axis_index*4 + 3]),
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 0], handle_viewport_plane_points[axis_index*4 + 2]),
-				line_segment_begin_end(handle_viewport_plane_points[axis_index*4 + 1], handle_viewport_plane_points[axis_index*4 + 3]),
-			};
-			for (u32 line_index = 0; line_index != 4; ++line_index) {
-				dist = min(dist, distance(plane_lines[line_index], (v2f)mouse_position));
-			}
-			if (dist < closest_dist) {
-				closest_dist = dist;
-				closest_element = axis_index + 3;
-			}
-		}
-		if (closest_dist > window->client_size.y * handle_grab_thickness) {
-			closest_element = null_manipulator_part;
-		}
-
-		bool begin_drag = false;
-		if (closest_element != null_manipulator_part && mouse_down(0)) {
-			begin_drag = true;
-			state.dragging_part_index = closest_element;
-			state.original_scale = handle_size_scaled_by_distance;
-		}
-
-		m4 camera_to_world_matrix = inverse(current_camera->world_to_camera_matrix);
-
-		if (state.dragging_part_index != null_manipulator_part) {
-			v3f new_position;
-			if (state.dragging_part_index < 3) {
-				v2f closest_in_viewport = closest_point(line_begin_end(handle_viewport_position.xy, handle_viewport_axis_tips[state.dragging_part_index]), (v2f)mouse_position);
-
-				v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, {}, (v2f)current_viewport.size, {-1,-1}, {1,1}),1, 1);
-				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
-
-				cursor_ray.direction = normalize(cursor_ray.direction);
-				new_position = closest_point(line_begin_end(position, handle_world_axis_tips[state.dragging_part_index]), as_line(cursor_ray));
-			} else {
-				v3f plane_normal = handle_world_axis_tips[state.dragging_part_index - 3] - position;
-
-				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)current_viewport.size, {-1,-1}, {1,1}),1, 1);
-				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
-
-				auto d = dot(position, -plane_normal);
-				auto t = -(d + dot(cursor_ray.origin, plane_normal)) / dot(cursor_ray.direction, plane_normal);
-				new_position = cursor_ray.origin + t * cursor_ray.direction;
-			}
-			if (begin_drag) {
-				state.drag_offset = manipulated_transform.position - new_position;
-			} else {
-				manipulated_transform.position = new_position + state.drag_offset * (handle_size_scaled_by_distance / state.original_scale);
-			}
-		}
-	}
-	print("%\n", handle_viewport_position.z);
-	
-	if (mouse_up(0)) {
-		state.dragging_part_index = null_manipulator_part;
-	}
-
-
-	manipulator_draw_requests.add({
-		.flags = flags,
-		.highlighted_part_index = (state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element,
-		.position = position,
-		.rotation = rotation,
-		.size = handle_size,
-	});
-
-	return manipulated_transform;
-}
-
 void render_scene(SceneViewWindow *view) {
 	timed_function();
 
@@ -1023,6 +458,7 @@ void render_scene(SceneViewWindow *view) {
 
 	t3d::update_shader_constants(global_constants, {
 		.camera_rotation_projection_matrix = camera_projection_matrix * camera_rotation_matrix,
+		.world_to_camera_matrix = camera.world_to_camera_matrix, 
 		.camera_position = camera_entity.position,
 		//.camera_forward = m3::rotation_r_zxy(camera_entity.rotation) * v3f{0,0,-1},
 		.camera_forward = camera_entity.rotation * v3f{0,0,-1},
@@ -1031,6 +467,8 @@ void render_scene(SceneViewWindow *view) {
 	t3d::set_render_target(camera.destination_target);
 	t3d::set_viewport(camera.destination_target->color->size);
 	t3d::clear(camera.destination_target, t3d::ClearFlags_color | t3d::ClearFlags_depth, {.9,.1,.9,1}, 1);
+	
+	t3d::set_topology(t3d::Topology_triangle_list);
 
 	t3d::set_rasterizer({
 		.depth_test = true,
@@ -1067,10 +505,13 @@ void render_scene(SceneViewWindow *view) {
 			t3d::set_shader_constants(mesh_renderer.material->constants, 0);
 
 
-			EntityConstants entity_data = {};
-			entity_data.local_to_camera_matrix = camera.world_to_camera_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation;
 			//entity_data.local_to_camera_matrix = camera.world_to_camera_matrix * m4::translation(mesh_entity.position) * m4::rotation_r_zxy(mesh_entity.rotation);
-			t3d::update_shader_constants(entity_constants, entity_data);
+			m4 local_to_world = m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale);
+			t3d::update_shader_constants(entity_constants, {
+				.local_to_camera_matrix = camera.world_to_camera_matrix * local_to_world,
+				.local_to_world_position_matrix = local_to_world,
+				.local_to_world_normal_matrix = (m4)mesh_entity.rotation * m4::scale(1 / mesh_entity.scale),
+			});
 			t3d::set_texture(mesh_renderer.lightmap, LIGHTMAP_TEXTURE_SLOT);
 			draw_mesh(mesh_renderer.mesh);
 		};
@@ -1129,53 +570,119 @@ void render_scene(SceneViewWindow *view) {
 		.depth_write = true,
 		.depth_func = t3d::Comparison_less,
 	});
+	t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_source_alpha, t3d::Blend_one_minus_source_alpha);
 
-	selected_entity->position = manipulate_transform(selected_entity->position, selected_entity->rotation, Manipulate_position).position;
+	auto new_transform = manipulate_transform(selected_entity->position, selected_entity->rotation, selected_entity->scale, view->manipulator_kind);
+	selected_entity->position = new_transform.position;
+	selected_entity->rotation = new_transform.rotation;
+	selected_entity->scale    = new_transform.scale;
 
 	for (auto &request : manipulator_draw_requests) {
-		assert(request.flags == Manipulate_position, "other modes are not implemented");
-
-		EntityConstants entity_data = {};
 		v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
-		entity_data.local_to_camera_matrix =
-			camera.world_to_camera_matrix
-			* m4::translation(camera_entity.position + camera_to_handle_direction)
-			* (m4)-request.rotation
-			* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}));
-		t3d::update_shader_constants(entity_constants, entity_data);
+		t3d::update_shader_constants(entity_constants, {
+			.local_to_camera_matrix = 
+				camera.world_to_camera_matrix
+				* m4::translation(camera_entity.position + camera_to_handle_direction)
+				* (m4)request.rotation
+				* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1})),
+			.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
+			.object_rotation_matrix = (m4)request.rotation,
+		});
 		t3d::set_shader(handle_shader);
 		t3d::set_shader_constants(handle_constants, 0);
-
-
+		
 		u32 selected_element = request.highlighted_part_index;
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != -1)});
-		draw_mesh(handle_center_mesh);
+		switch (request.kind) {
+			case Manipulate_position: {
+				t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part)});
+				draw_mesh(handle_sphere_mesh);
+		
+				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0)});
+				draw_mesh(handle_axis_x_mesh);
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0)});
-		draw_mesh(handle_axis_x_mesh);
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1)});
+				draw_mesh(handle_axis_y_mesh);
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1)});
-		draw_mesh(handle_axis_y_mesh);
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2)});
+				draw_mesh(handle_axis_z_mesh);
+				
+				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0)});
+				draw_mesh(handle_arrow_x_mesh);
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2)});
-		draw_mesh(handle_axis_z_mesh);
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1)});
+				draw_mesh(handle_arrow_y_mesh);
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3)});
-		draw_mesh(handle_plane_x_mesh);
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2)});
+				draw_mesh(handle_arrow_z_mesh);
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4)});
-		draw_mesh(handle_plane_y_mesh);
+				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3)});
+				draw_mesh(handle_plane_x_mesh);
 
-		t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5)});
-		draw_mesh(handle_plane_z_mesh);
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4)});
+				draw_mesh(handle_plane_y_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5)});
+				draw_mesh(handle_plane_z_mesh);
+				break;
+			}
+			case Manipulate_rotation: {
+				v3f to_camera = normalize(camera_entity.position - selected_entity->position);
+
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
+				draw_mesh(handle_circle_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
+				draw_mesh(handle_circle_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
+				draw_mesh(handle_circle_mesh);
+				
+				break;
+			}
+			case Manipulate_scale: {
+				t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part)});
+				draw_mesh(handle_sphere_mesh);
+		
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0)});
+				draw_mesh(handle_axis_x_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1)});
+				draw_mesh(handle_axis_y_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2)});
+				draw_mesh(handle_axis_z_mesh);
+				
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0)});
+				draw_mesh(handle_sphere_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1)});
+				draw_mesh(handle_sphere_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2)});
+				draw_mesh(handle_sphere_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3)});
+				draw_mesh(handle_plane_x_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4)});
+				draw_mesh(handle_plane_y_mesh);
+
+				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5)});
+				draw_mesh(handle_plane_z_mesh);
+				break;
+			}
+		}
 	}
 	manipulator_draw_requests.clear();
+	
+	debug_draw_lines();
 }
 
 void run() {
 	manipulator_draw_requests = {};
 	manipulator_states = {};
+	debug_lines = {};
 
 	init_component_storages<
 #define c(name) name
@@ -1193,7 +700,14 @@ void run() {
 			.window_size = window.client_size,
 			.debug = true,
 		}));
-
+		
+		debug_lines_vertex_buffer = t3d::create_vertex_buffer(
+			{},
+			{
+				t3d::Element_f32x3, // position
+				t3d::Element_f32x3, // color
+			}
+		);
 		//t3d::set_vsync(false);
 
 		global_constants = t3d::create_shader_constants<GlobalConstants>();
@@ -1248,9 +762,9 @@ layout(location=3) in vec2 uv;
 
 void main() {
 	vec3 local_position = position;
-	vertex_normal = normal;
+	vertex_normal = (local_to_world_normal_matrix * vec4(normal, 0)).xyz;
 	vertex_color = color * u_color;
-	vertex_world_position = local_position;
+	vertex_world_position = (local_to_world_position_matrix * vec4(local_position, 1)).xyz;
 	vertex_position_in_light_space = world_to_light_matrix * vec4(vertex_world_position, 1);
 	vertex_view_direction = camera_position - vertex_world_position;
 	vertex_to_light_direction = light_position - vertex_world_position;
@@ -1280,12 +794,16 @@ void main() {
 				handle_constants = t3d::create_shader_constants<HandleConstants>();
 				handle_shader = create_shader(u8R"(
 layout (std140, binding=0) uniform _ {
+	mat4 object_matrix;
 	vec3 u_color;
 	float selected;
+	vec3 to_camera;
+	float is_rotation;
 };
 
-V2F vec4 vertex_color;
+V2F vec3 vertex_color;
 V2F vec3 vertex_normal;
+V2F vec3 vertex_local_position;
 
 #ifdef VERTEX_SHADER
 
@@ -1294,15 +812,27 @@ layout(location=1) in vec3 normal;
 
 void main() {
 	vec3 local_position = position;
-	vertex_color = vec4(u_color, 1);
-	vertex_normal = normal;
-	gl_Position = local_to_camera_matrix * vec4(local_position, 1);
+	vertex_color = u_color;
+	vertex_normal = (local_to_world_normal_matrix * (object_matrix * vec4(normal, 0))).xyz;
+	vertex_local_position =  (object_rotation_matrix * (object_matrix * vec4(local_position, 1))).xyz;
+	gl_Position = local_to_camera_matrix * (object_matrix * vec4(local_position, 1));
 }
 #endif
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
-	fragment_color = mix(mix(vec4(0.5f), vertex_color * 0.5, dot(vertex_normal, -camera_forward) * 0.5 + 0.5), vertex_color, selected);
+	vec3 normal = normalize(vertex_normal);
+	vec3 default_color = vertex_color * 0.5f;
+	vec3 highlighted_color = mix(vertex_color, vec3(1), .1);
+
+	vec4 mixed_color = vec4(
+		mix(default_color, highlighted_color, selected),
+		-dot(normal, camera_forward) * mix(1, saturate((dot(vertex_local_position, to_camera) + 0.1f) * 16), is_rotation)
+	);
+
+	fragment_color = mixed_color;
+	//fragment_color = vec4(-dot(normal, camera_forward));
+	//fragment_color = vec4(normal, 1);
 }
 #endif
 )"s);
@@ -1415,7 +945,7 @@ void main() {
 		7, 6, 3, 3, 6, 2
 	);
 	vec3 local_position = positions[indices[gl_VertexID]];
-	vertex_uv = local_position;
+	vertex_uv = local_position * vec3(1,1,-1);
 	gl_Position = camera_rotation_projection_matrix * vec4(local_position, 1);
 }
 #endif
@@ -1444,6 +974,27 @@ void main() {
 	//
 	//atomicAdd(dest_sum, uint(average * 256));
 }
+)"s);
+				debug_line_shader = create_shader(u8R"(
+V2F vec3 vertex_color;
+
+#ifdef VERTEX_SHADER
+
+layout(location=0) in vec3 position;
+layout(location=1) in vec3 color;
+
+void main() {
+	vec3 local_position = position;
+	vertex_color = color;
+	gl_Position = world_to_camera_matrix * vec4(local_position, 1);
+}
+#endif
+#ifdef FRAGMENT_SHADER
+out vec4 fragment_color;
+void main() {
+	fragment_color = vec4(vertex_color, 1);
+}
+#endif
 )"s);
 				break;
 			}
@@ -1518,32 +1069,40 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		u32 black_pixel = 0xFF000000;
 		black_texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &black_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
 
+		auto scene_meshes = parse_glb_from_file(tl_file_string("../data/scene.glb"ts)).get();
+
 		auto &suzanne         = entities.add();
 		suzanne.debug_name = as_list(u8"suzanne"s);
 		auto &floor           = entities.add();
 		floor.debug_name = as_list(u8"floor"s);
 
+		selected_entity = &suzanne;
 		{
 			auto &mr = add_component<MeshRenderer>(suzanne);
-			mr.mesh = load_mesh(tl_file_string("../data/suzanne.glb"ts));
+			mr.mesh = create_mesh(*scene_meshes.get_node(u8"Suzanne"s)->mesh);
 			mr.material = &surface_material;
+			mr.lightmap = t3d::load_texture(tl_file_string("../data/suzanne_lightmap.png"ts));
 		}
 
 		{
 			auto &mr = add_component<MeshRenderer>(floor);
-			mr.mesh = load_mesh(tl_file_string("../data/floor.glb"ts));
+			mr.mesh = create_mesh(*scene_meshes.get_node(u8"Room"s)->mesh);
 			mr.material = &surface_material;
 			mr.lightmap = t3d::load_texture(tl_file_string("../data/floor_lightmap.png"ts));
 		}
 
 		auto handle_meshes = parse_glb_from_file(tl_file_string("../data/handle.glb"ts)).get();
-		handle_center_mesh  = create_mesh(*handle_meshes.get_node(u8"Center"s).mesh);
-		handle_axis_x_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisX"s ).mesh);
-		handle_axis_y_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisY"s ).mesh);
-		handle_axis_z_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisZ"s ).mesh);
-		handle_plane_x_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneX"s).mesh);
-		handle_plane_y_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneY"s).mesh);
-		handle_plane_z_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneZ"s).mesh);
+		handle_sphere_mesh  = create_mesh(*handle_meshes.get_node(u8"Sphere"s)->mesh);
+		handle_circle_mesh  = create_mesh(*handle_meshes.get_node(u8"Circle"s)->mesh);
+		handle_axis_x_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisX"s )->mesh);
+		handle_axis_y_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisY"s )->mesh);
+		handle_axis_z_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisZ"s )->mesh);
+		handle_arrow_x_mesh  = create_mesh(*handle_meshes.get_node(u8"ArrowX"s )->mesh);
+		handle_arrow_y_mesh  = create_mesh(*handle_meshes.get_node(u8"ArrowY"s )->mesh);
+		handle_arrow_z_mesh  = create_mesh(*handle_meshes.get_node(u8"ArrowZ"s )->mesh);
+		handle_plane_x_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneX"s)->mesh);
+		handle_plane_y_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneY"s)->mesh);
+		handle_plane_z_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneZ"s)->mesh);
 
 		auto light_texture = t3d::load_texture(tl_file_string("../data/spotlight_mask.png"ts));
 
@@ -1551,9 +1110,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			auto &light = entities.add();
 			light.debug_name = as_list(u8"light1"s);
 			light.position = {0,2,6};
-			light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
+			//light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
+			light.rotation = quaternion_from_euler(0,0,0);
 			add_component<Light>(light).texture = light_texture;
-			selected_entity = &light;
 		}
 
 		{
@@ -1572,12 +1131,10 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			.front  = tl_file_string("../data/sky_z-.hdr"ts),
 			.back   = tl_file_string("../data/sky_z+.hdr"ts),
 		});
-
-		print("%\n%\n", m4::rotation_r_zxy(1,2,3), transpose(m4::rotation_r_yxz(-1,-2,-3)));
 	};
 	info.on_draw = [](Window &window) {
 		static v2u old_window_size;
-		if (old_window_size != window.client_size) {
+		if (any_true(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
 
 			main_view->resize({.position = {}, .size = window.client_size});
@@ -1616,6 +1173,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 					.set_depth_func(t3d::Comparison_less)
 			);
 			t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+			t3d::set_topology(t3d::Topology_triangle_list);
 
 			for_each_component_of_type(Light, light) {
 				timed_block("Light"s);
@@ -1632,7 +1190,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 				for_each_component_of_type(MeshRenderer, mesh_renderer) {
 					auto &mesh_entity = entities[mesh_renderer.entity_index];
-					t3d::update_shader_constants(entity_constants, shader_value_location(EntityConstants, local_to_camera_matrix), light.world_to_light_matrix * m4::translation(mesh_entity.position));
+					t3d::update_shader_constants(entity_constants, {
+						.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
+					});
 					draw_mesh(mesh_renderer.mesh);
 				};
 			};
@@ -1642,7 +1202,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			timed_block("main_view->render()"s);
 			main_view->render();
 		}
-
+		
+		debug_frame();
+		
 		{
 			timed_block("present"s);
 			t3d::present();
@@ -1670,6 +1232,16 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	assert_always(window);
 
 	static InputHandler *grabbed = 0;
+	on_key_down = [](u8 key) {
+		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
+		auto response = main_view->on_input({
+			.kind = InputEvent_key_down,
+			.key_down = {
+				.key = (Key)key,
+				.position = mouse_position,
+			}
+		});
+	};
 	on_mouse_down = [](u8 button){
 		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
 		auto response = main_view->on_input({
