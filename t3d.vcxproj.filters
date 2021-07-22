@@ -51,6 +51,7 @@
     </ClInclude>
     <ClInclude Include="src\current.h" />
     <ClInclude Include="src\debug.h" />
+    <ClInclude Include="src\input.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

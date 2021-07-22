@@ -149,6 +149,10 @@ union Viewport {
 	v2s bottom_right() const {
 		return { x + (s32)w, y };
 	}
+
+	aabb<v2s> aabb() {
+		return {position, position + (v2s)size};
+	}
 };
 
 #define APIS(A) \

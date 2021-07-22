@@ -41,6 +41,7 @@
     <ClInclude Include="src\editor\scene_view.h" />
     <ClInclude Include="src\editor\window.h" />
     <ClInclude Include="src\entity.h" />
+    <ClInclude Include="src\input.h" />
     <ClInclude Include="src\manipulator.h" />
     <ClInclude Include="src\material.h" />
     <ClInclude Include="src\mesh.h" />

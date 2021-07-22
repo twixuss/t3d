@@ -6,6 +6,7 @@ Window *window;
 
 Entity *current_camera_entity;
 Camera *current_camera;
+v2s current_mouse_position;
 t3d::Viewport current_viewport;
 
 v3f world_to_camera(v3f point) {

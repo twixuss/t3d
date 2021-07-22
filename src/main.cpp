@@ -13,6 +13,7 @@ bool operator==(std::source_location a, std::source_location b) {
 #include "components/camera.h"
 #include "editor/window.h"
 #include "editor/scene_view.h"
+#include "input.h"
 
 using namespace tl;
 
@@ -249,7 +250,7 @@ t3d::Shader *sky_box_shader;
 
 t3d::Texture *floor_lightmap;
 
-struct SplitView : InputHandler {
+struct SplitView/* : InputHandler */{
 	bool is_split;
 	bool is_sizing;
 	bool axis_is_x;
@@ -293,6 +294,28 @@ struct SplitView : InputHandler {
 	}
 	void render() {
 		if (is_split) {
+			
+			if (mouse_down(0)) {
+				f32 const grab_distance = 4;
+				if (axis_is_x) {
+					s32 bar_position = viewport.y + viewport.h * split_t;
+					if (distance((v2f)current_mouse_position, (line_segment<v2f>)line_segment_begin_end(v2s{viewport.x, bar_position}, v2s{viewport.x + (s32)viewport.w, bar_position})) <= grab_distance) {
+						is_sizing = true;
+					}
+				} else {
+					s32 bar_position = viewport.x + viewport.w * split_t;
+					if (distance((v2f)current_mouse_position, (line_segment<v2f>)line_segment_begin_end(v2s{bar_position, viewport.y}, v2s{bar_position, viewport.y + (s32)viewport.h})) <= grab_distance) {
+						is_sizing = true;
+					}
+				}
+				if (is_sizing) {
+					lock_input();
+				}
+			}
+			if (mouse_up(0)) {
+				is_sizing = false;
+				unlock_input();
+			}
 
 			if (is_sizing) {
 				v2s mouse_position = {::window->mouse_position.x, (s32)::window->client_size.y - ::window->mouse_position.y};
@@ -310,7 +333,7 @@ struct SplitView : InputHandler {
 			window->render();
 		}
 	}
-
+	/*
 	InputResponse on_input(InputEvent event) {
 		switch (event.kind) {
 			case InputEvent_key_down:   return on_key_down  (event.key_down);
@@ -341,20 +364,6 @@ struct SplitView : InputHandler {
 
 	InputResponse on_mouse_down(InputEvent::MouseDown event) {
 		v2s mouse_position = {::window->mouse_position.x, (s32)::window->client_size.y - ::window->mouse_position.y};
-		if (event.button == 0) {
-			f32 const grab_distance = 4;
-			if (axis_is_x) {
-				s32 bar_position = viewport.y + viewport.h * split_t;
-				if (distance((v2f)mouse_position, (line<v2f>)line_begin_end(v2s{viewport.x, bar_position}, v2s{viewport.x + (s32)viewport.w, bar_position})) <= grab_distance) {
-					is_sizing = true;
-				}
-			} else {
-				s32 bar_position = viewport.x + viewport.w * split_t;
-				if (distance((v2f)mouse_position, (line<v2f>)line_begin_end(v2s{bar_position, viewport.y}, v2s{bar_position, viewport.y + (s32)viewport.h})) <= grab_distance) {
-					is_sizing = true;
-				}
-			}
-		}
 		if (is_sizing) {
 			return {.kind = InputResponse_begin_drag, .sender = this};
 		} else {
@@ -400,11 +409,12 @@ struct SplitView : InputHandler {
 		else 
 			return {};
 	}
+	*/
 };
 
 SplitView *create_split_view() {
 	auto result = default_allocator.allocate<SplitView>();
-	result->_on_input = input_handler_on_input<SplitView>;
+	//result->_on_input = input_handler_on_input<SplitView>;
 	return result;
 }
 
@@ -415,7 +425,19 @@ void render_scene(SceneViewWindow *view) {
 
 	//print("%\n", to_euler_angles(quaternion_from_euler(0, time, time)));
 	//selected_entity->qrotation = quaternion_from_euler(to_euler_angles(quaternion_from_euler(0, time, time)));
+	
+	if (mouse_down(1)) {
+		view->flying = true;
+		lock_input();
+	}
+	if (mouse_up(1)) {
+		view->flying = false;
+		unlock_input();
+	}
 
+	if (key_down('1')) view->manipulator_kind = Manipulate_position;
+	if (key_down('2')) view->manipulator_kind = Manipulate_rotation;
+	if (key_down('3')) view->manipulator_kind = Manipulate_scale;
 
 	auto &camera = *view->camera;
 	auto &camera_entity = *view->camera_entity;
@@ -1141,7 +1163,14 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 			t3d::resize_render_targets(window.client_size);
 		}
+		
+		current_viewport = {
+			.position = {},
+			.size = window.client_size,
+		};
 
+		current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
+		
 		if (key_down(Key_f1)) {
 			Profiler::enabled = true;
 			Profiler::reset();
@@ -1154,12 +1183,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		};
 		timed_block("frame"s);
 
-		static v2s old_mouse_position;
-		v2s mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
-		if (any_true(window.mouse_position != old_mouse_position)) {
-			main_view->on_input({.kind = InputEvent_mouse_move, .mouse_move = {.position = mouse_position}});
-			old_mouse_position = mouse_position;
-		}
+		//static v2s old_mouse_position;
+		//v2s mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
+		//if (any_true(window.mouse_position != old_mouse_position)) {
+		//	main_view->on_input({.kind = InputEvent_mouse_move, .mouse_move = {.position = mouse_position}});
+		//	old_mouse_position = mouse_position;
+		//}
 
 		{
 			timed_block("Shadows"s);
@@ -1205,6 +1234,16 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		
 		debug_frame();
 		
+		for (auto &state : key_state) {
+			if (state.state & KeyState_down) {
+				state.state &= ~KeyState_down;
+			} else if (state.state & KeyState_up) {
+				state.state = KeyState_none;
+			}
+			if (state.state & KeyState_repeated) {
+				state.state &= ~KeyState_repeated;
+			}
+		}
 		{
 			timed_block("present"s);
 			t3d::present();
@@ -1230,40 +1269,23 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	defer { free(window); };
 
 	assert_always(window);
-
-	static InputHandler *grabbed = 0;
+	
 	on_key_down = [](u8 key) {
-		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
-		auto response = main_view->on_input({
-			.kind = InputEvent_key_down,
-			.key_down = {
-				.key = (Key)key,
-				.position = mouse_position,
-			}
-		});
+		key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
+		key_state[key].start_position = input_is_locked ? input_lock_mouse_position : current_mouse_position;
+	};
+	on_key_up = [](u8 key) {
+		key_state[key].state = KeyState_up;
+	};
+	on_key_repeat = [](u8 key) {
+		key_state[key].state |= KeyState_repeated;
 	};
 	on_mouse_down = [](u8 button){
-		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
-		auto response = main_view->on_input({
-			.kind = InputEvent_mouse_down,
-			.mouse_down = {.button = button, .position = mouse_position}
-		});
-		if (response.kind == InputResponse_begin_drag) {
-			grabbed = response.sender;
-		}
+		key_state[256 + button].state = KeyState_down | KeyState_held;
+		key_state[256 + button].start_position = input_is_locked ? input_lock_mouse_position : current_mouse_position;
 	};
-	on_mouse_up   = [](u8 button){
-		v2s mouse_position = {window->mouse_position.x, (s32)window->client_size.y - window->mouse_position.y};
-		main_view->on_input({
-			.kind = InputEvent_mouse_up,
-			.mouse_up = {.button = button, .position = mouse_position}
-		});
-		if (grabbed) {
-			grabbed->on_input({
-				.kind = InputEvent_mouse_up,
-				.mouse_up = {.button = button, .position = mouse_position}
-			});
-		}
+	on_mouse_up = [](u8 button){
+		key_state[256 + button].state = KeyState_up;
 	};
 
 	frame_timer = create_precise_timer();

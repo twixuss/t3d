@@ -1,28 +1,6 @@
 #pragma once
 #include <t3d.h>
-
-enum InputEventKind {
-	InputEvent_none,
-	InputEvent_key_down,
-	InputEvent_mouse_down,
-	InputEvent_mouse_up,
-	InputEvent_mouse_move,
-};
-
-struct InputEvent {
-	InputEventKind kind = {};
-	struct KeyDown   { Key key; v2s position; };
-	struct MouseDown { u8 button; v2s position; };
-	struct MouseUp   { u8 button; v2s position; };
-	struct MouseMove { v2s position; };
-	union {
-		KeyDown key_down;
-		MouseDown mouse_down;
-		MouseUp   mouse_up;
-		MouseMove mouse_move;
-	};
-};
-
+/*
 enum InputResponseKind {
 	InputResponse_none,
 	InputResponse_begin_drag,
@@ -42,13 +20,14 @@ struct InputHandler {
 };
 
 template <class T> InputResponse input_handler_on_input(void *data, InputEvent event) { return ((T *)data)->on_input(event); }
+*/
 
 enum EditorWindowKind : u16 {
 	EditorWindow_none,
 	EditorWindow_scene_view,
 };
 
-struct EditorWindow : InputHandler {
+struct EditorWindow/* : InputHandler */{
 	EditorWindowKind kind;
 	t3d::Viewport viewport;
 	void (*_resize)(void *data, t3d::Viewport viewport);
@@ -77,6 +56,6 @@ T *create_editor_window() {
 	result->_resize   = editor_window_resize<T>;
 	result->_render   = editor_window_render<T>;
 	result->_free     = editor_window_free<T>;
-	result->_on_input = input_handler_on_input<T>;
+	//result->_on_input = input_handler_on_input<T>;
 	return result;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "../current.h"
 #include "../debug.h"
+#include "../input.h"
 
 enum ManipulateKind {
 	Manipulate_position,
