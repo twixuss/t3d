@@ -2,10 +2,16 @@
 #include <t3d.h>
 #include <tl/quaternion.h>
 
+using EntityFlags = u32;
+enum : EntityFlags {
+	Entity_editor = 0x1,
+};
+
 struct Entity {
 	v3f position = {};
 	quaternion rotation = quaternion::identity();
 	v3f scale = {1, 1, 1};
+	EntityFlags flags;
 	StaticList<ComponentIndex, 16> components;
 	List<utf8> debug_name;
 };

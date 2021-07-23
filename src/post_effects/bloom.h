@@ -132,16 +132,16 @@ void main() {
 				t3d::draw(3);
 			}
 		}
-		t3d::set_shader(blit_shader);
+		t3d::set_shader(blit_texture_shader);
 		t3d::set_render_target(destination);
 		t3d::set_viewport(destination->color->size);
 		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
 		t3d::set_texture(source->color, 0);
 		t3d::draw(3);
 
-		t3d::set_shader(blit_color_shader);
-		t3d::update_shader_constants(blit_color_constants, {.color = V4f(0.1f)});
-		t3d::set_shader_constants(blit_color_constants, 0);
+		t3d::set_shader(blit_texture_color_shader);
+		t3d::update_shader_constants(blit_texture_color_constants, {.color = V4f(0.1f)});
+		t3d::set_shader_constants(blit_texture_color_constants, 0);
 		t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
 		for (auto &target : downsampled_targets) {
 			t3d::set_texture(target->color, 0);

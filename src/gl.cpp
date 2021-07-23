@@ -152,6 +152,7 @@ GLuint get_format(TextureFormat format) {
 	switch (format) {
 		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
 		case TextureFormat_r_f32:    return GL_RED;
+		case TextureFormat_rgb_u8n:  return GL_RGB;
 		case TextureFormat_rgb_f16:  return GL_RGB;
 		case TextureFormat_rgb_f32:  return GL_RGB;
 		case TextureFormat_rgba_u8n: return GL_RGBA;
@@ -166,6 +167,7 @@ GLuint get_internal_format(TextureFormat format) {
 	switch (format) {
 		case TextureFormat_depth:    return GL_DEPTH_COMPONENT;
 		case TextureFormat_r_f32:    return GL_R32F;
+		case TextureFormat_rgb_u8n:  return GL_RGB8;
 		case TextureFormat_rgb_f16:  return GL_RGB16F;
 		case TextureFormat_rgb_f32:  return GL_RGB32F;
 		case TextureFormat_rgba_u8n: return GL_RGBA8;
@@ -180,6 +182,7 @@ GLuint get_type(TextureFormat format) {
 	switch (format) {
 		case TextureFormat_depth:    return GL_FLOAT;
 		case TextureFormat_r_f32:    return GL_FLOAT;
+		case TextureFormat_rgb_u8n:  return GL_UNSIGNED_BYTE;
 		case TextureFormat_rgb_f16:  return GL_FLOAT;
 		case TextureFormat_rgb_f32:  return GL_FLOAT;
 		case TextureFormat_rgba_u8n: return GL_UNSIGNED_BYTE;
@@ -193,6 +196,7 @@ u32 get_bytes_per_texel(TextureFormat format) {
 	switch (format) {
 		case TextureFormat_depth:    return 4;
 		case TextureFormat_r_f32:    return 4;
+		case TextureFormat_rgb_u8n:  return 3;
 		case TextureFormat_rgb_f16:  return 6;
 		case TextureFormat_rgb_f32:  return 12;
 		case TextureFormat_rgba_u8n: return 4;
@@ -205,9 +209,11 @@ u32 get_bytes_per_texel(TextureFormat format) {
 
 GLuint get_blend(Blend blend) {
 	switch (blend) {
-		case t3d::Blend_one:                    return GL_ONE;
-		case t3d::Blend_source_alpha:           return GL_SRC_ALPHA;
-		case t3d::Blend_one_minus_source_alpha: return GL_ONE_MINUS_SRC_ALPHA;
+		case t3d::Blend_one:                       return GL_ONE;
+		case t3d::Blend_source_alpha:              return GL_SRC_ALPHA;
+		case t3d::Blend_one_minus_source_alpha:    return GL_ONE_MINUS_SRC_ALPHA;
+		case t3d::Blend_secondary_color:           return GL_SRC1_COLOR;
+		case t3d::Blend_one_minus_secondary_color: return GL_ONE_MINUS_SRC1_COLOR;
 	}
 	invalid_code_path();
 	return 0;
@@ -308,6 +314,7 @@ bool init(InitInfo init_info) {
 		gl::present();
 	};
 	_draw = [](u32 vertex_count, u32 start_vertex) {
+		assert(vertex_count, "t3d::draw called with 0 vertices");
 		glDrawArrays(state.topology, start_vertex, vertex_count);
 	};
 	_draw_indexed = [](u32 index_count) {
@@ -326,15 +333,18 @@ bool init(InitInfo init_info) {
 		state.window_size = state.back_buffer_color.size = state.back_buffer_depth.size = {width, height};
 	};
 	_set_shader = [](Shader *_shader) {
+		assert(_shader);
 		auto &shader = *(ShaderImpl *)_shader;
 		glUseProgram(shader.program);
 	};
 	_set_shader_constants = [](ShaderConstants *_constants, u32 slot) {
+		assert(_constants);
 		auto &constants = *(ShaderConstantsImpl *)_constants;
 		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
 		glBindBufferBase(GL_UNIFORM_BUFFER, slot, constants.uniform_buffer);
 	};
 	_update_shader_constants = [](ShaderConstants *_constants, ShaderValueLocation dest, void const *source) {
+		assert(_constants);
 		auto &constants = *(ShaderConstantsImpl *)_constants;
 		glBindBuffer(GL_UNIFORM_BUFFER, constants.uniform_buffer);
 		glBufferSubData(GL_UNIFORM_BUFFER, dest.start, dest.size, source);
@@ -342,9 +352,13 @@ bool init(InitInfo init_info) {
 	};
 	_create_shader = [](Span<utf8> source) -> Shader * {
 		auto &shader = state.shaders.add();
+		auto vertex   = tl::gl::create_shader(GL_VERTEX_SHADER, 430, true, (Span<char>)source);
+		auto fragment = tl::gl::create_shader(GL_FRAGMENT_SHADER, 430, true, (Span<char>)source);
+		assert(vertex);
+		assert(fragment);
 		shader.program = create_program({
-			.vertex   = tl::gl::create_shader(GL_VERTEX_SHADER, 430, true, (Span<char>)source),
-			.fragment = tl::gl::create_shader(GL_FRAGMENT_SHADER, 430, true, (Span<char>)source)
+			.vertex = vertex,
+			.fragment = fragment,
 		});
 		assert(shader.program);
 		return &shader;
@@ -635,6 +649,12 @@ bool init(InitInfo init_info) {
 		glBindBuffer(GL_ARRAY_BUFFER, buffer.buffer);
 		glBufferData(GL_ARRAY_BUFFER, data.size, data.data, GL_STATIC_DRAW);
 		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	};
+	_update_texture = [](Texture *_texture, u32 width, u32 height, void *data) {
+		auto &texture = *(TextureImpl *)_texture;
+		glBindTexture(texture.target, texture.texture);
+		glTexImage2D(texture.target, 0, texture.internal_format, width, height, 0, texture.format, texture.type, data);
+		glBindTexture(texture.target, 0);
 	};
 	return true;
 }

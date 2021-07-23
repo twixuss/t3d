@@ -1,7 +1,7 @@
 #pragma once
-#include "../current.h"
-#include "../debug.h"
-#include "../input.h"
+#include "current.h"
+#include "debug.h"
+#include "input.h"
 
 enum ManipulateKind {
 	Manipulate_position,
@@ -22,6 +22,8 @@ struct ManipulatorDrawRequest {
 	quaternion rotation;
 	v3f scale;
 	f32 size;
+	bool dragging;
+	ray<v3f> tangent;
 };
 
 List<ManipulatorDrawRequest> manipulator_draw_requests;
@@ -35,6 +37,7 @@ struct ManipulatorState {
 	f32 previous_angle;
 	v3f rotation_axis;
 	ray<v2f> tangent;
+	ray<v3f> tangent3;
 	v2f start_mouse_position;
 	v2f accumulated_mouse_delta;
 	ManipulatedTransform original_transform;
@@ -213,7 +216,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 			};
 			
 			f32 closest_dist = max_value<f32>;
-			//v3f closest_intersect_position;
+			v3f closest_intersect_position = {};
 
 			for (u32 part_index = 0; part_index < 3; ++part_index) {
 				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)current_viewport.size, {-1,-1}, {1,1}), 1, 1);
@@ -221,29 +224,26 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 				cursor_ray.direction = normalize(cursor_ray.direction);
 
 				// TODO: this could be better
-				u32 const point_count = 4 * 12;
-				f32 dist = max_value<f32>;
+				u32 const point_count = 4 * 24;
 				for (u32 point_index = 0; point_index < point_count; ++point_index) {
 					v3f point = position + -rotation * quaternion_from_axis_angle(global_normals[part_index], point_index * (2 * pi / point_count)) * global_normals[part_index].zxy() * handle_size_scaled_by_distance;
 					
 					// Ignore the back of the circle
-					if (dot(point - position, normalize(current_camera_entity->position - position)) < -0.0) 
+					if (dot(normalize(point - position), normalize(current_camera_entity->position - position)) < -0.1) 
 						continue;
 
-					if (key_down('F') && part_index == 0) {
-						print("%\n", distance((v2f)mouse_position, world_to_viewport(point).xy));
-					}
-					dist = min(dist, distance((v2f)mouse_position, world_to_viewport(point).xy));
-				}
+					//debug_line(position, point);
 
-				if (dist < closest_dist) {
-					closest_dist = dist;
-					closest_element = part_index;
-					//closest_intersect_position = intersect_position;
+					f32 dist = distance((v2f)mouse_position, world_to_viewport(point).xy);
+					if (dist < closest_dist) {
+						closest_intersect_position = point;
+						closest_dist = dist;
+						closest_element = part_index;
+					}
 				}
 			}
 
-			//debug_line(closest_intersect_position, closest_intersect_position + -rotation * global_normals[closest_element], {1, 0, 0});
+			//debug_line(position, closest_intersect_position, {1, 0, 0});
 			
 			if (closest_dist > handle_grab_thickness * current_viewport.h) {
 				closest_element = null_manipulator_part;
@@ -266,39 +266,34 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 					state.rotation_axis = -rotation * global_normals[state.dragging_part_index];
 				}
 
-				v3f intersect_position = intersect(cursor_ray, plane_point_normal(position, state.rotation_axis));
-				
-				v2f aspect_correction = {1, (f32)current_viewport.w / current_viewport.h};
-
+				v3f intersect_position = closest_intersect_position;
 				
 				if (begin_drag) {
-					v2f intersect_position_normalized = map((v2f)mouse_position, {}, (v2f)current_viewport.size, {-1,-1}, {1,1}) * aspect_correction;
-					v3f tip = intersect_position + normalize(cross(intersect_position - position, state.rotation_axis));
-					debug_line(1.0f, intersect_position, tip, {0, 1, 0});
+					v2f intersect_position_viewport = (v2f)(current_mouse_position - current_viewport.position);
+					v3f tip = intersect_position + normalize(cross(intersect_position - position, state.rotation_axis)) * handle_size_scaled_by_distance;
+					//debug_line(10.0f, intersect_position, tip, {0, 1, 0});
+					state.tangent3 = normalize(ray_origin_end(
+						intersect_position,
+						tip
+					));
+					state.tangent3.origin = normalize(state.tangent3.origin - position);
+
 					state.tangent = ray_origin_direction(
-						intersect_position_normalized,
-						normalize(world_to_camera(tip).xy - intersect_position_normalized * aspect_correction)
+						intersect_position_viewport,
+						normalize((world_to_viewport(tip).xy - intersect_position_viewport))
 					);
 					state.start_mouse_position = (v2f)mouse_position;
 					state.accumulated_mouse_delta = {};
-					print("%\n", state.tangent);
+					
+					//print("%\n", state.tangent.direction);
 				}
 
-				state.accumulated_mouse_delta += (v2f)window->mouse_delta * v2f{1,-1};
+				state.accumulated_mouse_delta += (v2f)window->mouse_delta * v2f{2.5f,-2.5f};
 
-
-				f32 dist = 2 * pi * dot(
-					map(
-						state.start_mouse_position + state.accumulated_mouse_delta, 
-						{}, 
-						(v2f)current_viewport.size,
-						{-1,-1},
-						{1,1}
-					) * aspect_correction - state.tangent.origin,
+				f32 dist = pi * 2 * dot(
+					state.start_mouse_position + state.accumulated_mouse_delta - state.tangent.origin,
 					state.tangent.direction
-				);
-
-				//print("%\n", dist);
+				) / current_viewport.h;
 
 				manipulated_transform.rotation = state.original_transform.rotation * quaternion_from_axis_angle(state.rotation_axis, dist);
 			}
@@ -316,11 +311,13 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 		}
 	}
 
-	draw_request.kind = kind,
-	draw_request.highlighted_part_index = (state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element,
-	draw_request.position = position,
-	draw_request.rotation = rotation,
-	draw_request.size = handle_size,
+	draw_request.tangent = state.tangent3;
+	draw_request.kind = kind;
+	draw_request.dragging = state.dragging_part_index != null_manipulator_part;
+	draw_request.highlighted_part_index = (state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element;
+	draw_request.position = position;
+	draw_request.rotation = rotation;
+	draw_request.size = handle_size;
 
 	manipulator_draw_requests.add(draw_request);
 

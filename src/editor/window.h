@@ -25,6 +25,7 @@ template <class T> InputResponse input_handler_on_input(void *data, InputEvent e
 enum EditorWindowKind : u16 {
 	EditorWindow_none,
 	EditorWindow_scene_view,
+	EditorWindow_hierarchy_view,
 };
 
 struct EditorWindow/* : InputHandler */{

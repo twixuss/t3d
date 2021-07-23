@@ -93,7 +93,7 @@ void main() {
 
 			t3d::set_blend(t3d::BlendFunction_disable, {}, {});
 
-			t3d::set_shader(blit_shader);
+			t3d::set_shader(blit_texture_shader);
 
 			auto sample_from = source;
 			for (auto &target : downsampled_targets) {

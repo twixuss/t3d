@@ -49,9 +49,15 @@
     <ClInclude Include="src\manipulator.h">
       <Filter>editor</Filter>
     </ClInclude>
-    <ClInclude Include="src\current.h" />
+    <ClInclude Include="src\editor\current.h" />
     <ClInclude Include="src\debug.h" />
-    <ClInclude Include="src\input.h" />
+    <ClInclude Include="src\editor\input.h" />
+    <ClInclude Include="src\component_list.h" />
+    <ClInclude Include="src\editor\file_view.h" />
+    <ClInclude Include="src\editor\hierarchy_view.h" />
+    <ClInclude Include="src\font.h" />
+    <ClInclude Include="src\selection.h" />
+    <ClInclude Include="src\editor\split_view.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

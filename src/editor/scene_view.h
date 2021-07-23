@@ -39,16 +39,13 @@ struct SceneViewWindow : EditorWindow {
 	void free() {
 		destroy(*camera_entity);
 	}
-
-	v3f get_drag_position(v2s mouse_position) {
-		return {};
-	}
 };
 
 SceneViewWindow *create_scene_view() {
 	auto result = create_editor_window<SceneViewWindow>();
 	result->kind = EditorWindow_scene_view;
 	result->camera_entity = &entities.add();
+	result->camera_entity->flags |= Entity_editor;
 	result->camera_entity->debug_name = format(u8"scene_camera_%", result);
 	result->camera = &add_component<Camera>(*result->camera_entity);
 	return result;

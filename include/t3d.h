@@ -67,6 +67,7 @@ enum TextureFormat : u8 {
 	TextureFormat_null,
 	TextureFormat_depth,
 	TextureFormat_r_f32,
+	TextureFormat_rgb_u8n,
 	TextureFormat_rgb_f16,
 	TextureFormat_rgb_f32,
 	TextureFormat_rgba_u8n,
@@ -114,6 +115,8 @@ enum Blend {
 	Blend_one,
 	Blend_source_alpha,
 	Blend_one_minus_source_alpha,
+	Blend_secondary_color,
+	Blend_one_minus_secondary_color,
 };
 
 enum Topology {
@@ -192,6 +195,7 @@ A(void, set_blend, (BlendFunction function, Blend source, Blend destination), (f
 A(Texture *, create_cube_texture, (CreateTextureFlags flags, u32 width, u32 height, void *data[6], TextureFormat format, TextureFiltering filtering, Comparison comparison), (flags, width, height, data, format, filtering, comparison)) \
 A(void, set_topology, (Topology topology), (topology)) \
 A(void, update_vertex_buffer, (VertexBuffer *buffer, Span<u8> data), (buffer, data)) \
+A(void, update_texture, (Texture *texture, u32 width, u32 height, void *data), (texture, width, height, data)) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)

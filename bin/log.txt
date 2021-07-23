@@ -1,0 +1,1524 @@
+Unfreed allocations:
+size: 16, location: F:\t3d\dep\tl\include\tl\linked_list.h(71:27):add, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Node>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Node>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\linked_list.h(71):tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::add(struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry)
+	F:\t3d\dep\tl\include\tl\hash_map.h(28):tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::get_or_insert(struct t3d::gl::SamplerKey const &)
+	F:\t3d\src\gl.cpp(233):t3d::gl::get_sampler(enum t3d::TextureFiltering,enum t3d::Comparison)
+	F:\t3d\src\gl.cpp(488):tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Iterator::operator++(void)
+	F:\t3d\src\gl.cpp(491):__JustMyCode_Default
+	F:\t3d\include\t3d.h(188):t3d::create_texture(enum t3d::CreateTextureFlags,unsigned int,unsigned int,void *,enum t3d::TextureFormat,enum t3d::TextureFiltering,enum t3d::Comparison)
+	F:\t3d\src\components\camera.h(50):tl::operator/(float,union tl::v2<float>)
+	F:\t3d\src\components\camera.h(54):??$on_create@UCamera@@$$VX@@YAXAEAUCamera@@@Z
+	F:\t3d\src\main.cpp(247):add_component<struct Camera>(struct Entity &,unsigned int)
+	F:\t3d\src\main.cpp(254):add_component<struct Camera>(struct Entity &)
+	F:\t3d\src\main.cpp(502):create_scene_view(void)
+	F:\t3d\src\main.cpp(911):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 190824, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1218):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 16, location: F:\t3d\dep\tl\include\tl\linked_list.h(71:27):add, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Node>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Node>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\linked_list.h(71):tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::add(struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry)
+	F:\t3d\dep\tl\include\tl\hash_map.h(28):tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::get_or_insert(struct t3d::gl::SamplerKey const &)
+	F:\t3d\src\gl.cpp(233):t3d::gl::get_sampler(enum t3d::TextureFiltering,enum t3d::Comparison)
+	F:\t3d\src\gl.cpp(488):tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Iterator::operator++(void)
+	F:\t3d\src\gl.cpp(491):__JustMyCode_Default
+	F:\t3d\include\t3d.h(188):t3d::create_texture(enum t3d::CreateTextureFlags,unsigned int,unsigned int,void *,enum t3d::TextureFormat,enum t3d::TextureFiltering,enum t3d::Comparison)
+	F:\t3d\src\main.cpp(1206):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 479904, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1218):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 80, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonMesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonMesh>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct tl::CommonMesh>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct tl::CommonMesh>::add(struct tl::CommonMesh)
+	F:\t3d\dep\tl\include\tl\mesh.h(310):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1218):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::Scene3D::Node>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::Scene3D::Node>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct tl::Scene3D::Node>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct tl::Scene3D::Node>::add(struct tl::Scene3D::Node)
+	F:\t3d\dep\tl\include\tl\mesh.h(319):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1218):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\mesh.h(31):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1218):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 5760, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1224):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 1008, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1224):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 80, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonMesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonMesh>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct tl::CommonMesh>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct tl::CommonMesh>::add(struct tl::CommonMesh)
+	F:\t3d\dep\tl\include\tl\mesh.h(310):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1224):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::Scene3D::Node>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::Scene3D::Node>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct tl::Scene3D::Node>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct tl::Scene3D::Node>::add(struct tl::Scene3D::Node)
+	F:\t3d\dep\tl\include\tl\mesh.h(319):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\mesh.h(30):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1224):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\mesh.h(31):load_mesh(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1224):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 3515, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(218):t3d::load_texture(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1226):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 48, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 192, location: F:\t3d\dep\tl\include\tl\list.h(58:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(47):tl::retrack_allocation(void *,void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(62):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1255):tl::Allocator::reallocate<struct tl::Scene3D::Node>(enum tl::AllocateFlags,struct tl::Scene3D::Node *,unsigned __int64,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(58):tl::List<struct tl::Scene3D::Node>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct tl::Scene3D::Node>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct tl::Scene3D::Node>::add(struct tl::Scene3D::Node)
+	F:\t3d\dep\tl\include\tl\mesh.h(319):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 360, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 640, location: F:\t3d\dep\tl\include\tl\list.h(58:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(47):tl::retrack_allocation(void *,void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(62):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1255):tl::Allocator::reallocate<struct tl::CommonMesh>(enum tl::AllocateFlags,struct tl::CommonMesh *,unsigned __int64,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(58):tl::List<struct tl::CommonMesh>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct tl::CommonMesh>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct tl::CommonMesh>::add(struct tl::CommonMesh)
+	F:\t3d\dep\tl\include\tl\mesh.h(310):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 360, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 48, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 1872, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 384, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 1680, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 360, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 1680, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 6000, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 2304, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 384, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 48, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned int>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<unsigned int>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<unsigned int>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(287):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 384, location: F:\t3d\dep\tl\include\tl\list.h(60:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::CommonVertex>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(60):tl::List<struct tl::CommonVertex>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(70):tl::List<struct tl::CommonVertex>::reserve(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\mesh.h(276):tl::parse_glb_from_memory(struct tl::Span<unsigned char>)
+	F:\t3d\dep\tl\include\tl\mesh.h(80):tl::parse_glb_from_file(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1229):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1230):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1231):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1232):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1233):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1234):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1235):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 24, location: F:\t3d\src\mesh.h(12:33):create_mesh, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct Mesh>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct Mesh>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\src\mesh.h(12):create_mesh(struct tl::CommonMesh)
+	F:\t3d\src\main.cpp(1236):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 35666, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(218):t3d::load_texture(struct tl::Span<UNKNOWN>)
+	F:\t3d\src\main.cpp(1238):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 16, location: F:\t3d\dep\tl\include\tl\linked_list.h(74:27):add, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<struct tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Node>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\common.h(1246):tl::Allocator::allocate<struct tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Node>(unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\linked_list.h(74):tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::add(struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry)
+	F:\t3d\dep\tl\include\tl\hash_map.h(28):tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::get_or_insert(struct t3d::gl::SamplerKey const &)
+	F:\t3d\src\gl.cpp(233):t3d::gl::get_sampler(enum t3d::TextureFiltering,enum t3d::Comparison)
+	F:\t3d\src\gl.cpp(488):tl::LinkedList<struct tl::StaticHashMap<struct t3d::gl::SamplerKey,unsigned int,256>::Entry>::Iterator::operator++(void)
+	F:\t3d\src\gl.cpp(491):__JustMyCode_Default
+	F:\t3d\include\t3d.h(188):t3d::create_texture(enum t3d::CreateTextureFlags,unsigned int,unsigned int,void *,enum t3d::TextureFormat,enum t3d::TextureFiltering,enum t3d::Comparison)
+	F:\t3d\src\components\light.h(19):??$on_create@ULight@@$$VX@@YAXAEAULight@@@Z
+	F:\t3d\src\main.cpp(247):add_component<struct Light>(struct Entity &,unsigned int)
+	F:\t3d\src\main.cpp(254):add_component<struct Light>(struct Entity &)
+	F:\t3d\src\main.cpp(1245):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 3413550, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(230):t3d::load_texture(union t3d::CubeTexturePaths)
+	F:\t3d\src\main.cpp(1257):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 128, location: F:\t3d\dep\tl\include\tl\list.h(58:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(47):tl::retrack_allocation(void *,void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(62):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1255):tl::Allocator::reallocate<struct t3d::RenderTarget *>(enum tl::AllocateFlags,struct t3d::RenderTarget * *,unsigned __int64,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(58):tl::List<struct t3d::RenderTarget *>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct t3d::RenderTarget *>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct t3d::RenderTarget *>::add(struct t3d::RenderTarget *)
+	F:\t3d\src\exposure.h(175):Exposure::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(30):post_effect_resize<struct Exposure>(void *,union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(24):PostEffect::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\main.cpp(476):SceneViewWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(442):editor_window_resize<struct SceneViewWindow>(void *,union t3d::Viewport)
+	F:\t3d\src\main.cpp(426):EditorWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(525):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(535):SplitView::resize_children(void)
+	F:\t3d\src\main.cpp(518):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(1320):`tl::append(struct tl::StringBuilder &,struct tl::FormatFloat<double>)'::`2'::<lambda_2>::operator()(double)const 
+	F:\t3d\src\main.cpp(1321):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(204):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):glDebugEntry
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):MapWindowPoints
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 3295519, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(230):t3d::load_texture(union t3d::CubeTexturePaths)
+	F:\t3d\src\main.cpp(1257):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 2850849, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(230):t3d::load_texture(union t3d::CubeTexturePaths)
+	F:\t3d\src\main.cpp(1257):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 3801331, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(230):t3d::load_texture(union t3d::CubeTexturePaths)
+	F:\t3d\src\main.cpp(1257):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 3467621, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(230):t3d::load_texture(union t3d::CubeTexturePaths)
+	F:\t3d\src\main.cpp(1257):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 3241188, location: F:\t3d\dep\tl\include\tl\buffer.h(14:32):create_buffer, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(33):tl::track_allocation(void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(57):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1227):tl::Allocator::allocate<unsigned char>(enum tl::AllocateFlags,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\buffer.h(14):tl::create_buffer(enum tl::AllocateFlags,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\buffer.h(19):tl::create_buffer(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(96):tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(104):tl::read_entire_file(UNKNOWN const *,unsigned __int64,unsigned __int64)
+	F:\t3d\dep\tl\include\tl\file.h(108):tl::read_entire_file(struct tl::Span<UNKNOWN>,unsigned __int64,unsigned __int64)
+	F:\t3d\src\t3d.cpp(55):t3d::load_pixels(struct tl::Span<UNKNOWN>)
+	F:\t3d\include\t3d.h(230):t3d::load_texture(union t3d::CubeTexturePaths)
+	F:\t3d\src\main.cpp(1257):`tl::read_entire_file(struct tl::File,unsigned __int64,unsigned __int64)'::`2'::<lambda_1>::operator()(void)const 
+	F:\t3d\src\main.cpp(1267):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(137):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):CopyRect
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 128, location: F:\t3d\dep\tl\include\tl\list.h(58:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(47):tl::retrack_allocation(void *,void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(62):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1255):tl::Allocator::reallocate<struct t3d::RenderTarget *>(enum tl::AllocateFlags,struct t3d::RenderTarget * *,unsigned __int64,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(58):tl::List<struct t3d::RenderTarget *>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct t3d::RenderTarget *>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct t3d::RenderTarget *>::add(struct t3d::RenderTarget *)
+	F:\t3d\src\exposure.h(175):Exposure::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(30):post_effect_resize<struct Exposure>(void *,union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(24):PostEffect::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\main.cpp(476):SceneViewWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(442):editor_window_resize<struct SceneViewWindow>(void *,union t3d::Viewport)
+	F:\t3d\src\main.cpp(426):EditorWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(525):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(531):SplitView::resize_children(void)
+	F:\t3d\src\main.cpp(518):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(1320):`tl::append(struct tl::StringBuilder &,struct tl::FormatFloat<double>)'::`2'::<lambda_2>::operator()(double)const 
+	F:\t3d\src\main.cpp(1321):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(204):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):glDebugEntry
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):MapWindowPoints
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 128, location: F:\t3d\dep\tl\include\tl\list.h(58:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(47):tl::retrack_allocation(void *,void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(62):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1255):tl::Allocator::reallocate<struct t3d::RenderTarget *>(enum tl::AllocateFlags,struct t3d::RenderTarget * *,unsigned __int64,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(58):tl::List<struct t3d::RenderTarget *>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct t3d::RenderTarget *>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct t3d::RenderTarget *>::add(struct t3d::RenderTarget *)
+	F:\t3d\src\bloom.h(173):Bloom::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(30):post_effect_resize<struct Bloom>(void *,union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(24):PostEffect::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\main.cpp(476):SceneViewWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(442):editor_window_resize<struct SceneViewWindow>(void *,union t3d::Viewport)
+	F:\t3d\src\main.cpp(426):EditorWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(525):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(531):SplitView::resize_children(void)
+	F:\t3d\src\main.cpp(518):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(1320):`tl::append(struct tl::StringBuilder &,struct tl::FormatFloat<double>)'::`2'::<lambda_2>::operator()(double)const 
+	F:\t3d\src\main.cpp(1321):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(204):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):glDebugEntry
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):MapWindowPoints
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart
+size: 128, location: F:\t3d\dep\tl\include\tl\list.h(58:24):reallocate, call stack:
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(47):tl::retrack_allocation(void *,void *,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(62):`tl::track_allocation(void *,unsigned __int64,struct std::source_location)'::`2'::<lambda_2>::operator()(void)const 
+	F:\t3d\dep\tl\include\tl\tracking_allocator.h(73):stbi_zlib_decode_noheader_malloc
+	F:\t3d\dep\tl\include\tl\common.h(1255):tl::Allocator::reallocate<struct t3d::RenderTarget *>(enum tl::AllocateFlags,struct t3d::RenderTarget * *,unsigned __int64,unsigned __int64,unsigned __int64,struct std::source_location)
+	F:\t3d\dep\tl\include\tl\list.h(58):tl::List<struct t3d::RenderTarget *>::reallocate(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(78):tl::List<struct t3d::RenderTarget *>::reserve_exponential(unsigned __int64)
+	F:\t3d\dep\tl\include\tl\list.h(28):tl::List<struct t3d::RenderTarget *>::add(struct t3d::RenderTarget *)
+	F:\t3d\src\bloom.h(173):Bloom::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(30):post_effect_resize<struct Bloom>(void *,union tl::v2<unsigned int>)
+	F:\t3d\src\post_effect.h(24):PostEffect::resize(union tl::v2<unsigned int>)
+	F:\t3d\src\main.cpp(476):SceneViewWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(442):editor_window_resize<struct SceneViewWindow>(void *,union t3d::Viewport)
+	F:\t3d\src\main.cpp(426):EditorWindow::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(525):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(535):SplitView::resize_children(void)
+	F:\t3d\src\main.cpp(518):SplitView::resize(union t3d::Viewport)
+	F:\t3d\src\main.cpp(1320):`tl::append(struct tl::StringBuilder &,struct tl::FormatFloat<double>)'::`2'::<lambda_2>::operator()(double)const 
+	F:\t3d\src\main.cpp(1321):_Closure_wrapper_66eb97c5_1::<lambda_invoker_cdecl>(enum tl::PrintKind,struct tl::Span<UNKNOWN>,void *)
+	F:\t3d\dep\tl\include\tl\window.h(204):std::exception::what(void)const 
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):glDebugEntry
+	unknown(0):CallWindowProcW
+	unknown(0):CallWindowProcW
+	unknown(0):MapWindowPoints
+	unknown(0):KiUserCallbackDispatcher
+	unknown(0):NtUserCreateWindowEx
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	unknown(0):CreateWindowExW
+	F:\t3d\dep\tl\include\tl\window.h(305):tl::create_window(struct tl::CreateWindowInfo)
+	F:\t3d\src\main.cpp(1323):run(void)
+	F:\t3d\src\main.cpp(1349):tl_main(struct tl::Span<struct tl::Span<UNKNOWN> >)
+	F:\t3d\dep\tl\include\tl\common.h(1531):wmain
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(91):__scrt_wide_environment_policy::initialize_environment(void)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(288):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_common.inl(331):type_info::`vector deleting destructor'(unsigned int)
+	d:\agent\_work\4\s\src\vctools\crt\vcstartup\src\startup\exe_wmain.cpp(17):wmainCRTStartup
+	unknown(0):BaseThreadInitThunk
+	unknown(0):RtlUserThreadStart

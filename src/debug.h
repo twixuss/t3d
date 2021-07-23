@@ -38,13 +38,15 @@ void debug_draw_lines() {
 		vertices.add({line.a, line.b});
 	}
 
-	t3d::set_topology(t3d::Topology_line_list);
-	t3d::set_rasterizer({.depth_test = false});
-	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-	t3d::set_vertex_buffer(debug_lines_vertex_buffer);
-	t3d::update_vertex_buffer(debug_lines_vertex_buffer, as_bytes(vertices));
-	t3d::set_shader(debug_line_shader);
-	t3d::draw(vertices.size * 2);
+	if (vertices.size) {
+		t3d::set_topology(t3d::Topology_line_list);
+		t3d::set_rasterizer({.depth_test = false});
+		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+		t3d::set_vertex_buffer(debug_lines_vertex_buffer);
+		t3d::update_vertex_buffer(debug_lines_vertex_buffer, as_bytes(vertices));
+		t3d::set_shader(debug_line_shader);
+		t3d::draw(vertices.size * 2);
+	}
 }
 
 void debug_frame() {
