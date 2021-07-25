@@ -10,7 +10,7 @@ struct TextShaderConstants {
 t3d::TypedShaderConstants<TextShaderConstants> text_shader_constants;
 
 void init_font() {
-	Span<filechar> font_paths[] = {
+	Span<pathchar> font_paths[] = {
 		tl_file_string("../data/segoeui.ttf"ts),
 	};
 	font_collection = create_font_collection(font_paths);
@@ -108,4 +108,28 @@ void draw_text(Span<utf8> string) {
 	t3d::draw(vertices.size);
 }
 void draw_text(utf8 const *string) { draw_text(as_span(string)); }
+void draw_text(Span<char> string) { draw_text((Span<utf8>)string); }
 void draw_text(char const *string) { draw_text((Span<utf8>)as_span(string)); }
+
+bool button(t3d::Viewport button_viewport, Span<utf8> text, v4f color) {
+	push_current_viewport(button_viewport) {
+		if (mouse_held(0)) {
+			color *= V4f(0.5f);
+		} 
+		if (in_bounds(current_mouse_position, button_viewport.aabb())) {
+			color *= V4f(1.5f);
+		}
+			
+		t3d::set_shader(blit_color_shader);
+		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+		t3d::set_topology(t3d::Topology_triangle_list);
+		t3d::set_shader_constants(blit_color_constants, 0);
+		t3d::update_shader_constants(blit_color_constants, {.color = color});
+		t3d::draw(3);
+
+		draw_text(text);
+		
+		return mouse_click(0);
+	}
+	return false;
+}

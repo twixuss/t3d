@@ -4,7 +4,9 @@
 
 u32 const shadow_map_resolution = 256;
 
-struct Light : Component {
+#define FIELDS(F)
+
+DECLARE_COMPONENT(Light) {
 	t3d::RenderTarget *shadow_map;
 	t3d::Texture *texture;
 	m4 world_to_light_matrix;

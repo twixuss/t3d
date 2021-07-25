@@ -6,9 +6,10 @@
 #include "post_effects/bloom.h"
 #include "post_effects/dither.h"
 
-struct Camera : Component {
-	f32 fov = pi * 0.5f;
+#define FIELDS(F) \
+F(f32, fov, pi * 0.5f) \
 
+DECLARE_COMPONENT(Camera) {
 	m4 world_to_camera_matrix;
 
 	t3d::RenderTarget *source_target;

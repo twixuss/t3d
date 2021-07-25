@@ -58,6 +58,9 @@
     <ClInclude Include="src\font.h" />
     <ClInclude Include="src\selection.h" />
     <ClInclude Include="src\editor\split_view.h" />
+    <ClInclude Include="src\serialize.h" />
+    <ClInclude Include="src\components\serialize.h" />
+    <ClInclude Include="src\editor\property_view.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

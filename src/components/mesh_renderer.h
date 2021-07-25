@@ -4,7 +4,9 @@
 #include "mesh.h"
 #include "basic_textures.h"
 
-struct MeshRenderer : Component {
+#define FIELDS(F)
+
+DECLARE_COMPONENT(MeshRenderer) {
 	Mesh *mesh;
 	Material *material;
 	t3d::Texture *lightmap;

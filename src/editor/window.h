@@ -26,6 +26,7 @@ enum EditorWindowKind : u16 {
 	EditorWindow_none,
 	EditorWindow_scene_view,
 	EditorWindow_hierarchy_view,
+	EditorWindow_property_view,
 };
 
 struct EditorWindow/* : InputHandler */{
@@ -33,6 +34,7 @@ struct EditorWindow/* : InputHandler */{
 	t3d::Viewport viewport;
 	void (*_resize)(void *data, t3d::Viewport viewport);
 	void resize(t3d::Viewport viewport) {
+		this->viewport = viewport;
 		_resize(this, viewport);
 	}
 

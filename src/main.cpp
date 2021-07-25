@@ -15,7 +15,9 @@ bool operator==(std::source_location a, std::source_location b) {
 #include "editor/scene_view.h"
 #include "editor/hierarchy_view.h"
 #include "editor/split_view.h"
+#include "editor/property_view.h"
 #include "editor/input.h"
+#include "serialize.h"
 
 using namespace tl;
 
@@ -259,19 +261,6 @@ void render_scene(SceneViewWindow *view) {
 	//print("%\n", to_euler_angles(quaternion_from_euler(0, time, time)));
 	//selected_entity->qrotation = quaternion_from_euler(to_euler_angles(quaternion_from_euler(0, time, time)));
 	
-	if (mouse_down(1)) {
-		view->flying = true;
-		lock_input();
-	}
-	if (mouse_up(1)) {
-		view->flying = false;
-		unlock_input();
-	}
-
-	if (key_down('1')) view->manipulator_kind = Manipulate_position;
-	if (key_down('2')) view->manipulator_kind = Manipulate_rotation;
-	if (key_down('3')) view->manipulator_kind = Manipulate_scale;
-
 	auto &camera = *view->camera;
 	auto &camera_entity = *view->camera_entity;
 
@@ -595,8 +584,12 @@ void run() {
 
 		main_window = create_split_view(
 			create_scene_view(),
-			create_hierarchy_view(),
-			0.9f
+			create_split_view(
+				create_hierarchy_view(),
+				create_property_view(),
+				{ .horizontal = true }
+			),
+			{ .split_t = 0.9f }
 		);
 
 		switch (graphics_api) {
@@ -690,7 +683,7 @@ void main() {
 
 	vec4 mixed_color = vec4(
 		mix(default_color, highlighted_color, selected),
-		dot(normal, to_camera) * mix(1, saturate((dot(vertex_local_position, to_camera) + 0.1f) * 16), is_rotation)
+		abs(dot(normal, to_camera)) * mix(1, saturate((dot(vertex_local_position, to_camera) + 0.1f) * 16), is_rotation)
 	);
 
 	fragment_color = mixed_color;
@@ -964,10 +957,8 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		auto scene_meshes = parse_glb_from_file(tl_file_string("../data/scene.glb"ts)).get();
 
-		auto &suzanne         = entities.add();
-		suzanne.debug_name = as_list(u8"suzanne"s);
-		auto &floor           = entities.add();
-		floor.debug_name = as_list(u8"floor"s);
+		auto &suzanne = create_entity("suzanne");
+		auto &floor = create_entity("floor");
 
 		selected_entity = &suzanne;
 		{
@@ -1001,8 +992,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		auto light_texture = t3d::load_texture(tl_file_string("../data/spotlight_mask.png"ts));
 
 		{
-			auto &light = entities.add();
-			light.debug_name = as_list(u8"light1"s);
+			auto &light = create_entity("light1");
 			light.position = {0,2,6};
 			//light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
 			light.rotation = quaternion_from_euler(0,0,0);
@@ -1010,8 +1000,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}
 
 		{
-			auto &light = entities.add();
-			light.debug_name = as_list(u8"light2"s);
+			auto &light = create_entity("light2");
 			light.position = {6,2,-6};
 			light.rotation = quaternion_from_euler(pi/10,-pi*0.75,0);
 			add_component<Light>(light).texture = light_texture;
@@ -1027,6 +1016,8 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		});
 	};
 	info.on_draw = [](Window &window) {
+		current_cursor = Cursor_default;
+
 		static v2u old_window_size;
 		if (any_true(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
@@ -1053,6 +1044,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				write_entire_file(tl_file_string("update.tmd"ts), Profiler::output_for_timed());
 			}
 		};
+
 		timed_block("frame"s);
 
 		{
@@ -1109,6 +1101,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				state.state &= ~KeyState_repeated;
 			}
 		}
+
 		{
 			timed_block("present"s);
 			t3d::present();
@@ -1128,6 +1121,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}
 
 		clear_temporary_storage();
+	};
+	info.get_cursor = [](Window &window) -> Cursor {
+		return current_cursor;
 	};
 
 	window = create_window(info);
@@ -1160,6 +1156,8 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 	while (update(window)) {
 	}
+
+	write_entire_file(tl_file_string("test.scene"ts), serialize_scene());
 
 	for_each(entities, [](Entity &e) {
 		destroy(e);

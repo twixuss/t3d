@@ -36,11 +36,13 @@
     <ClInclude Include="src\components\camera.h" />
     <ClInclude Include="src\components\light.h" />
     <ClInclude Include="src\components\mesh_renderer.h" />
+    <ClInclude Include="src\components\serialize.h" />
     <ClInclude Include="src\component_list.h" />
     <ClInclude Include="src\editor\current.h" />
     <ClInclude Include="src\debug.h" />
     <ClInclude Include="src\editor\file_view.h" />
     <ClInclude Include="src\editor\hierarchy_view.h" />
+    <ClInclude Include="src\editor\property_view.h" />
     <ClInclude Include="src\editor\scene_view.h" />
     <ClInclude Include="src\editor\split_view.h" />
     <ClInclude Include="src\editor\window.h" />
@@ -55,6 +57,7 @@
     <ClInclude Include="src\post_effects\dither.h" />
     <ClInclude Include="src\post_effects\exposure.h" />
     <ClInclude Include="src\selection.h" />
+    <ClInclude Include="src\serialize.h" />
     <ClInclude Include="src\time.h" />
     <ClInclude Include="src\tl.h" />
     <ClInclude Include="src\viewport.h" />

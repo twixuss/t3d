@@ -8,15 +8,18 @@ Entity *current_camera_entity;
 Camera *current_camera;
 v2s current_mouse_position;
 t3d::Viewport current_viewport;
+Cursor current_cursor;
 
 struct ViewportPusher {
 	t3d::Viewport old_viewport;
 	ViewportPusher(t3d::Viewport new_viewport) {
 		old_viewport = current_viewport;
 		current_viewport = new_viewport;
+		t3d::set_viewport(new_viewport);
 	}
 	~ViewportPusher() {
 		current_viewport = old_viewport;
+		t3d::set_viewport(old_viewport);
 	}
 	operator bool(){return true;}
 };

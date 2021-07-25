@@ -288,7 +288,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 					//print("%\n", state.tangent.direction);
 				}
 
-				state.accumulated_mouse_delta += (v2f)window->mouse_delta * v2f{2.5f,-2.5f};
+				state.accumulated_mouse_delta += window->mouse_delta * v2f{1, -1};
 
 				f32 dist = pi * 2 * dot(
 					state.start_mouse_position + state.accumulated_mouse_delta - state.tangent.origin,
@@ -314,7 +314,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 	draw_request.tangent = state.tangent3;
 	draw_request.kind = kind;
 	draw_request.dragging = state.dragging_part_index != null_manipulator_part;
-	draw_request.highlighted_part_index = (state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element;
+	draw_request.highlighted_part_index = in_bounds(current_mouse_position, current_viewport.aabb()) ? ((state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element) : -1;
 	draw_request.position = position;
 	draw_request.rotation = rotation;
 	draw_request.size = handle_size;

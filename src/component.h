@@ -20,7 +20,9 @@ then go through every `YourComponentType1`, then all of `YourComponentType2`.
 
 #include <tl/common.h>
 
-using ComponentIndexBase = tl::u64;
+using namespace tl;
+
+using ComponentIndexBase = u64;
 
 union ComponentIndex {
 	ComponentIndexBase value;
@@ -34,7 +36,7 @@ union ComponentIndex {
 struct Entity;
 
 struct Component {
-	tl::u32 entity_index;
+	u32 entity_index;
 	Entity &entity() const;
 };
 
@@ -53,11 +55,11 @@ ENUMERATE_COMPONENTS
 
 // Make sure every component is listed before including this file
 template <class Component>
-inline static constexpr tl::u32 component_type_index = tl::type_index<Component,
+inline static constexpr u32 component_type_index = type_index<Component,
 	ENUMERATE_COMPONENTS
 >(0);
 
-inline static constexpr tl::u32 component_type_count = tl::type_count<
+inline static constexpr u32 component_type_count = type_count<
 	ENUMERATE_COMPONENTS
 >();
 
@@ -65,9 +67,36 @@ inline static constexpr tl::u32 component_type_count = tl::type_count<
 #undef c
 
 
+#define c(name) u8#name##s
+#define sep ,
+
+Span<utf8> component_names[] {
+	ENUMERATE_COMPONENTS
+};
+
+#undef sep
+#undef c
+
+
+using ComponentSerializer = void(*)(StringBuilder &builder, void *component);
+
 template <class Component>
-inline constexpr tl::u32 get_component_type_index() {
-	constexpr tl::u32 index = component_type_index<Component>;
+void adapt_component_serializer(StringBuilder &builder, void *component) {
+	((Component *)component)->serialize(builder);
+}
+
+#define c(name) adapt_component_serializer<name>
+#define sep ,
+ComponentSerializer component_serializers[] = {
+	ENUMERATE_COMPONENTS
+};
+#undef sep
+#undef c
+
+
+template <class Component>
+inline constexpr u32 get_component_type_index() {
+	constexpr u32 index = component_type_index<Component>;
 	static_assert(index != component_type_count, "attempt to get a unregistered component type");
 	return index;
 }
@@ -78,44 +107,44 @@ void on_create(Component &component, Args const &...args) {
 
 
 struct ComponentStorage {
-	using Mask = tl::umm;
-	static constexpr tl::u32 bits_in_mask = sizeof(Mask) * 8;
-	static constexpr tl::u32 values_per_block = 256;
-	static constexpr tl::u32 masks_per_block = values_per_block / bits_in_mask;
+	using Mask = umm;
+	static constexpr u32 bits_in_mask = sizeof(Mask) * 8;
+	static constexpr u32 values_per_block = 256;
+	static constexpr u32 masks_per_block = values_per_block / bits_in_mask;
 
 	struct Block {
-		tl::umm unfull_mask_count;
+		umm unfull_mask_count;
 		void *data() { return this + 1; }
-		tl::Span<Mask> masks() { return {(Mask *)data(), masks_per_block}; }
+		Span<Mask> masks() { return {(Mask *)data(), masks_per_block}; }
 		void *values() { return (Mask *)data() + masks_per_block; }
 	};
 
-	tl::Allocator allocator = tl::current_allocator;
-	tl::umm bytes_per_entry = 0;
-	tl::List<Block *> blocks;
+	Allocator allocator = current_allocator;
+	umm bytes_per_entry = 0;
+	List<Block *> blocks;
 	void (*free_entry)(void *entry);
 
 	struct Added {
 		void *pointer;
-		tl::u32 index;
+		u32 index;
 	};
 
 	Added add() {
 		Added result;
 
-		for (tl::u32 block_index = 0; block_index < blocks.size; block_index += 1) {
+		for (u32 block_index = 0; block_index < blocks.size; block_index += 1) {
 			auto block = blocks[block_index];
 			if (block->unfull_mask_count == 0)
 				continue;
 
 			// Search for free space in current block
-			for (tl::u32 mask_index = 0; mask_index < masks_per_block; mask_index += 1) {
+			for (u32 mask_index = 0; mask_index < masks_per_block; mask_index += 1) {
 				auto &mask = block->masks()[mask_index];
 
 				if (mask == ~0)
 					continue;
 
-				auto bit_index = tl::find_lowest_zero_bit(mask);
+				auto bit_index = find_lowest_zero_bit(mask);
 				auto value_index = (mask_index * bits_in_mask) + bit_index;
 
 				mask |= (Mask)1 << bit_index;
@@ -123,14 +152,14 @@ struct ComponentStorage {
 				if (mask == ~0)
 					block->unfull_mask_count -= 1;
 
-				result.pointer = (tl::u8 *)block->values() + value_index * bytes_per_entry;
+				result.pointer = (u8 *)block->values() + value_index * bytes_per_entry;
 				result.index = block_index * values_per_block + value_index;
 				return result;
 			}
 		}
 
 		auto block_index = blocks.size;
-		auto block = blocks.add((Block *)allocator.allocate(tl::Allocate_uninitialized, sizeof(Block) + sizeof(Mask) * masks_per_block + bytes_per_entry * values_per_block));
+		auto block = blocks.add((Block *)allocator.allocate(Allocate_uninitialized, sizeof(Block) + sizeof(Mask) * masks_per_block + bytes_per_entry * values_per_block));
 		block->unfull_mask_count = masks_per_block;
 		memset(block->masks().data, 0, sizeof(Mask) * masks_per_block);
 		block->masks()[0] = 1;
@@ -157,6 +186,21 @@ struct ComponentStorage {
 
 		free_entry((u8 *)block->values() + value_index * bytes_per_entry);
 	}
+
+	void *get(umm index) {
+		auto block_index = index / values_per_block;
+		auto value_index = index % values_per_block;
+
+		auto mask_index = value_index / bits_in_mask;
+		auto bit_index  = value_index % bits_in_mask;
+
+		auto &block = blocks[block_index];
+
+		auto mask = block->masks()[mask_index];
+		bounds_check(mask & ((Mask)1 << bit_index), "attempt to get non-existant component");
+
+		return (u8 *)block->values() + value_index * bytes_per_entry;
+	}
 };
 
 ComponentStorage component_storages[component_type_count];
@@ -167,39 +211,39 @@ void free_component(void *data) {
 }
 
 template <class Component>
-void init_component_storage(tl::u32 index) {
+void init_component_storage(u32 index) {
 	auto &storage = component_storages[index];
-	tl::construct(storage);
+	construct(storage);
 	storage.bytes_per_entry = sizeof(Component);
 	storage.free_entry = free_component<Component>;
 }
 
 
 template <class First = void, class ...Rest>
-void init_component_storages(tl::umm index = 0) {
+void init_component_storages(umm index = 0) {
 	init_component_storage<First>(index);
 	init_component_storages<Rest...>(index + 1);
 }
 
 template <>
-void init_component_storages<void>(tl::umm index) {
+void init_component_storages<void>(umm index) {
 }
 
 template <class Component>
 struct ComponentStorageIterator {
 	template <class Fn>
 	ComponentStorageIterator(Fn &&fn) {
-		static constexpr tl::u32 component_type = get_component_type_index<Component>();
+		static constexpr u32 component_type = get_component_type_index<Component>();
 		auto &storage = component_storages[component_type];
 		for (auto block : storage.blocks) {
 			if (block->unfull_mask_count == 0)
 				continue;
 
-			tl::u32 mask_index = 0;
+			u32 mask_index = 0;
 			for (auto mask : block->masks()) {
 				if (mask == 0)
 					continue;
-				for (tl::u32 bit_index = 0; bit_index != storage.bits_in_mask; bit_index += 1) {
+				for (u32 bit_index = 0; bit_index != storage.bits_in_mask; bit_index += 1) {
 					if (mask & ((ComponentStorage::Mask)1 << bit_index)) {
 						fn(((Component *)block->values())[mask_index * storage.bits_in_mask + bit_index]);
 					}
@@ -221,3 +265,18 @@ void free_component_storages() {
 
 #define for_each_component_of_type(type, name) ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
 #define for_all_components() ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
+
+#include "components/serialize.h"
+
+template <class Derived>
+struct SerializableComponent : Component {};
+
+#define DECLARE_COMPONENT(name) \
+template <> \
+struct SerializableComponent<name> : Component { \
+	FIELDS(DECLARE_FIELD) \
+	void serialize(StringBuilder &builder) { \
+		FIELDS(APPEND_FIELD) \
+	}  \
+};  \
+struct name : SerializableComponent<name>

@@ -6,12 +6,10 @@
 struct SplitView : EditorWindow {
 	bool is_sizing;
 	bool axis_is_x;
-	t3d::Viewport viewport;
 	f32 split_t = 0.5f;
 	EditorWindow *part1;
 	EditorWindow *part2;
 	void resize(t3d::Viewport viewport) {
-		this->viewport = viewport;
 		resize_children();
 	}
 	void resize_children() {
@@ -37,24 +35,32 @@ struct SplitView : EditorWindow {
 		part2->resize(viewport2);
 	}
 	void render() {
-		if (mouse_down(0)) {
-			f32 const grab_distance = 4;
-			if (axis_is_x) {
-				s32 bar_position = viewport.y + viewport.h * split_t;
-				if (distance((v2f)current_mouse_position, (line_segment<v2f>)line_segment_begin_end(v2s{viewport.x, bar_position}, v2s{viewport.x + (s32)viewport.w, bar_position})) <= grab_distance) {
-					is_sizing = true;
-				}
-			} else {
-				s32 bar_position = viewport.x + viewport.w * split_t;
-				if (distance((v2f)current_mouse_position, (line_segment<v2f>)line_segment_begin_end(v2s{bar_position, viewport.y}, v2s{bar_position, viewport.y + (s32)viewport.h})) <= grab_distance) {
-					is_sizing = true;
-				}
-			}
-			if (is_sizing) {
+		line_segment<v2f> bar_line;
+		if (axis_is_x) {
+			s32 bar_position = viewport.y + viewport.h * split_t;
+			bar_line = (line_segment<v2f>)line_segment_begin_end(v2s{viewport.x, bar_position}, v2s{viewport.x + (s32)viewport.w, bar_position});
+		} else {
+			s32 bar_position = viewport.x + viewport.w * split_t;
+			bar_line = (line_segment<v2f>)line_segment_begin_end(v2s{bar_position, viewport.y}, v2s{bar_position, viewport.y + (s32)viewport.h});
+		}
+		f32 const grab_distance = 4;
+		Cursor cursor = axis_is_x ? Cursor_vertical : Cursor_horizontal;
+		if (distance((v2f)current_mouse_position, bar_line) <= grab_distance) {
+			if (mouse_down(0, {.anywhere = true})) {
+				is_sizing = true;
 				lock_input();
 			}
+		} else if (!is_sizing) {
+			cursor = Cursor_default;
 		}
-		if (mouse_up(0)) {
+		//if ((cursor == Cursor_vertical && current_cursor == Cursor_horizontal) || (cursor == Cursor_horizontal && current_cursor == Cursor_vertical)) {
+		//	current_cursor = Cursor_horizontal_and_vertical;
+		//} else 
+		if (current_cursor == Cursor_default) {
+			current_cursor = cursor;
+		}
+
+		if (mouse_up_no_lock(0, {.anywhere = true})) {
 			is_sizing = false;
 			unlock_input();
 		}
@@ -69,15 +75,22 @@ struct SplitView : EditorWindow {
 			resize_children();
 		}
 
-		part1->render();
-		part2->render();
+		push_current_viewport(part1->viewport) part1->render();
+		push_current_viewport(part2->viewport) part2->render();
 	}
 };
 
-SplitView *create_split_view(EditorWindow *left, EditorWindow *right, f32 split_t = 0.5f) {
+struct CreateSplitViewParams {
+	f32 split_t = 0.5f;
+	bool horizontal = false;
+
+};
+
+SplitView *create_split_view(EditorWindow *left, EditorWindow *right, CreateSplitViewParams params = {}) {
 	auto result = create_editor_window<SplitView>();
 	result->part1 = left;
 	result->part2 = right;
-	result->split_t = split_t;
+	result->split_t = params.split_t;
+	result->axis_is_x = params.horizontal;
 	return result;
 }

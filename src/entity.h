@@ -13,7 +13,7 @@ struct Entity {
 	v3f scale = {1, 1, 1};
 	EntityFlags flags;
 	StaticList<ComponentIndex, 16> components;
-	List<utf8> debug_name;
+	List<utf8> name;
 };
 
 MaskedBlockList<Entity, 256> entities;
@@ -22,12 +22,41 @@ Entity &Component::entity() const {
 	return entities[entity_index];
 }
 
+enum OwnershipFlags {
+	Ownership_copy     = 0x0,
+	Ownership_transfer = 0x1,
+};
+
+Entity &create_entity(List<utf8> name, OwnershipFlags flags = Ownership_copy) {
+	auto &result = entities.add();
+	if (flags & Ownership_transfer) {
+		result.name = name;
+	} else {
+		result.name = copy(name);
+	}
+	return result;
+}
+Entity &create_entity(Span<utf8> name = u8"unnamed"s) {
+	return create_entity(as_list(name));
+}
+Entity &create_entity(char const *name) {
+	return create_entity((Span<utf8>)as_span(name));
+}
+template <class ...Args>
+Entity &create_entity(utf8 const *fmt, Args const &...args) {
+	return create_entity(format(fmt, args...), Ownership_transfer);
+}
+template <class ...Args>
+Entity &create_entity(char const *fmt, Args const &...args) {
+	return create_entity((utf8 *)fmt, args...);
+}
+
 void destroy(Entity &entity) {
 	for (auto &component_index : entity.components) {
 		auto &storage = component_storages[component_index.type];
 		storage.remove_at(component_index.index);
 	}
-	free(entity.debug_name);
+	free(entity.name);
 	entities.remove(entity);
 }
 

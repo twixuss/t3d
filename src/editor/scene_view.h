@@ -33,6 +33,19 @@ struct SceneViewWindow : EditorWindow {
 		current_camera_entity = camera_entity;
 		current_camera = camera;
 		current_viewport = viewport;
+		
+		if (mouse_down(1)) {
+			flying = true;
+			lock_input();
+		}
+		if (mouse_up_no_lock(1)) {
+			flying = false;
+			unlock_input();
+		}
+
+		if (key_down('1')) manipulator_kind = Manipulate_position;
+		if (key_down('2')) manipulator_kind = Manipulate_rotation;
+		if (key_down('3')) manipulator_kind = Manipulate_scale;
 
 		render_scene(this);
 	}
@@ -44,9 +57,8 @@ struct SceneViewWindow : EditorWindow {
 SceneViewWindow *create_scene_view() {
 	auto result = create_editor_window<SceneViewWindow>();
 	result->kind = EditorWindow_scene_view;
-	result->camera_entity = &entities.add();
+	result->camera_entity = &create_entity("scene_camera_%", result);
 	result->camera_entity->flags |= Entity_editor;
-	result->camera_entity->debug_name = format(u8"scene_camera_%", result);
 	result->camera = &add_component<Camera>(*result->camera_entity);
 	return result;
 }

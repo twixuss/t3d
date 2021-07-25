@@ -46,7 +46,7 @@ void free() {
 	current_api = {};
 }
 
-Pixels load_pixels(Span<filechar> path) {
+Pixels load_pixels(Span<pathchar> path) {
 	print(Print_info, "Loading texture %.\n", path);
 
 	Pixels result;

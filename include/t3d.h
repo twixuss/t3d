@@ -126,14 +126,14 @@ enum Topology {
 
 union CubeTexturePaths {
 	struct {
-		Span<filechar> left;
-		Span<filechar> right;
-		Span<filechar> top;
-		Span<filechar> bottom;
-		Span<filechar> front;
-		Span<filechar> back;
+		Span<pathchar> left;
+		Span<pathchar> right;
+		Span<pathchar> top;
+		Span<pathchar> bottom;
+		Span<pathchar> front;
+		Span<pathchar> back;
 	};
-	Span<filechar> paths[6];
+	Span<pathchar> paths[6];
 };
 
 // position is bottom left
@@ -229,9 +229,9 @@ struct Pixels {
 	void (*free)(void *data);
 };
 
-T3D_API Pixels load_pixels(Span<filechar> path);
+T3D_API Pixels load_pixels(Span<pathchar> path);
 
-inline Texture *load_texture(Span<filechar> path) {
+inline Texture *load_texture(Span<pathchar> path) {
 	auto pixels = load_pixels(path);
 	if (!pixels.data) {
 		return 0;

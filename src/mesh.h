@@ -26,7 +26,7 @@ Mesh *create_mesh(tl::CommonMesh mesh) {
 
 	return result;
 }
-Mesh *load_mesh(Span<filechar> path) {
+Mesh *load_mesh(Span<pathchar> path) {
 	if (auto parse_result = parse_glb_from_file(path)) {
 		return create_mesh(parse_result.value.meshes[0]);
 	} else {
