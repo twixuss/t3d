@@ -1,13 +1,13 @@
-scene_camera_1642000EDF0 {
-	position 0.120 0.147 0.466
-	rotation -0.014 0.014 0.000 0.999
+scene_camera_1FB1411EC20 {
+	position -1.169 0.813 1.690
+	rotation 0.071 -0.787 0.093 0.604
 	Camera {
-		fov 1.570
+		fov 2.094
 	}
 }
 suzanne {
-	position 0.000 0.000 0.000
-	rotation 0.287 0.435 0.136 0.841
+	position -0.739 -0.000 -0.233
+	rotation 0.000 0.000 0.000 1.000
 	MeshRenderer {
 	}
 }

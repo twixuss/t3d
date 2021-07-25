@@ -104,8 +104,6 @@ Mesh *handle_plane_x_mesh;
 Mesh *handle_plane_y_mesh;
 Mesh *handle_plane_z_mesh;
 
-f32 camera_velocity;
-
 
 m4 local_to_world_position(v3f position, quaternion rotation, v3f scale) {
 	return m4::translation(position) * (m4)rotation * m4::scale(scale);
@@ -268,30 +266,6 @@ void render_scene(SceneViewWindow *view) {
 		window->mouse_position.x,
 		((s32)window->client_size.y - window->mouse_position.y),
 	} - view->viewport.position;
-
-	v3f camera_position_delta = {};
-	if (view->flying) {
-		camera.fov = clamp(camera.fov - window->mouse_wheel * radians(10), radians(30.0f), radians(120.0f));
-
-		camera_entity.rotation =
-			quaternion_from_axis_angle({0,1,0}, window->mouse_delta.x * -0.005f * camera.fov) *
-			quaternion_from_axis_angle(camera_entity.rotation * v3f{1,0,0}, window->mouse_delta.y * -0.005f * camera.fov) *
-			camera_entity.rotation;
-
-		if (key_held(Key_d)) camera_position_delta.x += 1;
-		if (key_held(Key_a)) camera_position_delta.x -= 1;
-		if (key_held(Key_e)) camera_position_delta.y += 1;
-		if (key_held(Key_q)) camera_position_delta.y -= 1;
-		if (key_held(Key_s)) camera_position_delta.z += 1;
-		if (key_held(Key_w)) camera_position_delta.z -= 1;
-		if (all_true(camera_position_delta == v3f{})) {
-			camera_velocity = 1;
-		} else {
-			camera_velocity += frame_time;
-		}
-	}
-	//camera_entity.position += m4::rotation_r_zxy(camera_entity.rotation) * camera_position_delta * frame_time * camera_velocity;
-	camera_entity.position += camera_entity.rotation * camera_position_delta * frame_time * camera_velocity;
 
 	m4 camera_projection_matrix = m4::perspective_right_handed((f32)view->viewport.size.x / view->viewport.size.y, camera.fov, 0.1f, 100.0f);
 	m4 camera_translation_matrix = m4::translation(-camera_entity.position);
