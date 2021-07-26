@@ -1,4 +1,3 @@
-#define TL_DEBUG
 #define TL_ENABLE_VEC4_SIMD
 #define TL_OPENGL_LOG_LEVEL 3
 namespace t3d { struct Texture; }

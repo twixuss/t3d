@@ -50,7 +50,7 @@ struct ManipulatorStateKey {
 };
 
 umm get_hash(ManipulatorStateKey const &key) {
-	return key.id * (umm)954277 + key.location.column() * (umm)152753 + key.location.line() * (umm)57238693 + (umm)key.location.file_name();
+	return key.id * (umm)954277 + key.location.column() * (umm)152753 + key.location.line() * (umm)57238693 + (umm)key.location.file_name() + (umm)key.camera;
 }
 bool operator==(ManipulatorStateKey const &a, ManipulatorStateKey const &b) {
 	return a.id == b.id && a.camera == b.camera && a.location == b.location;

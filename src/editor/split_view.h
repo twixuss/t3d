@@ -5,27 +5,54 @@
 
 struct SplitView : EditorWindow {
 	bool is_sizing;
-	bool axis_is_x;
+	bool horizontal;
 	f32 split_t = 0.5f;
+	f32 clamped_split_t;
 	EditorWindow *part1;
 	EditorWindow *part2;
+
+	v2u get_min_size() {
+		v2u result;
+
+		auto size1 = part1->get_min_size();
+		auto size2 = part2->get_min_size();
+
+		if(horizontal) {
+			result.x = max(size1.x, size2.x);
+			result.y = size1.y + size2.y;
+		} else {
+			result.x = size1.x + size2.x;
+			result.y = max(size1.y, size2.y);
+		}
+		return result;
+	}
 	void resize(t3d::Viewport viewport) {
 		resize_children();
 	}
 	void resize_children() {
+		// add 1 to account for half of the split bar
+		auto size1 = part1->get_min_size() + 1;
+		auto size2 = part2->get_min_size() + 1;
+		
+		if(horizontal) {
+			clamped_split_t = clamp(split_t, (f32)size1.y / viewport.h, 1 - (f32)size2.y / viewport.h);
+		} else {
+			clamped_split_t = clamp(split_t, (f32)size1.x / viewport.w, 1 - (f32)size2.x / viewport.w);
+		}
+
 		t3d::Viewport viewport1 = viewport;
-		if (axis_is_x) {
-			viewport1.h *= split_t;
+		if (horizontal) {
+			viewport1.h *= clamped_split_t;
 			viewport1.h -= 1;
 		} else {
-			viewport1.w *= split_t;
+			viewport1.w *= clamped_split_t;
 			viewport1.w -= 1;
 		}
 
 		part1->resize(viewport1);
 
 		t3d::Viewport viewport2 = viewport;
-		if (axis_is_x) {
+		if (horizontal) {
 			viewport2.y = viewport1.y + viewport1.h + 2;
 			viewport2.h = viewport.h - viewport1.h - 2;
 		} else {
@@ -36,15 +63,15 @@ struct SplitView : EditorWindow {
 	}
 	void render() {
 		line_segment<v2f> bar_line;
-		if (axis_is_x) {
-			s32 bar_position = viewport.y + viewport.h * split_t;
+		if (horizontal) {
+			s32 bar_position = viewport.y + viewport.h * clamped_split_t;
 			bar_line = (line_segment<v2f>)line_segment_begin_end(v2s{viewport.x, bar_position}, v2s{viewport.x + (s32)viewport.w, bar_position});
 		} else {
-			s32 bar_position = viewport.x + viewport.w * split_t;
+			s32 bar_position = viewport.x + viewport.w * clamped_split_t;
 			bar_line = (line_segment<v2f>)line_segment_begin_end(v2s{bar_position, viewport.y}, v2s{bar_position, viewport.y + (s32)viewport.h});
 		}
 		f32 const grab_distance = 4;
-		Cursor cursor = axis_is_x ? Cursor_vertical : Cursor_horizontal;
+		Cursor cursor = horizontal ? Cursor_vertical : Cursor_horizontal;
 		if (distance((v2f)current_mouse_position, bar_line) <= grab_distance) {
 			if (mouse_down(0, {.anywhere = true})) {
 				is_sizing = true;
@@ -67,10 +94,10 @@ struct SplitView : EditorWindow {
 
 		if (is_sizing) {
 			v2s mouse_position = {::window->mouse_position.x, (s32)::window->client_size.y - ::window->mouse_position.y};
-			if (axis_is_x) {
-				split_t = clamp(map<f32>(mouse_position.y, viewport.y, viewport.y + viewport.h, 0, 1), 0.1f, 0.9f);
+			if (horizontal) {
+				split_t = map<f32>(mouse_position.y, viewport.y, viewport.y + viewport.h, 0, 1);
 			} else {
-				split_t = clamp(map<f32>(mouse_position.x, viewport.x, viewport.x + viewport.w, 0, 1), 0.1f, 0.9f);
+				split_t = map<f32>(mouse_position.x, viewport.x, viewport.x + viewport.w, 0, 1);
 			}
 			resize_children();
 		}
@@ -87,10 +114,11 @@ struct CreateSplitViewParams {
 };
 
 SplitView *create_split_view(EditorWindow *left, EditorWindow *right, CreateSplitViewParams params = {}) {
-	auto result = create_editor_window<SplitView>();
+	auto result = create_editor_window<SplitView>(EditorWindow_split_view);
 	result->part1 = left;
 	result->part2 = right;
 	result->split_t = params.split_t;
-	result->axis_is_x = params.horizontal;
+	result->clamped_split_t = params.split_t;
+	result->horizontal = params.horizontal;
 	return result;
 }

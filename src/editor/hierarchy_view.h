@@ -2,10 +2,13 @@
 #include "window.h"
 #include "../blit.h"
 #include "../entity.h"
-#include "../font.h"
+#include "../gui.h"
 #include "../selection.h"
 
 struct HierarchyViewWindow : EditorWindow {
+	v2u get_min_size() {
+		return {160, 160};
+	}
 	void resize(t3d::Viewport viewport) {
 		this->viewport = viewport;
 	}
@@ -37,12 +40,15 @@ struct HierarchyViewWindow : EditorWindow {
 			button_viewport.position = next_pos;
 			button_viewport.size = {viewport.size.x - (u32)button_padding * 2, (u32)button_height};
 			
-			v4f button_color = V4f(.15);
+
+			ButtonTheme theme = default_button_theme;
 			if (&entity == selected_entity) {
-				button_color.xy *= 1.5f;
+				theme.color.xy *= 1.5f;
+				theme.hovered_color.xy *= 1.5f;
+				theme.pressed_color.xy *= 1.5f;
 			}
 
-			if (button(button_viewport, entity.name, button_color)) {
+			if (button(button_viewport, entity.name, theme)) {
 				selected_entity = &entity;
 			}
 
@@ -52,7 +58,5 @@ struct HierarchyViewWindow : EditorWindow {
 };
 
 HierarchyViewWindow *create_hierarchy_view() {
-	auto result = create_editor_window<HierarchyViewWindow>();
-	result->kind = EditorWindow_hierarchy_view;
-	return result;
+	return create_editor_window<HierarchyViewWindow>(EditorWindow_hierarchy_view);
 }

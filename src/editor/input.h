@@ -18,6 +18,8 @@ struct InputQueryParams {
 bool input_is_locked;
 v2s input_lock_mouse_position;
 
+List<utf8> input_string;
+
 bool key_down  (u8 key, InputQueryParams params = {}) { return (key_state[key].state & KeyState_down    ) && (params.anywhere || in_bounds(key_state[key].start_position, current_viewport.aabb())); }
 bool key_up    (u8 key, InputQueryParams params = {}) { return (key_state[key].state & KeyState_up      ) && (params.anywhere || in_bounds(key_state[key].start_position, current_viewport.aabb())); }
 bool key_repeat(u8 key, InputQueryParams params = {}) { return (key_state[key].state & KeyState_repeated) && (params.anywhere || in_bounds(key_state[key].start_position, current_viewport.aabb())); }

@@ -6,28 +6,16 @@ inline void serialize_component(StringBuilder &builder, u32 component_type, void
 	component_serializers[component_type](builder, data);
 }
 
-template <class Container>
-struct ForIterator {
-	Container &container;
-	ForIterator(Container &container) : container(container) {}
-	template <class Fn>
-	void operator<<(Fn &&fn) {
-		for_each(container, std::forward<Fn>(fn));
-	}
-};
-
-#define foreach(collection) ForIterator(collection) << [&] (auto &it) 
-
 List<u8> serialize_scene() {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 
-	foreach(entities) {
-		append(builder, it.name);
+	for_each(entities, [&](Entity &entity) {
+		append(builder, entity.name);
 		append(builder, " {\n");
-		append_format(builder, "\tposition % % %\n", it.position.x, it.position.y, it.position.z);
-		append_format(builder, "\trotation % % % %\n", it.rotation.x, it.rotation.y, it.rotation.z, it.rotation.w);
-		for (auto &component : it.components) {
+		append_format(builder, "\tposition % % %\n", entity.position.x, entity.position.y, entity.position.z);
+		append_format(builder, "\trotation % % % %\n", entity.rotation.x, entity.rotation.y, entity.rotation.z, entity.rotation.w);
+		for (auto &component : entity.components) {
 			append(builder, "\t");
 			append(builder, component_names[component.type]);
 			append(builder, " {\n");
@@ -35,7 +23,7 @@ List<u8> serialize_scene() {
 			append(builder, "\t}\n");
 		}
 		append(builder, "}\n");
-	};
+	});
 
 	return (List<u8>)to_string(builder, current_allocator);
 }

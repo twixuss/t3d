@@ -2,6 +2,7 @@
 #include "window.h"
 #include "../entity.h"
 #include "manipulator.h"
+#include "gui.h"
 
 void render_scene(struct SceneViewWindow *);
 
@@ -11,7 +12,10 @@ struct SceneViewWindow : EditorWindow {
 	bool flying;
 	ManipulateKind manipulator_kind;
 	f32 camera_velocity;
-
+	
+	v2u get_min_size() {
+		return {160, 160};
+	}
 	void resize(t3d::Viewport viewport) {
 		this->viewport = viewport;
 		for (auto &effect : camera->post_effects) {
@@ -55,9 +59,10 @@ struct SceneViewWindow : EditorWindow {
 		v3f camera_position_delta = {};
 		if (flying) {
 
+			f32 mouse_scale = -0.003f;
 			camera_entity->rotation =
-				quaternion_from_axis_angle({0,1,0}, window->mouse_delta.x * -0.005f * camera->fov) *
-				quaternion_from_axis_angle(camera_entity->rotation * v3f{1,0,0}, window->mouse_delta.y * -0.005f * camera->fov) *
+				quaternion_from_axis_angle({0,1,0}, window->mouse_delta.x * mouse_scale * camera->fov) *
+				quaternion_from_axis_angle(camera_entity->rotation * v3f{1,0,0}, window->mouse_delta.y * mouse_scale * camera->fov) *
 				camera_entity->rotation;
 
 			if (key_held(Key_d)) camera_position_delta.x += 1;
@@ -76,6 +81,19 @@ struct SceneViewWindow : EditorWindow {
 		camera_entity->position += camera_entity->rotation * camera_position_delta * frame_time * camera_velocity;
 
 		render_scene(this);
+
+		u32 const button_size = 32;
+
+		auto translate_viewport = current_viewport;
+		translate_viewport.x += 2;
+		translate_viewport.y = current_viewport.y + current_viewport.h - 2 - button_size;
+		translate_viewport.w = button_size;
+		translate_viewport.h = button_size;
+		if (button(translate_viewport, u8"T"s)) manipulator_kind = Manipulate_position;
+		translate_viewport.x += button_size + 2;
+		if (button(translate_viewport, u8"R"s)) manipulator_kind = Manipulate_rotation;
+		translate_viewport.x += button_size + 2;
+		if (button(translate_viewport, u8"S"s)) manipulator_kind = Manipulate_scale;
 	}
 	void free() {
 		destroy(*camera_entity);
@@ -83,8 +101,7 @@ struct SceneViewWindow : EditorWindow {
 };
 
 SceneViewWindow *create_scene_view() {
-	auto result = create_editor_window<SceneViewWindow>();
-	result->kind = EditorWindow_scene_view;
+	auto result = create_editor_window<SceneViewWindow>(EditorWindow_scene_view);
 	result->camera_entity = &create_entity("scene_camera_%", result);
 	result->camera_entity->flags |= Entity_editor;
 	result->camera = &add_component<Camera>(*result->camera_entity);

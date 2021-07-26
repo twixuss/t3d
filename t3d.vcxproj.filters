@@ -61,6 +61,7 @@
     <ClInclude Include="src\serialize.h" />
     <ClInclude Include="src\components\serialize.h" />
     <ClInclude Include="src\editor\property_view.h" />
+    <ClInclude Include="src\gui.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

@@ -1,30 +1,30 @@
-scene_camera_1FB1411EC20 {
-	position -1.169 0.813 1.690
-	rotation 0.071 -0.787 0.093 0.604
+scene_camera_1CFC7DC5480 {
+	position 1.271 2.477 2.334
+	rotation -0.399 0.493 0.272 0.722
 	Camera {
-		fov 2.094
+		fov 1.57
 	}
 }
 suzanne {
-	position -0.739 -0.000 -0.233
-	rotation 0.000 0.000 0.000 1.000
+	position 0 0 0
+	rotation 0 0 0 1
 	MeshRenderer {
 	}
 }
 floor {
-	position 0.000 0.000 0.000
-	rotation 0.000 0.000 0.000 1.000
+	position 0 0 0
+	rotation 0 0 0 1
 	MeshRenderer {
 	}
 }
 light1 {
-	position 0.000 2.000 6.000
-	rotation 0.000 0.000 0.000 1.000
+	position 0 2 6
+	rotation 0 0 0 1
 	Light {
 	}
 }
 light2 {
-	position 6.000 2.000 -6.000
+	position 6 2 -6
 	rotation 0.059 -0.912 0.144 0.377
 	Light {
 	}

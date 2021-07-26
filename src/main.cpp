@@ -516,6 +516,11 @@ void run() {
 	manipulator_states = {};
 	debug_lines = {};
 
+	float_field_states = {};
+	text_field_states = {};
+
+	input_string = {};
+
 	init_component_storages<
 #define c(name) name
 #define sep ,
@@ -530,7 +535,7 @@ void run() {
 		assert_always(t3d::init(graphics_api, {
 			.window = window.handle,
 			.window_size = window.client_size,
-			.debug = true,
+			.debug = BUILD_DEBUG,
 		}));
 		
 		init_font();
@@ -653,7 +658,7 @@ out vec4 fragment_color;
 void main() {
 	vec3 normal = normalize(vertex_normal);
 	vec3 default_color = vertex_color * 0.5f;
-	vec3 highlighted_color = mix(vertex_color, vec3(1), .1);
+	vec3 highlighted_color = mix(vertex_color, vec3(1), .2);
 
 	vec4 mixed_color = vec4(
 		mix(default_color, highlighted_color, selected),
@@ -1008,12 +1013,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
 		
-		if (key_down(Key_f1)) {
+		if (key_down(Key_f1, {.anywhere = true})) {
 			Profiler::enabled = true;
 			Profiler::reset();
 		}
 		defer {
-			if (key_down(Key_f1)) {
+			if (Profiler::enabled) {
 				Profiler::enabled = false;
 				write_entire_file(tl_file_string("update.tmd"ts), Profiler::output_for_timed());
 			}
@@ -1075,13 +1080,17 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				state.state &= ~KeyState_repeated;
 			}
 		}
+		
+		input_string.clear();
+		
+		clear_temporary_storage();
 
 		{
 			timed_block("present"s);
 			t3d::present();
 		}
 
-		frame_time = reset(frame_timer);
+		frame_time = min(max_frame_time, reset(frame_timer));
 		time += frame_time;
 		++fps_counter;
 
@@ -1093,8 +1102,6 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			fps_timer -= 1;
 			fps_counter = 0;
 		}
-
-		clear_temporary_storage();
 	};
 	info.get_cursor = [](Window &window) -> Cursor {
 		return current_cursor;
@@ -1121,6 +1128,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	};
 	on_mouse_up = [](u8 button){
 		key_state[256 + button].state = KeyState_up;
+	};
+	on_char = [](u32 ch) {
+		input_string.add(encode_utf8(ch));
 	};
 
 	frame_timer = create_precise_timer();

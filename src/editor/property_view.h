@@ -2,37 +2,46 @@
 #include "window.h"
 #include "../blit.h"
 #include "../entity.h"
-#include "../font.h"
+#include "../gui.h"
 #include "../selection.h"
 
 struct PropertyViewWindow : EditorWindow {
+	v2u get_min_size() {
+		return {160, 160};
+	}
 	void resize(t3d::Viewport viewport) {
 		this->viewport = viewport;
 	}
 	void render() {
-		t3d::set_rasterizer({
-			.depth_test = false,
-			.depth_write = false,
-		});
-		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-		t3d::set_topology(t3d::Topology_triangle_list);
-
 		t3d::set_render_target(t3d::back_buffer);
-		t3d::set_shader(blit_color_shader);
-		t3d::set_shader_constants(blit_color_constants, 0);
-
-		t3d::update_shader_constants(blit_color_constants, {.color = V4f(.1)});
 		t3d::set_viewport(viewport);
-		t3d::draw(3);
+		blit(V4f(.1));
+		
+		current_viewport.x += 2;
+		current_viewport.y += 2;
+		current_viewport.w -= 4;
+		current_viewport.h -= 4;
+		
+		current_property_y = 0;
+			
+		push_current_viewport(current_viewport) {
+			if (selected_entity) {
+				header("Name");
+				draw_property(selected_entity->name);
 
-		if (selected_entity) {
-			draw_text(to_string(selected_entity->position));
-		}
+				header("Position");
+				draw_property(selected_entity->position);
+				
+				header("Rotation");
+				//draw_property(selected_entity->rotation);
+				
+				header("Scale");
+				draw_property(selected_entity->scale);
+			}
+		};
 	}
 };
 
 PropertyViewWindow *create_property_view() {
-	auto result = create_editor_window<PropertyViewWindow>();
-	result->kind = EditorWindow_property_view;
-	return result;
+	return create_editor_window<PropertyViewWindow>(EditorWindow_property_view);
 }
