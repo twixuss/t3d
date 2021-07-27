@@ -1,3 +1,4 @@
+#pragma once
 #define TL_ENABLE_VEC4_SIMD
 #define TL_OPENGL_LOG_LEVEL 3
 namespace t3d { struct Texture; }
@@ -13,5 +14,11 @@ namespace t3d { struct Texture; }
 #include <tl/profiler.h>
 #include <tl/hash_map.h>
 #include <tl/font.h>
+#include <tl/cpu.h>
+#include <source_location>
 #include "../include/t3d.h"
 #include "component_list.h"
+
+inline bool operator==(std::source_location a, std::source_location b) {
+	return a.line() == b.line() && a.column() == b.column() && tl::as_span(a.file_name()) == tl::as_span(b.file_name());
+}

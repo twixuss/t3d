@@ -1,9 +1,11 @@
 #pragma once
 #include "font.h"
+#include "blit.h"
+#include "editor/current.h"
 
 struct ButtonTheme {
-	v4f color = {.15f, .15f, .15f, 1};
-	v4f hovered_color = {.2f, .2f, .2f, 1};
+	v4f color = {.18f, .18f, .18f, 1};
+	v4f hovered_color = {.25f, .25f, .25f, 1};
 	v4f pressed_color = {.1f, .1f, .1f, 1};
 };
 
@@ -49,10 +51,22 @@ void blit(v4f color) {
 		.depth_write = false,
 	});
 	t3d::set_shader(blit_color_shader);
-	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+	t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_source_alpha, t3d::Blend_one_minus_source_alpha);
 	t3d::set_topology(t3d::Topology_triangle_list);
 	t3d::set_shader_constants(blit_color_constants, 0);
 	t3d::update_shader_constants(blit_color_constants, {.color = color});
+	t3d::draw(3);
+}
+
+void blit(t3d::Texture *texture) {
+	t3d::set_rasterizer({
+		.depth_test = false,
+		.depth_write = false,
+	});
+	t3d::set_shader(blit_texture_shader);
+	t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_source_alpha, t3d::Blend_one_minus_source_alpha);
+	t3d::set_topology(t3d::Topology_triangle_list);
+	t3d::set_texture(texture, 0);
 	t3d::draw(3);
 }
 
@@ -126,14 +140,22 @@ bool button(Span<utf8> text, ButtonTheme const &theme = default_button_theme) {
 		color = theme.hovered_color;
 	}
 			
-	t3d::set_shader(blit_color_shader);
-	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-	t3d::set_topology(t3d::Topology_triangle_list);
-	t3d::set_shader_constants(blit_color_constants, 0);
-	t3d::update_shader_constants(blit_color_constants, {.color = color});
-	t3d::draw(3);
-
+	blit(color);
 	draw_text(text);
+		
+	return mouse_click(0);
+}
+
+bool button(t3d::Texture *texture, ButtonTheme const &theme = default_button_theme) {
+	v4f color = theme.color;
+	if (mouse_held(0)) {
+		color = theme.pressed_color;
+	} else if (in_bounds(current_mouse_position, current_viewport.aabb())) {
+		color = theme.hovered_color;
+	}
+	
+	blit(color);
+	blit(texture);
 		
 	return mouse_click(0);
 }
@@ -141,6 +163,12 @@ bool button(Span<utf8> text, ButtonTheme const &theme = default_button_theme) {
 bool button(t3d::Viewport button_viewport, Span<utf8> text, ButtonTheme const &theme = default_button_theme) {
 	push_current_viewport(button_viewport) {
 		return button(text, theme);
+	}
+	return false;
+}
+bool button(t3d::Viewport button_viewport, t3d::Texture *texture, ButtonTheme const &theme = default_button_theme) {
+	push_current_viewport(button_viewport) {
+		return button(texture, theme);
 	}
 	return false;
 }
@@ -208,9 +236,9 @@ Optional<f32> parse_f32(Span<utf8> string) {
 	return result;
 }
 
-void edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
+bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
 	auto &state = float_field_states.get_or_insert({id, location});
-	
+	bool value_changed = false;
 	bool stop_edit = false;
 	bool apply_input = false;
 	if (state.editing) {
@@ -225,6 +253,17 @@ void edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 		}
 		if (key_down(Key_escape)) {
 			stop_edit = true;
+		}
+	} else {
+		if (mouse_begin_drag(0)) {
+			lock_input(key_state[256 + 0].start_position);
+		}
+		if (mouse_drag_no_lock(0)) {
+			value += window->mouse_delta.x * (key_held(Key_shift) ? 0.01f : 0.1f);
+			value_changed = true;
+		}
+		if (mouse_end_drag_no_lock(0)) {
+			unlock_input();
 		}
 	}
 	if (mouse_click(0)) {
@@ -408,8 +447,9 @@ void edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 		}
 
 		auto parsed = parse_f32(state.string);
-		if (parsed) {
-			value = parsed.value;
+		if (parsed || state.string.size == 0) {
+			value = parsed ? parsed.value : 0;
+			value_changed = true;
 		}
 	}
 
@@ -420,6 +460,7 @@ void edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 
 	if (stop_edit && !apply_input) {
 		value = state.original_value;	
+		value_changed = true;
 	}
 
 	v4f color = theme.color;
@@ -482,6 +523,7 @@ void edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 		draw_text((List<utf8>)to_string(value));
 	}
 
+	return value_changed;
 }
 
 void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
@@ -757,7 +799,7 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 s32 current_property_y;
 s32 const line_height = 16;
 
-void header(char const *text) {
+void header(Span<utf8> text) {
 	t3d::Viewport line_viewport = current_viewport;
 	line_viewport.h = line_height;
 	line_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
@@ -765,8 +807,59 @@ void header(char const *text) {
 	current_property_y += line_height + 2;
 }
 
-void draw_property(v3f &value, std::source_location location = std::source_location::current()) {
+void property_separator() {
+	s32 const separator_height = 2;
 	t3d::Viewport line_viewport = current_viewport;
+	line_viewport.h = separator_height;
+	line_viewport.y = current_viewport.y + current_viewport.h - separator_height - current_property_y;
+	push_current_viewport(line_viewport) blit({.05, .05, .05, 1});
+	current_property_y += separator_height + 2;
+}
+
+void draw_property(Span<utf8> name, f32 &value, std::source_location location) {
+	t3d::Viewport line_viewport = current_viewport;
+	line_viewport.h = line_height;
+	line_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
+	s32 text_width;
+	push_current_viewport(line_viewport) {
+		auto font = get_font_at_size(font_collection, font_size);
+		ensure_all_chars_present(name, font);
+		auto placed_text = with(temporary_allocator, place_text(name, font));
+		text_width = placed_text.back().position.max.x;
+		draw_text(placed_text, font);
+	};
+
+	line_viewport = current_viewport;
+	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
+	line_viewport.h = line_height;
+	line_viewport.x += text_width;
+	line_viewport.w -= text_width;
+
+	auto x_viewport = line_viewport;
+	auto y_viewport = line_viewport;
+	auto z_viewport = line_viewport;
+
+	x_viewport.w = line_viewport.w / 3;
+
+	y_viewport.x = x_viewport.x + x_viewport.w;
+	y_viewport.w = line_viewport.w * 2 / 3 - x_viewport.w;
+
+	z_viewport.x = y_viewport.x + y_viewport.w;
+	z_viewport.w = line_viewport.w - (x_viewport.w + y_viewport.w);
+
+	push_current_viewport(x_viewport) draw_text("X");
+	push_current_viewport(y_viewport) draw_text("Y");
+	push_current_viewport(z_viewport) draw_text("Z");
+	
+	push_current_viewport(line_viewport) edit_float(value, (umm)location.line() * (umm)location.file_name());
+
+	current_property_y += line_height + 2;
+}
+
+void draw_property(Span<utf8> name, v3f &value, std::source_location location) {
+	header(name);
+
+	auto line_viewport = current_viewport;
 	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
 	line_viewport.h = line_height;
 
@@ -801,7 +894,48 @@ void draw_property(v3f &value, std::source_location location = std::source_locat
 	current_property_y += line_height + 2;
 }
 
-void draw_property(List<utf8> &value, std::source_location location = std::source_location::current()) {
+void draw_property(Span<utf8> name, quaternion &value, std::source_location location) {
+	header(name);
+
+	t3d::Viewport line_viewport = current_viewport;
+	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
+	line_viewport.h = line_height;
+
+
+	auto x_viewport = line_viewport;
+	auto y_viewport = line_viewport;
+	auto z_viewport = line_viewport;
+
+	x_viewport.w = line_viewport.w / 3;
+
+	y_viewport.x = x_viewport.x + x_viewport.w;
+	y_viewport.w = line_viewport.w * 2 / 3 - x_viewport.w;
+
+	z_viewport.x = y_viewport.x + y_viewport.w;
+	z_viewport.w = line_viewport.w - (x_viewport.w + y_viewport.w);
+
+	push_current_viewport(x_viewport) draw_text("X");
+	push_current_viewport(y_viewport) draw_text("Y");
+	push_current_viewport(z_viewport) draw_text("Z");
+	
+	x_viewport.x += font_size;
+	x_viewport.w -= font_size;
+	y_viewport.x += font_size;
+	y_viewport.w -= font_size;
+	z_viewport.x += font_size;
+	z_viewport.w -= font_size;
+
+	v3f angles = degrees(to_euler_angles(value));
+	push_current_viewport(x_viewport) if (edit_float(angles.x, (umm)location.line() * (umm)location.file_name())) value = quaternion_from_euler(radians(angles));
+	push_current_viewport(y_viewport) if (edit_float(angles.y, (umm)location.line() * (umm)location.file_name())) value = quaternion_from_euler(radians(angles));
+	push_current_viewport(z_viewport) if (edit_float(angles.z, (umm)location.line() * (umm)location.file_name())) value = quaternion_from_euler(radians(angles));
+
+	current_property_y += line_height + 2;
+}
+
+void draw_property(Span<utf8> name, List<utf8> &value, std::source_location location) {
+	header(name);
+
 	t3d::Viewport line_viewport = current_viewport;
 	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
 	line_viewport.h = line_height;

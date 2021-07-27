@@ -79,6 +79,7 @@ enum TextureFiltering : u8 {
 	TextureFiltering_none,    // texture will be unsamplable
 	TextureFiltering_nearest,
 	TextureFiltering_linear,
+	TextureFiltering_linear_mipmap,
 };
 
 enum Comparison : u8 {
@@ -196,6 +197,7 @@ A(Texture *, create_cube_texture, (CreateTextureFlags flags, u32 width, u32 heig
 A(void, set_topology, (Topology topology), (topology)) \
 A(void, update_vertex_buffer, (VertexBuffer *buffer, Span<u8> data), (buffer, data)) \
 A(void, update_texture, (Texture *texture, u32 width, u32 height, void *data), (texture, width, height, data)) \
+A(void, generate_mipmaps, (Texture *texture), (texture)) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)
@@ -229,15 +231,32 @@ struct Pixels {
 	void (*free)(void *data);
 };
 
-T3D_API Pixels load_pixels(Span<pathchar> path);
+struct LoadPixelsParams {
+	bool flip_y = false;
+};
 
-inline Texture *load_texture(Span<pathchar> path) {
-	auto pixels = load_pixels(path);
+T3D_API Pixels load_pixels(Span<pathchar> path, LoadPixelsParams params = {});
+
+struct LoadTextureParams {
+	bool generate_mipmaps = false;
+	bool flip_y = false;
+};
+
+inline Texture *load_texture(Span<pathchar> path, LoadTextureParams params = {}) {
+	auto pixels = load_pixels(path, {.flip_y = params.flip_y});
 	if (!pixels.data) {
 		return 0;
 	}
 	defer { pixels.free(pixels.data); };
-	return _create_texture(CreateTexture_default, pixels.size.x, pixels.size.y, pixels.data, pixels.format, TextureFiltering_linear, Comparison_none);
+	auto filter = TextureFiltering_linear;
+	if (params.generate_mipmaps) {
+		filter = TextureFiltering_linear_mipmap;
+	}
+	auto result = _create_texture(CreateTexture_default, pixels.size.x, pixels.size.y, pixels.data, pixels.format, filter, Comparison_none);
+	if (params.generate_mipmaps) {
+		_generate_mipmaps(result);
+	}
+	return result;
 }
 
 inline Texture *load_texture(CubeTexturePaths paths) {

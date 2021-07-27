@@ -1,26 +1,8 @@
 #pragma once
 #include <t3d.h>
-/*
-enum InputResponseKind {
-	InputResponse_none,
-	InputResponse_begin_drag,
-	InputResponse_end_grab,
-};
+#include "current.h"
 
-struct InputResponse {
-	InputResponseKind kind;
-	struct InputHandler *sender;
-};
-
-struct InputHandler {
-	InputResponse (*_on_input)(void *data, InputEvent event);
-	InputResponse on_input(InputEvent event) {
-		return _on_input(this, event);
-	}
-};
-
-template <class T> InputResponse input_handler_on_input(void *data, InputEvent event) { return ((T *)data)->on_input(event); }
-*/
+v4f background_color = {.12, .12, .12, 1};
 
 enum EditorWindowKind : u16 {
 	EditorWindow_none,
@@ -47,7 +29,9 @@ struct EditorWindow/* : InputHandler */{
 
 	void (*_render)(void *_this);
 	void render() {
-		return _render(this);
+		push_current_viewport(viewport) {
+			return _render(this);
+		};
 	}
 
 	void (*_free)(void *_this);

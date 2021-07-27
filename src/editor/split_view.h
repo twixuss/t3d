@@ -10,6 +10,7 @@ struct SplitView : EditorWindow {
 	f32 clamped_split_t;
 	EditorWindow *part1;
 	EditorWindow *part2;
+	f32 grab_offset;
 
 	v2u get_min_size() {
 		v2u result;
@@ -63,11 +64,12 @@ struct SplitView : EditorWindow {
 	}
 	void render() {
 		line_segment<v2f> bar_line;
+		s32 bar_position;
 		if (horizontal) {
-			s32 bar_position = viewport.y + viewport.h * clamped_split_t;
+			bar_position = viewport.y + viewport.h * clamped_split_t;
 			bar_line = (line_segment<v2f>)line_segment_begin_end(v2s{viewport.x, bar_position}, v2s{viewport.x + (s32)viewport.w, bar_position});
 		} else {
-			s32 bar_position = viewport.x + viewport.w * clamped_split_t;
+			bar_position = viewport.x + viewport.w * clamped_split_t;
 			bar_line = (line_segment<v2f>)line_segment_begin_end(v2s{bar_position, viewport.y}, v2s{bar_position, viewport.y + (s32)viewport.h});
 		}
 		f32 const grab_distance = 4;
@@ -76,6 +78,11 @@ struct SplitView : EditorWindow {
 			if (mouse_down(0, {.anywhere = true})) {
 				is_sizing = true;
 				lock_input();
+				if (horizontal) {
+					grab_offset = bar_position - current_mouse_position.y;
+				} else {
+					grab_offset = bar_position - current_mouse_position.x;
+				}
 			}
 		} else if (!is_sizing) {
 			cursor = Cursor_default;
@@ -95,9 +102,9 @@ struct SplitView : EditorWindow {
 		if (is_sizing) {
 			v2s mouse_position = {::window->mouse_position.x, (s32)::window->client_size.y - ::window->mouse_position.y};
 			if (horizontal) {
-				split_t = map<f32>(mouse_position.y, viewport.y, viewport.y + viewport.h, 0, 1);
+				split_t = map<f32>(mouse_position.y + grab_offset, viewport.y, viewport.y + viewport.h, 0, 1);
 			} else {
-				split_t = map<f32>(mouse_position.x, viewport.x, viewport.x + viewport.w, 0, 1);
+				split_t = map<f32>(mouse_position.x + grab_offset, viewport.x, viewport.x + viewport.w, 0, 1);
 			}
 			resize_children();
 		}

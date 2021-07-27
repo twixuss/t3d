@@ -14,8 +14,7 @@ struct PropertyViewWindow : EditorWindow {
 	}
 	void render() {
 		t3d::set_render_target(t3d::back_buffer);
-		t3d::set_viewport(viewport);
-		blit(V4f(.1));
+		blit(background_color);
 		
 		current_viewport.x += 2;
 		current_viewport.y += 2;
@@ -26,17 +25,17 @@ struct PropertyViewWindow : EditorWindow {
 			
 		push_current_viewport(current_viewport) {
 			if (selected_entity) {
-				header("Name");
-				draw_property(selected_entity->name);
+				draw_property(u8"Name"s,     selected_entity->name);
+				draw_property(u8"Position"s, selected_entity->position);
+				draw_property(u8"Rotation"s, selected_entity->rotation);
+				draw_property(u8"Scale"s,    selected_entity->scale);
+				property_separator();
 
-				header("Position");
-				draw_property(selected_entity->position);
-				
-				header("Rotation");
-				//draw_property(selected_entity->rotation);
-				
-				header("Scale");
-				draw_property(selected_entity->scale);
+				for (auto component : selected_entity->components) {
+					header(component_names[component.type]);
+					component_property_drawers[component.type](component_storages[component.type].get(component.index));
+					property_separator();
+				}
 			}
 		};
 	}

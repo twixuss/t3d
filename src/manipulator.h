@@ -226,7 +226,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 				// TODO: this could be better
 				u32 const point_count = 4 * 24;
 				for (u32 point_index = 0; point_index < point_count; ++point_index) {
-					v3f point = position + -rotation * quaternion_from_axis_angle(global_normals[part_index], point_index * (2 * pi / point_count)) * global_normals[part_index].zxy() * handle_size_scaled_by_distance;
+					v3f point = position + rotation * quaternion_from_axis_angle(global_normals[part_index], point_index * (2 * pi / point_count)) * global_normals[part_index].zxy() * handle_size_scaled_by_distance;
 					
 					// Ignore the back of the circle
 					if (dot(normalize(point - position), normalize(current_camera_entity->position - position)) < -0.1) 
@@ -242,8 +242,6 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 					}
 				}
 			}
-
-			//debug_line(position, closest_intersect_position, {1, 0, 0});
 			
 			if (closest_dist > handle_grab_thickness * current_viewport.h) {
 				closest_element = null_manipulator_part;
@@ -255,6 +253,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 					begin_drag = true;
 					state.dragging_part_index = closest_element;
 					save_transform();
+					lock_input();
 				}
 
 			}
@@ -263,8 +262,10 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
 	
 				if (begin_drag) {
-					state.rotation_axis = -rotation * global_normals[state.dragging_part_index];
+					state.rotation_axis = rotation * global_normals[state.dragging_part_index];
 				}
+			
+				//debug_line(10, position, position + state.rotation_axis, {1, 0, 0});
 
 				v3f intersect_position = closest_intersect_position;
 				
@@ -290,12 +291,12 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 
 				state.accumulated_mouse_delta += window->mouse_delta * v2f{1, -1};
 
-				f32 dist = pi * 2 * dot(
+				f32 dist = pi * -2 * dot(
 					state.start_mouse_position + state.accumulated_mouse_delta - state.tangent.origin,
 					state.tangent.direction
 				) / current_viewport.h;
 
-				manipulated_transform.rotation = state.original_transform.rotation * quaternion_from_axis_angle(state.rotation_axis, dist);
+				manipulated_transform.rotation = quaternion_from_axis_angle(state.rotation_axis, dist) * state.original_transform.rotation;
 			}
 			if (mouse_up(0)) {
 				state.dragging_part_index = null_manipulator_part;
@@ -305,7 +306,8 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 	}
 	
 	if (state.dragging_part_index != null_manipulator_part) {
-		if (mouse_down(1)) {
+		if (mouse_down_no_lock(1, {.anywhere = true})) {
+			unlock_input();
 			manipulated_transform = state.original_transform;
 			state.dragging_part_index = null_manipulator_part;
 		}

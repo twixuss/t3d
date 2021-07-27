@@ -13,19 +13,9 @@ struct HierarchyViewWindow : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		t3d::set_rasterizer({
-			.depth_test = false,
-			.depth_write = false,
-		});
-		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-		t3d::set_topology(t3d::Topology_triangle_list);
-
 		t3d::set_render_target(t3d::back_buffer);
-		t3d::set_shader(blit_color_shader);
-		t3d::set_shader_constants(blit_color_constants, 0);
 
-		t3d::update_shader_constants(blit_color_constants, {.color = V4f(.1)});
-		t3d::draw(3);
+		blit(background_color);
 
 		s32 const button_height = 16;
 		s32 const button_padding = 2;

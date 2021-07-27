@@ -6,6 +6,10 @@
 
 void render_scene(struct SceneViewWindow *);
 
+t3d::Texture *translate_icon;
+t3d::Texture *rotate_icon;
+t3d::Texture *scale_icon;
+
 struct SceneViewWindow : EditorWindow {
 	Entity *camera_entity;
 	Camera *camera;
@@ -84,16 +88,22 @@ struct SceneViewWindow : EditorWindow {
 
 		u32 const button_size = 32;
 
+		if (!translate_icon) {
+			translate_icon = t3d::load_texture(tl_file_string("../data/icons/translate.png"ts), {.generate_mipmaps = true, .flip_y = true});
+			rotate_icon    = t3d::load_texture(tl_file_string("../data/icons/rotate.png"ts)   , {.generate_mipmaps = true, .flip_y = true});
+			scale_icon     = t3d::load_texture(tl_file_string("../data/icons/scale.png"ts)    , {.generate_mipmaps = true, .flip_y = true});
+		}
+
 		auto translate_viewport = current_viewport;
 		translate_viewport.x += 2;
 		translate_viewport.y = current_viewport.y + current_viewport.h - 2 - button_size;
 		translate_viewport.w = button_size;
 		translate_viewport.h = button_size;
-		if (button(translate_viewport, u8"T"s)) manipulator_kind = Manipulate_position;
+		if (button(translate_viewport, translate_icon)) manipulator_kind = Manipulate_position;
 		translate_viewport.x += button_size + 2;
-		if (button(translate_viewport, u8"R"s)) manipulator_kind = Manipulate_rotation;
+		if (button(translate_viewport, rotate_icon)) manipulator_kind = Manipulate_rotation;
 		translate_viewport.x += button_size + 2;
-		if (button(translate_viewport, u8"S"s)) manipulator_kind = Manipulate_scale;
+		if (button(translate_viewport, scale_icon)) manipulator_kind = Manipulate_scale;
 	}
 	void free() {
 		destroy(*camera_entity);

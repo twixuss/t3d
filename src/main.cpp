@@ -1,9 +1,7 @@
+#include "tl.h"
 #include <source_location>
 #include <tl/common.h>
 tl::umm get_hash(struct ManipulatorStateKey const &);
-bool operator==(std::source_location a, std::source_location b) {
-	return a.line() == b.line() && a.column() == b.column() && tl::as_span(a.file_name()) == tl::as_span(b.file_name());
-}
 
 #include "tl.h"
 #include "../dep/tl/include/tl/masked_block_list.h"
@@ -271,7 +269,7 @@ void render_scene(SceneViewWindow *view) {
 	m4 camera_translation_matrix = m4::translation(-camera_entity.position);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_entity.rotation);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-to_euler_angles(camera_entity.rotation));
-	m4 camera_rotation_matrix = (m4)camera_entity.rotation;
+	m4 camera_rotation_matrix = transpose((m4)camera_entity.rotation);
 	camera.world_to_camera_matrix = camera_projection_matrix * camera_rotation_matrix * camera_translation_matrix;
 
 	t3d::update_shader_constants(global_constants, {
@@ -308,7 +306,7 @@ void render_scene(SceneViewWindow *view) {
 		t3d::update_shader_constants(light_constants, {
 			.world_to_light_matrix = light.world_to_light_matrix,
 			.light_position = light_entity.position,
-			.light_intensity = 100,
+			.light_intensity = light.intensity,
 			.light_index = light_index,
 		});
 
@@ -517,7 +515,7 @@ void run() {
 	debug_lines = {};
 
 	float_field_states = {};
-	text_field_states = {};
+	text_field_states  = {};
 
 	input_string = {};
 
@@ -937,16 +935,16 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		auto scene_meshes = parse_glb_from_file(tl_file_string("../data/scene.glb"ts)).get();
 
 		auto &suzanne = create_entity("suzanne");
-		auto &floor = create_entity("floor");
-
-		selected_entity = &suzanne;
+		suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
 		{
 			auto &mr = add_component<MeshRenderer>(suzanne);
 			mr.mesh = create_mesh(*scene_meshes.get_node(u8"Suzanne"s)->mesh);
 			mr.material = &surface_material;
 			mr.lightmap = t3d::load_texture(tl_file_string("../data/suzanne_lightmap.png"ts));
 		}
+		selected_entity = &suzanne;
 
+		auto &floor = create_entity("floor");
 		{
 			auto &mr = add_component<MeshRenderer>(floor);
 			mr.mesh = create_mesh(*scene_meshes.get_node(u8"Room"s)->mesh);
@@ -981,7 +979,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		{
 			auto &light = create_entity("light2");
 			light.position = {6,2,-6};
-			light.rotation = quaternion_from_euler(pi/10,-pi*0.75,0);
+			light.rotation = quaternion_from_euler(-pi/10,pi*0.75,0);
 			add_component<Light>(light).texture = light_texture;
 		}
 
@@ -1079,6 +1077,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			if (state.state & KeyState_repeated) {
 				state.state &= ~KeyState_repeated;
 			}
+			if ((state.state & KeyState_held) && !(state.state & KeyState_drag) && (distance_squared(state.start_position, current_mouse_position) >= pow2(8))) {
+				state.state |= KeyState_drag | KeyState_begin_drag;
+			}
 		}
 		
 		input_string.clear();
@@ -1127,7 +1128,8 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		key_state[256 + button].start_position = input_is_locked ? input_lock_mouse_position : current_mouse_position;
 	};
 	on_mouse_up = [](u8 button){
-		key_state[256 + button].state = KeyState_up;
+		auto &state = key_state[256 + button];
+		state.state = KeyState_up | ((state.state & KeyState_drag) ? KeyState_end_drag : 0);
 	};
 	on_char = [](u32 ch) {
 		input_string.add(encode_utf8(ch));
@@ -1161,16 +1163,45 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	defer { debug_deinit(); };
 	current_allocator = tracking_allocator;
 #endif
-	current_printer = console_printer;
+
+	auto log_file = open_file(tl_file_string("log.txt"ts), File_write);
+	defer { close(log_file); };
+	auto log_printer = Printer {
+		[](PrintKind kind, Span<utf8> string, void *data) {
+			console_printer(kind, string);
+			write({data}, as_bytes(string));
+		},
+		log_file.handle
+	};
+
+	current_printer = log_printer;
+
+	auto cpu_info = get_cpu_info();
+	print(R"(CPU:
+ - Brand: %
+ - Vendor: %
+ - Thread count: %
+ - Cache line size: %
+)", as_span(cpu_info.brand), to_string(cpu_info.vendor), cpu_info.logicalProcessorCount, cpu_info.cacheLineSize);
+	
+	print("Cache:\n");
+
+	for (u32 level = 0; level != CpuCacheLevel_count; ++level) {
+		for (u32 type_index = 0; type_index != CpuCacheType_count; ++type_index) {
+			auto &cache = cpu_info.cache[level][type_index];
+			if (cache.count == 0 || cache.size == 0)
+				continue;
+			print("L% %: % x %\n", level + 1, to_string((CpuCacheType)type_index), cache.count, format_bytes(cache.size));
+		}
+	}
+
+#define f(x) print(" - " #x ": %\n", cpu_info.hasFeature(CpuFeature_##x));
+	tl_all_cpu_features(f)
+#undef f
 
 	run();
 
 #if TRACK_ALLOCATIONS
-	auto file_printer = create_file_printer(tl_file_string("log.txt"ts));
-	defer { close(file_printer.file); };
-
-	current_printer = file_printer;
-
 	current_allocator = temporary_allocator;
 
 	print("Unfreed allocations:\n");

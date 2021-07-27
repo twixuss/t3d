@@ -46,7 +46,7 @@ void free() {
 	current_api = {};
 }
 
-Pixels load_pixels(Span<pathchar> path) {
+Pixels load_pixels(Span<pathchar> path, LoadPixelsParams params) {
 	print(Print_info, "Loading texture %.\n", path);
 
 	Pixels result;
@@ -134,6 +134,9 @@ Pixels load_pixels(Span<pathchar> path) {
 	//
 	//	int x = 1;
 	//
+
+	stbi_set_flip_vertically_on_load(params.flip_y);
+
 	int width, height;
 	if (stbi_is_hdr_from_memory(file.data, file.size)) {
 		result.data = stbi_loadf_from_memory(file.data, file.size, &width, &height, 0, 4);

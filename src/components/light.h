@@ -4,7 +4,8 @@
 
 u32 const shadow_map_resolution = 256;
 
-#define FIELDS(F)
+#define FIELDS(F) \
+F(f32, intensity, 100)
 
 DECLARE_COMPONENT(Light) {
 	t3d::RenderTarget *shadow_map;

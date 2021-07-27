@@ -19,6 +19,7 @@ then go through every `YourComponentType1`, then all of `YourComponentType2`.
 #endif
 
 #include <tl/common.h>
+#include <tl/quaternion.h>
 
 using namespace tl;
 
@@ -93,6 +94,20 @@ ComponentSerializer component_serializers[] = {
 #undef sep
 #undef c
 
+using ComponentPropertyDrawer = void(*)(void *component);
+
+template <class Component>
+void adapt_component_property_drawer(void *component) {
+	((Component *)component)->draw_properties();
+}
+
+#define c(name) adapt_component_property_drawer<name>
+#define sep ,
+ComponentPropertyDrawer component_property_drawers[] = {
+	ENUMERATE_COMPONENTS
+};
+#undef sep
+#undef c
 
 template <class Component>
 inline constexpr u32 get_component_type_index() {
@@ -268,6 +283,12 @@ void free_component_storages() {
 
 #include "components/serialize.h"
 
+// TODO: this should not be here... fucking c++
+void draw_property(Span<utf8> name, f32 &value, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, v3f &value, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, quaternion &value, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, List<utf8> &value, std::source_location location = std::source_location::current());
+
 template <class Derived>
 struct SerializableComponent : Component {};
 
@@ -277,6 +298,9 @@ struct SerializableComponent<name> : Component { \
 	FIELDS(DECLARE_FIELD) \
 	void serialize(StringBuilder &builder) { \
 		FIELDS(APPEND_FIELD) \
+	}  \
+	void draw_properties() { \
+		FIELDS(DRAW_FIELD) \
 	}  \
 };  \
 struct name : SerializableComponent<name>

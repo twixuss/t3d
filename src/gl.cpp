@@ -129,10 +129,20 @@ u32 get_index_type_from_size(u32 size) {
 	return 0;
 }
 
-GLuint get_filter(TextureFiltering filter) {
+GLuint get_min_filter(TextureFiltering filter) {
 	switch (filter) {
-		case TextureFiltering_nearest: return GL_NEAREST;
-		case TextureFiltering_linear:  return GL_LINEAR;
+		case TextureFiltering_nearest:        return GL_NEAREST;
+		case TextureFiltering_linear:         return GL_LINEAR;
+		case TextureFiltering_linear_mipmap:  return GL_LINEAR_MIPMAP_LINEAR;
+	}
+	invalid_code_path();
+	return 0;
+}
+GLuint get_mag_filter(TextureFiltering filter) {
+	switch (filter) {
+		case TextureFiltering_nearest:        return GL_NEAREST;
+		case TextureFiltering_linear:         return GL_LINEAR;
+		case TextureFiltering_linear_mipmap:  return GL_LINEAR;
 	}
 	invalid_code_path();
 	return 0;
@@ -257,9 +267,8 @@ GLuint get_sampler(TextureFiltering filtering, Comparison comparison) {
 			glSamplerParameteri(result, GL_TEXTURE_COMPARE_FUNC, func);
 		}
 
-		auto filter = get_filter(filtering);
-		glSamplerParameteri(result, GL_TEXTURE_MIN_FILTER, filter);
-		glSamplerParameteri(result, GL_TEXTURE_MAG_FILTER, filter);
+		glSamplerParameteri(result, GL_TEXTURE_MIN_FILTER, get_min_filter(filtering));
+		glSamplerParameteri(result, GL_TEXTURE_MAG_FILTER, get_mag_filter(filtering));
 		glSamplerParameteri(result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		glSamplerParameteri(result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	}
@@ -655,6 +664,17 @@ bool init(InitInfo init_info) {
 		glBindTexture(texture.target, texture.texture);
 		glTexImage2D(texture.target, 0, texture.internal_format, width, height, 0, texture.format, texture.type, data);
 		glBindTexture(texture.target, 0);
+	};
+	_generate_mipmaps = [](Texture *_texture) {
+		assert(_texture);
+		auto &texture = *(TextureImpl *)_texture;
+		glBindTexture(GL_TEXTURE_2D, texture.texture);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glGenerateMipmap(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, 0);
 	};
 	return true;
 }
