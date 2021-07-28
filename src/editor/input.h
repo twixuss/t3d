@@ -15,6 +15,7 @@ enum : KeyState {
 	KeyState_drag       = 0x10,
 	KeyState_begin_drag = 0x20,
 	KeyState_end_drag   = 0x40,
+	KeyState_clicked    = 0x40,
 };
 
 struct KeyInputState {
@@ -28,6 +29,7 @@ struct InputQueryParams {
 	bool anywhere = false;
 };
 
+void *input_locker;
 bool input_is_locked;
 v2s input_lock_mouse_position;
 
@@ -40,24 +42,32 @@ bool key_held  (u8 key, InputQueryParams params = {}) { return (key_state[key].s
 
 bool mouse_down_no_lock       (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_down      ) && (params.anywhere || in_bounds(key_state[256 + button].start_position, current_viewport.aabb())); }
 bool mouse_up_no_lock         (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_up        ) && (params.anywhere || in_bounds(key_state[256 + button].start_position, current_viewport.aabb())); }
-bool mouse_click_no_lock      (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_up        ) && (params.anywhere || (in_bounds(current_mouse_position, current_viewport.aabb()) && in_bounds(key_state[256 + button].start_position, current_viewport.aabb()))); }
+bool mouse_click_no_lock      (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_up && !(key_state[256 + button].state & KeyState_clicked)) && (params.anywhere || (in_bounds(current_mouse_position, current_viewport.aabb()) && in_bounds(key_state[256 + button].start_position, current_viewport.aabb()))); }
 bool mouse_held_no_lock       (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_held      ) && (params.anywhere || in_bounds(key_state[256 + button].start_position, current_viewport.aabb())); }
 bool mouse_drag_no_lock       (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_drag      ) && (params.anywhere || in_bounds(key_state[256 + button].start_position, current_viewport.aabb())); }
 bool mouse_begin_drag_no_lock (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_begin_drag) && (params.anywhere || in_bounds(key_state[256 + button].start_position, current_viewport.aabb())); }
 bool mouse_end_drag_no_lock   (u8 button, InputQueryParams params = {}) { return (key_state[256 + button].state & KeyState_end_drag  ) && (params.anywhere || in_bounds(key_state[256 + button].start_position, current_viewport.aabb())); }
 
-bool mouse_down      (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_down_no_lock      (button, params); }
-bool mouse_up        (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_up_no_lock        (button, params); }
-bool mouse_click     (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_click_no_lock     (button, params); }
+bool mouse_down      (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_down_no_lock(button, params); }
+bool mouse_up        (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_up_no_lock  (button, params); }
+bool mouse_click     (u8 button, InputQueryParams params = {}) {
+	bool result = !input_is_locked && mouse_click_no_lock(button, params);
+	if (result) {
+		key_state[256 + button].state |= KeyState_clicked;
+	}
+	return result;
+}
 bool mouse_held      (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_held_no_lock      (button, params); }
 bool mouse_drag      (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_drag_no_lock      (button, params); }
 bool mouse_begin_drag(u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_begin_drag_no_lock(button, params); }
 bool mouse_end_drag  (u8 button, InputQueryParams params = {}) { return !input_is_locked && mouse_end_drag_no_lock  (button, params); }
 
-void lock_input(v2s position = current_mouse_position) {
+void lock_input(void *input_locker, v2s position = current_mouse_position) {
 	input_is_locked = true;
 	input_lock_mouse_position = position;
+	::input_locker = input_locker;
 }
 void unlock_input() {
 	input_is_locked = false;
+	input_locker = 0;
 }

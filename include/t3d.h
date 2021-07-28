@@ -42,11 +42,6 @@ struct ShaderValueLocation {
 	umm size;
 };
 
-struct Mesh {
-	void *vertices;
-	void *indices;
-};
-
 struct CameraMatrices {
 	m4 mvp;
 };

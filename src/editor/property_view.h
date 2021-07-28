@@ -33,7 +33,7 @@ struct PropertyViewWindow : EditorWindow {
 
 				for (auto component : selected_entity->components) {
 					header(component_names[component.type]);
-					component_property_drawers[component.type](component_storages[component.type].get(component.index));
+					component_functions[component.type].draw_properties(component_storages[component.type].get(component.index));
 					property_separator();
 				}
 			}

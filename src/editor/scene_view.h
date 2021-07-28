@@ -45,7 +45,7 @@ struct SceneViewWindow : EditorWindow {
 		
 		if (mouse_down(1)) {
 			flying = true;
-			lock_input();
+			lock_input(this);
 		}
 		if (mouse_up_no_lock(1)) {
 			flying = false;

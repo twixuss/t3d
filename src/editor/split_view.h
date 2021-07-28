@@ -77,7 +77,7 @@ struct SplitView : EditorWindow {
 		if (distance((v2f)current_mouse_position, bar_line) <= grab_distance) {
 			if (mouse_down(0, {.anywhere = true})) {
 				is_sizing = true;
-				lock_input();
+				lock_input(this);
 				if (horizontal) {
 					grab_offset = bar_position - current_mouse_position.y;
 				} else {

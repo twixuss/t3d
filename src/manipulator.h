@@ -253,7 +253,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 					begin_drag = true;
 					state.dragging_part_index = closest_element;
 					save_transform();
-					lock_input();
+					lock_input(&state);
 				}
 
 			}

@@ -2,14 +2,15 @@
 #include "material.h"
 #include "component.h"
 #include "mesh.h"
-#include "basic_textures.h"
+#include "texture.h"
 
-#define FIELDS(F)
+#define FIELDS(f) \
+f(Mesh *, mesh, 0) \
+f(Texture *, lightmap, 0) \
+//f(Material *, material, 0) \
 
 DECLARE_COMPONENT(MeshRenderer) {
-	Mesh *mesh;
-	Material *material;
-	t3d::Texture *lightmap;
+	Material *material = 0;
 
 	void free() {
 
@@ -18,5 +19,5 @@ DECLARE_COMPONENT(MeshRenderer) {
 
 template <>
 void on_create(MeshRenderer &mesh_renderer) {
-	mesh_renderer.lightmap = black_texture;
+	if (!mesh_renderer.lightmap) mesh_renderer.lightmap = black_texture;
 }

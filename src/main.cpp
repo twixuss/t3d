@@ -312,13 +312,18 @@ void render_scene(SceneViewWindow *view) {
 
 
 		t3d::set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
-		t3d::set_texture(light.texture, LIGHT_TEXTURE_SLOT);
+		t3d::set_texture(light.mask->texture, LIGHT_TEXTURE_SLOT);
 		for_each_component_of_type(MeshRenderer, mesh_renderer) {
 			timed_block("MeshRenderer"s);
 			auto &mesh_entity = entities[mesh_renderer.entity_index];
 
-			t3d::set_shader(mesh_renderer.material->shader);
-			t3d::set_shader_constants(mesh_renderer.material->constants, 0);
+			auto material = mesh_renderer.material;
+			if (!material) {
+				material = &surface_material;
+			}
+
+			t3d::set_shader(material->shader);
+			t3d::set_shader_constants(material->constants, 0);
 
 
 			//entity_data.local_to_camera_matrix = camera.world_to_camera_matrix * m4::translation(mesh_entity.position) * m4::rotation_r_zxy(mesh_entity.rotation);
@@ -328,7 +333,7 @@ void render_scene(SceneViewWindow *view) {
 				.local_to_world_position_matrix = local_to_world,
 				.local_to_world_normal_matrix = (m4)mesh_entity.rotation * m4::scale(1 / mesh_entity.scale),
 			});
-			t3d::set_texture(mesh_renderer.lightmap, LIGHTMAP_TEXTURE_SLOT);
+			t3d::set_texture(mesh_renderer.lightmap->texture, LIGHTMAP_TEXTURE_SLOT);
 			draw_mesh(mesh_renderer.mesh);
 		};
 		t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
@@ -388,128 +393,132 @@ void render_scene(SceneViewWindow *view) {
 	});
 	t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_source_alpha, t3d::Blend_one_minus_source_alpha);
 
-	auto new_transform = manipulate_transform(selected_entity->position, selected_entity->rotation, selected_entity->scale, view->manipulator_kind);
-	selected_entity->position = new_transform.position;
-	selected_entity->rotation = new_transform.rotation;
-	selected_entity->scale    = new_transform.scale;
+	if (selected_entity) {
+		auto new_transform = manipulate_transform(selected_entity->position, selected_entity->rotation, selected_entity->scale, view->manipulator_kind);
+		selected_entity->position = new_transform.position;
+		selected_entity->rotation = new_transform.rotation;
+		selected_entity->scale    = new_transform.scale;
 
-	for (auto &request : manipulator_draw_requests) {
-		v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
-		t3d::update_shader_constants(entity_constants, {
-			.local_to_camera_matrix = 
-				camera.world_to_camera_matrix
-				* m4::translation(camera_entity.position + camera_to_handle_direction)
-				* (m4)request.rotation
-				* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1})),
-			.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
-			.object_rotation_matrix = (m4)request.rotation,
-		});
-		t3d::set_shader(handle_shader);
-		t3d::set_shader_constants(handle_constants, 0);
+		for (auto &request : manipulator_draw_requests) {
+			v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
+			t3d::update_shader_constants(entity_constants, {
+				.local_to_camera_matrix = 
+					camera.world_to_camera_matrix
+					* m4::translation(camera_entity.position + camera_to_handle_direction)
+					* (m4)request.rotation
+					* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1})),
+				.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
+				.object_rotation_matrix = (m4)request.rotation,
+			});
+			t3d::set_shader(handle_shader);
+			t3d::set_shader_constants(handle_constants, 0);
 		
-		u32 selected_element = request.highlighted_part_index;
+			u32 selected_element = request.highlighted_part_index;
 
-		v3f to_camera = normalize(camera_entity.position - selected_entity->position);
-		switch (request.kind) {
-			case Manipulate_position: {
-				t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
-				draw_mesh(handle_sphere_mesh);
+			v3f to_camera = normalize(camera_entity.position - selected_entity->position);
+			switch (request.kind) {
+				case Manipulate_position: {
+					t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					draw_mesh(handle_sphere_mesh);
 		
-				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
-				draw_mesh(handle_axis_x_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					draw_mesh(handle_axis_x_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
-				draw_mesh(handle_axis_y_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					draw_mesh(handle_axis_y_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
-				draw_mesh(handle_axis_z_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					draw_mesh(handle_axis_z_mesh);
 				
-				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
-				draw_mesh(handle_arrow_x_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					draw_mesh(handle_arrow_x_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
-				draw_mesh(handle_arrow_y_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					draw_mesh(handle_arrow_y_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
-				draw_mesh(handle_arrow_z_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					draw_mesh(handle_arrow_z_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
-				draw_mesh(handle_plane_x_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					draw_mesh(handle_plane_x_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
-				draw_mesh(handle_plane_y_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					draw_mesh(handle_plane_y_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
-				draw_mesh(handle_plane_z_mesh);
-				break;
-			}
-			case Manipulate_rotation: {
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
-				draw_mesh(handle_circle_mesh);
-
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
-				draw_mesh(handle_circle_mesh);
-
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
-				draw_mesh(handle_circle_mesh);
-				
-				if (request.dragging) {
-					quaternion rotation = quaternion_look(request.tangent.direction);
-					v3f position = request.tangent.origin;
-					t3d::update_shader_constants(entity_constants, {
-						.local_to_camera_matrix = 
-							camera.world_to_camera_matrix
-							* m4::translation(camera_entity.position + camera_to_handle_direction)
-							* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1})) * m4::translation(position) * (m4)rotation,
-						.local_to_world_normal_matrix = local_to_world_normal(rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
-						.object_rotation_matrix = (m4)rotation,
-					});
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
-					draw_mesh(handle_tangent_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					draw_mesh(handle_plane_z_mesh);
+					break;
 				}
+				case Manipulate_rotation: {
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
+					draw_mesh(handle_circle_mesh);
 
-				break;
-			}
-			case Manipulate_scale: {
-				t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
-				draw_mesh(handle_sphere_mesh);
-		
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
-				draw_mesh(handle_axis_x_mesh);
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
+					draw_mesh(handle_circle_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
-				draw_mesh(handle_axis_y_mesh);
-
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
-				draw_mesh(handle_axis_z_mesh);
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
+					draw_mesh(handle_circle_mesh);
 				
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
-				draw_mesh(handle_sphere_mesh);
+					if (request.dragging) {
+						quaternion rotation = quaternion_look(request.tangent.direction);
+						v3f position = request.tangent.origin;
+						t3d::update_shader_constants(entity_constants, {
+							.local_to_camera_matrix = 
+								camera.world_to_camera_matrix
+								* m4::translation(camera_entity.position + camera_to_handle_direction)
+								* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1})) * m4::translation(position) * (m4)rotation,
+							.local_to_world_normal_matrix = local_to_world_normal(rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
+							.object_rotation_matrix = (m4)rotation,
+						});
+						t3d::update_shader_constants(handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
+						draw_mesh(handle_tangent_mesh);
+					}
 
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
-				draw_mesh(handle_sphere_mesh);
+					break;
+				}
+				case Manipulate_scale: {
+					t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					draw_mesh(handle_sphere_mesh);
+		
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					draw_mesh(handle_axis_x_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
-				draw_mesh(handle_sphere_mesh);
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					draw_mesh(handle_axis_y_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
-				draw_mesh(handle_plane_x_mesh);
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					draw_mesh(handle_axis_z_mesh);
+				
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					draw_mesh(handle_sphere_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
-				draw_mesh(handle_plane_y_mesh);
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					draw_mesh(handle_sphere_mesh);
 
-				t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
-				draw_mesh(handle_plane_z_mesh);
-				break;
+					t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					draw_mesh(handle_sphere_mesh);
+
+					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					draw_mesh(handle_plane_x_mesh);
+
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					draw_mesh(handle_plane_y_mesh);
+
+					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					draw_mesh(handle_plane_z_mesh);
+					break;
+				}
 			}
 		}
+		manipulator_draw_requests.clear();
 	}
-	manipulator_draw_requests.clear();
 	
 	debug_draw_lines();
 }
 
 void run() {
+	construct(entities);
+
 	manipulator_draw_requests = {};
 	manipulator_states = {};
 	debug_lines = {};
@@ -518,6 +527,15 @@ void run() {
 	text_field_states  = {};
 
 	input_string = {};
+	
+	construct(textures);
+	textures_by_path = {};
+	
+	construct(meshes);
+	meshes_by_name = {};
+
+	construct(scenes3d);
+	scenes3d_by_name = {};
 
 	init_component_storages<
 #define c(name) name
@@ -927,70 +945,80 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}
 
 		u32 white_pixel = ~0;
-		white_texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &white_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+		white_texture = &textures.add();
+		white_texture->texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &white_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+		white_texture->name = as_list(u8"white"s);
 
 		u32 black_pixel = 0xFF000000;
-		black_texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &black_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
-
-		auto scene_meshes = parse_glb_from_file(tl_file_string("../data/scene.glb"ts)).get();
-
-		auto &suzanne = create_entity("suzanne");
-		suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
-		{
-			auto &mr = add_component<MeshRenderer>(suzanne);
-			mr.mesh = create_mesh(*scene_meshes.get_node(u8"Suzanne"s)->mesh);
-			mr.material = &surface_material;
-			mr.lightmap = t3d::load_texture(tl_file_string("../data/suzanne_lightmap.png"ts));
-		}
-		selected_entity = &suzanne;
-
-		auto &floor = create_entity("floor");
-		{
-			auto &mr = add_component<MeshRenderer>(floor);
-			mr.mesh = create_mesh(*scene_meshes.get_node(u8"Room"s)->mesh);
-			mr.material = &surface_material;
-			mr.lightmap = t3d::load_texture(tl_file_string("../data/floor_lightmap.png"ts));
-		}
-
-		auto handle_meshes = parse_glb_from_file(tl_file_string("../data/handle.glb"ts)).get();
-		handle_sphere_mesh  = create_mesh(*handle_meshes.get_node(u8"Sphere"s)->mesh);
-		handle_circle_mesh  = create_mesh(*handle_meshes.get_node(u8"Circle"s)->mesh);
-		handle_tangent_mesh = create_mesh(*handle_meshes.get_node(u8"Tangent"s)->mesh);
-		handle_axis_x_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisX"s )->mesh);
-		handle_axis_y_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisY"s )->mesh);
-		handle_axis_z_mesh  = create_mesh(*handle_meshes.get_node(u8"AxisZ"s )->mesh);
-		handle_arrow_x_mesh = create_mesh(*handle_meshes.get_node(u8"ArrowX"s )->mesh);
-		handle_arrow_y_mesh = create_mesh(*handle_meshes.get_node(u8"ArrowY"s )->mesh);
-		handle_arrow_z_mesh = create_mesh(*handle_meshes.get_node(u8"ArrowZ"s )->mesh);
-		handle_plane_x_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneX"s)->mesh);
-		handle_plane_y_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneY"s)->mesh);
-		handle_plane_z_mesh = create_mesh(*handle_meshes.get_node(u8"PlaneZ"s)->mesh);
-
-		auto light_texture = t3d::load_texture(tl_file_string("../data/spotlight_mask.png"ts));
-
-		{
-			auto &light = create_entity("light1");
-			light.position = {0,2,6};
-			//light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
-			light.rotation = quaternion_from_euler(0,0,0);
-			add_component<Light>(light).texture = light_texture;
-		}
-
-		{
-			auto &light = create_entity("light2");
-			light.position = {6,2,-6};
-			light.rotation = quaternion_from_euler(-pi/10,pi*0.75,0);
-			add_component<Light>(light).texture = light_texture;
-		}
-
+		black_texture = &textures.add();
+		black_texture->texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &black_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+		black_texture->name = as_list(u8"black"s);
+		
+		auto handle_meshes = parse_glb_from_file(u8"../data/handle.glb"s).get();
+		handle_sphere_mesh  = get_submesh(handle_meshes, u8"Sphere"s);
+		handle_circle_mesh  = get_submesh(handle_meshes, u8"Circle"s);
+		handle_tangent_mesh = get_submesh(handle_meshes, u8"Tangent"s);
+		handle_axis_x_mesh  = get_submesh(handle_meshes, u8"AxisX"s );
+		handle_axis_y_mesh  = get_submesh(handle_meshes, u8"AxisY"s );
+		handle_axis_z_mesh  = get_submesh(handle_meshes, u8"AxisZ"s );
+		handle_arrow_x_mesh = get_submesh(handle_meshes, u8"ArrowX"s );
+		handle_arrow_y_mesh = get_submesh(handle_meshes, u8"ArrowY"s );
+		handle_arrow_z_mesh = get_submesh(handle_meshes, u8"ArrowZ"s );
+		handle_plane_x_mesh = get_submesh(handle_meshes, u8"PlaneX"s);
+		handle_plane_y_mesh = get_submesh(handle_meshes, u8"PlaneY"s);
+		handle_plane_z_mesh = get_submesh(handle_meshes, u8"PlaneZ"s);
+		
 		sky_box_texture = t3d::load_texture({
-			.left   = tl_file_string("../data/sky_x+.hdr"ts),
-			.right  = tl_file_string("../data/sky_x-.hdr"ts),
-			.top    = tl_file_string("../data/sky_y+.hdr"ts),
-			.bottom = tl_file_string("../data/sky_y-.hdr"ts),
-			.front  = tl_file_string("../data/sky_z-.hdr"ts),
-			.back   = tl_file_string("../data/sky_z+.hdr"ts),
+			.left   = tl_file_string("../data/sky_x+.hdr"s),
+			.right  = tl_file_string("../data/sky_x-.hdr"s),
+			.top    = tl_file_string("../data/sky_y+.hdr"s),
+			.bottom = tl_file_string("../data/sky_y-.hdr"s),
+			.front  = tl_file_string("../data/sky_z-.hdr"s),
+			.back   = tl_file_string("../data/sky_z+.hdr"s),
 		});
+
+		auto create_default_scene = [&]() {
+			auto scene_meshes = parse_glb_from_file(u8"../data/scene.glb"s).get();
+
+			auto &suzanne = create_entity("suzan\"ne");
+			suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
+			{
+				auto &mr = add_component<MeshRenderer>(suzanne);
+				mr.mesh = get_submesh(scene_meshes, u8"Suzanne"s);
+				mr.material = &surface_material;
+				mr.lightmap = load_texture(tl_file_string("../data/suzanne_lightmap.png"s));
+			}
+			selected_entity = &suzanne;
+
+			auto &floor = create_entity("floor");
+			{
+				auto &mr = add_component<MeshRenderer>(floor);
+				mr.mesh = get_submesh(scene_meshes, u8"Room"s);
+				mr.material = &surface_material;
+				mr.lightmap = load_texture(tl_file_string("../data/floor_lightmap.png"s));
+			}
+			
+			auto light_texture = load_texture(tl_file_string("../data/spotlight_mask.png"s));
+
+			{
+				auto &light = create_entity("light1");
+				light.position = {0,2,6};
+				//light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
+				light.rotation = quaternion_from_euler(0,0,0);
+				add_component<Light>(light).mask = light_texture;
+			}
+
+			{
+				auto &light = create_entity("light2");
+				light.position = {6,2,-6};
+				light.rotation = quaternion_from_euler(-pi/10,pi*0.75,0);
+				add_component<Light>(light).mask = light_texture;
+			}
+
+		};
+
+		if (!deserialize_scene((Span<utf8>)with(temporary_allocator, read_entire_file(tl_file_string("test.scene"s)))))
+			create_default_scene();
 	};
 	info.on_draw = [](Window &window) {
 		current_cursor = Cursor_default;
@@ -1018,9 +1046,19 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		defer {
 			if (Profiler::enabled) {
 				Profiler::enabled = false;
-				write_entire_file(tl_file_string("update.tmd"ts), Profiler::output_for_timed());
+				write_entire_file(tl_file_string("update.tmd"s), Profiler::output_for_timed());
 			}
 		};
+
+		if (key_down(Key_f2, {.anywhere = true})) {
+			for_each(entities, [](Entity &e) {
+				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).value, e.flags, e.position, degrees(to_euler_angles(e.rotation)));
+				for (auto &c : e.components) {
+					print("\tparent: %, type: %, index: %\n", c.entity_index, c.type, c.index);
+				}
+			});
+		}
+
 
 		timed_block("frame"s);
 
@@ -1051,6 +1089,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 				for_each_component_of_type(MeshRenderer, mesh_renderer) {
 					auto &mesh_entity = entities[mesh_renderer.entity_index];
+
+					if (key_down(Key_f3)) {
+						auto &e = mesh_entity;
+						print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).value, e.flags, e.position, degrees(to_euler_angles(e.rotation)));
+					}
+
 					t3d::update_shader_constants(entity_constants, {
 						.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
 					});
@@ -1143,7 +1187,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	while (update(window)) {
 	}
 
-	write_entire_file(tl_file_string("test.scene"ts), serialize_scene());
+	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene())));
 
 	for_each(entities, [](Entity &e) {
 		destroy(e);
@@ -1164,7 +1208,7 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	current_allocator = tracking_allocator;
 #endif
 
-	auto log_file = open_file(tl_file_string("log.txt"ts), File_write);
+	auto log_file = open_file(tl_file_string("log.txt"s), File_write);
 	defer { close(log_file); };
 	auto log_printer = Printer {
 		[](PrintKind kind, Span<utf8> string, void *data) {
@@ -1198,6 +1242,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 #define f(x) print(" - " #x ": %\n", cpu_info.hasFeature(CpuFeature_##x));
 	tl_all_cpu_features(f)
 #undef f
+
+	print("RAM: %\n", format_bytes(get_ram_size()));
 
 	run();
 

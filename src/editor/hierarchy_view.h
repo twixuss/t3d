@@ -44,6 +44,10 @@ struct HierarchyViewWindow : EditorWindow {
 
 			next_pos.y -= button_height + button_padding;
 		});
+
+		if (mouse_click(0)) {
+			selected_entity = 0;
+		}
 	}
 };
 

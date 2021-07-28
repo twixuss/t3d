@@ -37,7 +37,7 @@ union ComponentIndex {
 struct Entity;
 
 struct Component {
-	u32 entity_index;
+	u32 entity_index = -1;
 	Entity &entity() const;
 };
 
@@ -79,31 +79,62 @@ Span<utf8> component_names[] {
 #undef c
 
 
-using ComponentSerializer = void(*)(StringBuilder &builder, void *component);
+using TokenKind = u16;
+enum : TokenKind {
+	Token_identifier = 0x100,
+	Token_number,
+	Token_null,
+	Token_entity,
+};
+
+struct Token {
+	TokenKind kind = {};
+	Span<utf8> string;
+};
+
+
+template <class Component, class ...Args, class = EnableIf<std::is_base_of_v<::Component, Component>>>
+void on_create(Component &component, Args const &...args) {
+}
+
+using ComponentSerialize = void(*)(StringBuilder &builder, void *component);
+using ComponentDeserialize = bool(*)(Token *&from, Token *end, void *component);
+using ComponentDrawProperties = void(*)(void *component);
+using ComponentOnCreate = void(*)(void *component);
+
+struct ComponentFunctions {
+	ComponentSerialize serialize;
+	ComponentDeserialize deserialize;
+	ComponentDrawProperties draw_properties;
+	ComponentOnCreate on_create;
+};
 
 template <class Component>
 void adapt_component_serializer(StringBuilder &builder, void *component) {
-	((Component *)component)->serialize(builder);
+	return ((Component *)component)->serialize(builder);
 }
-
-#define c(name) adapt_component_serializer<name>
-#define sep ,
-ComponentSerializer component_serializers[] = {
-	ENUMERATE_COMPONENTS
-};
-#undef sep
-#undef c
-
-using ComponentPropertyDrawer = void(*)(void *component);
-
+template <class Component>
+bool adapt_component_deserializer(Token *&from, Token *end, void *component) {
+	return ((Component *)component)->deserialize(from, end);
+}
 template <class Component>
 void adapt_component_property_drawer(void *component) {
-	((Component *)component)->draw_properties();
+	return ((Component *)component)->draw_properties();
+}
+template <class Component>
+void adapt_component_on_create(void *component) {
+	return on_create<Component>(*(Component *)component);
 }
 
-#define c(name) adapt_component_property_drawer<name>
+
+#define c(name) { \
+	adapt_component_serializer<name>, \
+	adapt_component_deserializer<name>, \
+	adapt_component_property_drawer<name>, \
+	adapt_component_on_create<name>, \
+}
 #define sep ,
-ComponentPropertyDrawer component_property_drawers[] = {
+ComponentFunctions component_functions[] = {
 	ENUMERATE_COMPONENTS
 };
 #undef sep
@@ -115,11 +146,6 @@ inline constexpr u32 get_component_type_index() {
 	static_assert(index != component_type_count, "attempt to get a unregistered component type");
 	return index;
 }
-
-template <class Component, class ...Args, class = EnableIf<std::is_base_of_v<::Component, Component>>>
-void on_create(Component &component, Args const &...args) {
-}
-
 
 struct ComponentStorage {
 	using Mask = umm;
@@ -281,26 +307,68 @@ void free_component_storages() {
 #define for_each_component_of_type(type, name) ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
 #define for_all_components() ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
 
-#include "components/serialize.h"
+struct Texture;
+struct Mesh;
+struct Material;
 
 // TODO: this should not be here... fucking c++
 void draw_property(Span<utf8> name, f32 &value, std::source_location location = std::source_location::current());
 void draw_property(Span<utf8> name, v3f &value, std::source_location location = std::source_location::current());
 void draw_property(Span<utf8> name, quaternion &value, std::source_location location = std::source_location::current());
 void draw_property(Span<utf8> name, List<utf8> &value, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, Texture *&value, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, Mesh *&value, std::source_location location = std::source_location::current());
+
+void serialize(StringBuilder &builder, f32 value);
+void serialize(StringBuilder &builder, Mesh *value);
+void serialize(StringBuilder &builder, Material *value);
+void serialize(StringBuilder &builder, Texture *value);
+
+bool deserialize(f32 &value, Token *&from, Token *end);
+bool deserialize(Mesh *&value, Token *&from, Token *end);
+bool deserialize(Material *&value, Token *&from, Token *end);
+bool deserialize(Texture *&value, Token *&from, Token *end);
 
 template <class Derived>
-struct SerializableComponent : Component {};
+struct ComponentBase : Component {};
+
+#define DECLARE_FIELD(type, name, default) type name = default;
+
+#define SERIALIZE_FIELD(type, name, default) \
+append(builder, "\t\t" #name " "); \
+::serialize(builder, name); \
+append(builder, "\n"); \
+
+#define DESERIALIZE_FIELD(type, name, default) \
+else if (from->string == u8#name##s) { \
+	from += 1; \
+	if (from == end) { \
+		print(Print_error, "Unexpected end of file while parsing property '" #name "'\n"); \
+		return false; \
+	} \
+	if (!::deserialize(name, from, end)) return false; \
+}
+
+#define DRAW_FIELD(type, name, default) \
+draw_property(u8#name##s, name); \
 
 #define DECLARE_COMPONENT(name) \
 template <> \
-struct SerializableComponent<name> : Component { \
+struct ComponentBase<name> : Component { \
 	FIELDS(DECLARE_FIELD) \
 	void serialize(StringBuilder &builder) { \
-		FIELDS(APPEND_FIELD) \
+		FIELDS(SERIALIZE_FIELD) \
+	}  \
+	bool deserialize(Token *&from, Token *end) { \
+		while (from->kind != '}') { \
+			if (false) {} \
+			FIELDS(DESERIALIZE_FIELD) \
+		} \
+		from += 1; \
+		return true; \
 	}  \
 	void draw_properties() { \
 		FIELDS(DRAW_FIELD) \
 	}  \
 };  \
-struct name : SerializableComponent<name>
+struct name : ComponentBase<name>

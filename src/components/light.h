@@ -1,15 +1,17 @@
 #pragma once
 #include "../include/t3d.h"
 #include "component.h"
+#include "texture.h"
 
 u32 const shadow_map_resolution = 256;
 
 #define FIELDS(F) \
-F(f32, intensity, 100)
+F(f32, intensity, 100) \
+F(Texture *, mask, 0)
 
 DECLARE_COMPONENT(Light) {
 	t3d::RenderTarget *shadow_map;
-	t3d::Texture *texture;
+	
 	m4 world_to_light_matrix;
 
 	void free() {

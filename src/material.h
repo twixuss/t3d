@@ -5,3 +5,5 @@ struct Material {
 	t3d::Shader *shader;
 	t3d::ShaderConstants *constants;
 };
+
+MaskedBlockList<Material, 256> materials;

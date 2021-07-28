@@ -1,33 +1,36 @@
-scene_camera_23EF9ED7948 {
-	position 5.487 2.05 4.953
-	rotation -0.058 0.239 0.014 0.969
-	Camera {
-		fov 1.57
-	}
-}
-suzanne {
-	position -6.456 2.026 -6.456
-	rotation 0.24 0.369 -0.099 0.891
+entity "suzan\"ne" {
+	position 2.283 0.68 -3.065
+	rotation -38.334 -50.124 32.587
+	scale 1 1 1
 	MeshRenderer {
+		mesh "../data/scene.glb:Suzanne"
+		lightmap "../data/suzanne_lightmap.png"
 	}
 }
-floor {
+entity "floor" {
 	position 0 0 0
-	rotation 0 0 0 1
+	rotation -0 0 0
+	scale 1 1 1
 	MeshRenderer {
+		mesh "../data/scene.glb:Room"
+		lightmap "../data/floor_lightmap.png"
 	}
 }
-light1 {
-	position 0 2 6
-	rotation -0.272 0 0 0.962
-	Light {
-		intensity -164.675
-	}
-}
-light2 {
-	position 6 2 -6
-	rotation -0.059 0.912 0.144 0.377
+entity "light1" {
+	position 1.258 1.215 4.519
+	rotation -26.543 -4.315 -0
+	scale 1 1 1
 	Light {
 		intensity 100
+		mask "../data/spotlight_mask.png"
+	}
+}
+entity "light2" {
+	position 6 2 -6
+	rotation -18 135 0
+	scale 1 1 1
+	Light {
+		intensity 1000
+		mask "../data/spotlight_mask.png"
 	}
 }

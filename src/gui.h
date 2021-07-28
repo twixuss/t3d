@@ -256,18 +256,23 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 		}
 	} else {
 		if (mouse_begin_drag(0)) {
-			lock_input(key_state[256 + 0].start_position);
+			lock_input(&state, key_state[256 + 0].start_position);
+			print("begin drag\n");
 		}
-		if (mouse_drag_no_lock(0)) {
-			value += window->mouse_delta.x * (key_held(Key_shift) ? 0.01f : 0.1f);
-			value_changed = true;
-		}
-		if (mouse_end_drag_no_lock(0)) {
-			unlock_input();
+		if (input_locker == &state) {
+			if (mouse_drag_no_lock(0)) {
+				value += window->mouse_delta.x * (key_held(Key_shift) ? 0.01f : 0.1f);
+				value_changed = true;
+				print("drag\n");
+			}
+			if (mouse_end_drag_no_lock(0)) {
+				unlock_input();
+				print("end drag\n");
+			}
 		}
 	}
 	if (mouse_click(0)) {
-		lock_input();
+		lock_input(&state);
 		
 		apply_input = false;
 		stop_edit = false;
@@ -541,7 +546,7 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 		}
 	}
 	if (mouse_click(0)) {
-		lock_input();
+		lock_input(&state);
 		
 		apply_input = false;
 		stop_edit = false;
@@ -832,25 +837,9 @@ void draw_property(Span<utf8> name, f32 &value, std::source_location location) {
 	line_viewport = current_viewport;
 	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
 	line_viewport.h = line_height;
-	line_viewport.x += text_width;
-	line_viewport.w -= text_width;
+	line_viewport.x += text_width + 2;
+	line_viewport.w -= text_width + 2;
 
-	auto x_viewport = line_viewport;
-	auto y_viewport = line_viewport;
-	auto z_viewport = line_viewport;
-
-	x_viewport.w = line_viewport.w / 3;
-
-	y_viewport.x = x_viewport.x + x_viewport.w;
-	y_viewport.w = line_viewport.w * 2 / 3 - x_viewport.w;
-
-	z_viewport.x = y_viewport.x + y_viewport.w;
-	z_viewport.w = line_viewport.w - (x_viewport.w + y_viewport.w);
-
-	push_current_viewport(x_viewport) draw_text("X");
-	push_current_viewport(y_viewport) draw_text("Y");
-	push_current_viewport(z_viewport) draw_text("Z");
-	
 	push_current_viewport(line_viewport) edit_float(value, (umm)location.line() * (umm)location.file_name());
 
 	current_property_y += line_height + 2;
@@ -942,5 +931,67 @@ void draw_property(Span<utf8> name, List<utf8> &value, std::source_location loca
 
 	push_current_viewport(line_viewport) text_field(value, (umm)location.line() * (umm)location.file_name());
 
+	current_property_y += line_height + 2;
+}
+
+void draw_property(Span<utf8> name, Texture *&value, std::source_location location) {
+	t3d::Viewport name_viewport = current_viewport;
+	name_viewport.h = line_height;
+	name_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
+	s32 text_width;
+	push_current_viewport(name_viewport) {
+		auto font = get_font_at_size(font_collection, font_size);
+		ensure_all_chars_present(name, font);
+		auto placed_text = with(temporary_allocator, place_text(name, font));
+		text_width = placed_text.back().position.max.x;
+		draw_text(placed_text, font);
+	};
+
+	auto value_viewport = current_viewport;
+	value_viewport.y = value_viewport.y + value_viewport.h - line_height - current_property_y;
+	value_viewport.h = line_height;
+	value_viewport.x += text_width + 2;
+	value_viewport.w -= text_width + 2;
+
+	push_current_viewport(value_viewport) {
+		blit({.05, .05, .05, 1});
+		if (value) {
+			draw_text(value->name);
+		} else {
+			draw_text("null");
+		}
+	}
+	
+	current_property_y += line_height + 2;
+}
+
+void draw_property(Span<utf8> name, Mesh *&value, std::source_location location) {
+	t3d::Viewport name_viewport = current_viewport;
+	name_viewport.h = line_height;
+	name_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
+	s32 text_width;
+	push_current_viewport(name_viewport) {
+		auto font = get_font_at_size(font_collection, font_size);
+		ensure_all_chars_present(name, font);
+		auto placed_text = with(temporary_allocator, place_text(name, font));
+		text_width = placed_text.back().position.max.x;
+		draw_text(placed_text, font);
+	};
+
+	auto value_viewport = current_viewport;
+	value_viewport.y = value_viewport.y + value_viewport.h - line_height - current_property_y;
+	value_viewport.h = line_height;
+	value_viewport.x += text_width + 2;
+	value_viewport.w -= text_width + 2;
+
+	push_current_viewport(value_viewport) {
+		blit({.05, .05, .05, 1});
+		if (value) {
+			draw_text(value->name);
+		} else {
+			draw_text("null");
+		}
+	}
+	
 	current_property_y += line_height + 2;
 }

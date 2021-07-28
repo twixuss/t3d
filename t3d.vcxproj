@@ -30,13 +30,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\t3d.h" />
-    <ClInclude Include="src\basic_textures.h" />
+    <ClInclude Include="src\texture.h" />
     <ClInclude Include="src\blit.h" />
     <ClInclude Include="src\component.h" />
     <ClInclude Include="src\components\camera.h" />
     <ClInclude Include="src\components\light.h" />
     <ClInclude Include="src\components\mesh_renderer.h" />
-    <ClInclude Include="src\components\serialize.h" />
     <ClInclude Include="src\component_list.h" />
     <ClInclude Include="src\editor\current.h" />
     <ClInclude Include="src\debug.h" />
