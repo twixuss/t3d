@@ -14,6 +14,13 @@ struct Entity {
 	EntityFlags flags;
 	StaticList<ComponentIndex, 16> components;
 	List<utf8> name;
+	
+	forceinline v3f   right() { return rotation * v3f{1,0,0}; }
+	forceinline v3f      up() { return rotation * v3f{0,1,0}; }
+	forceinline v3f    back() { return rotation * v3f{0,0,1}; }
+	forceinline v3f    left() { return rotation * v3f{-1,0,0}; }
+	forceinline v3f    down() { return rotation * v3f{0,-1,0}; }
+	forceinline v3f forward() { return rotation * v3f{0,0,-1}; }
 };
 
 MaskedBlockList<Entity, 256> entities;
@@ -54,6 +61,7 @@ Entity &create_entity(char const *fmt, Args const &...args) {
 void destroy(Entity &entity) {
 	for (auto &component_index : entity.components) {
 		auto &storage = component_storages[component_index.type];
+		component_functions[component_index.type].free(storage.get(component_index.index));
 		storage.remove_at(component_index.index);
 	}
 	free(entity.name);
@@ -75,7 +83,7 @@ T &add_component(Entity &entity, u32 entity_index) {
 	entity.components.add(component_index);
 
 	component.entity_index = entity_index;
-	on_create<T>(component);
+	component_init<T>(component);
 
 	return component;
 }

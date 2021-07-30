@@ -1,4 +1,5 @@
 #define ENUMERATE_COMPONENTS \
 c(Light) sep \
 c(MeshRenderer) sep \
-c(Camera) \
+c(Camera) sep \
+c(Rotator) \

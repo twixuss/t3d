@@ -9,13 +9,16 @@ tl::umm get_hash(struct ManipulatorStateKey const &);
 #include "components/light.h"
 #include "components/mesh_renderer.h"
 #include "components/camera.h"
+#include "components/rotator.h"
 #include "editor/window.h"
 #include "editor/scene_view.h"
 #include "editor/hierarchy_view.h"
 #include "editor/split_view.h"
 #include "editor/property_view.h"
+#include "editor/file_view.h"
 #include "editor/input.h"
 #include "serialize.h"
+#include "assets.h"
 
 using namespace tl;
 
@@ -254,6 +257,11 @@ EditorWindow *main_window;
 void render_scene(SceneViewWindow *view) {
 	timed_function();
 
+	t3d::disable_scissor();
+	defer {
+		t3d::enable_scissor();
+	};
+
 	//print("%\n", to_euler_angles(quaternion_from_euler(0, time, time)));
 	//selected_entity->qrotation = quaternion_from_euler(to_euler_angles(quaternion_from_euler(0, time, time)));
 	
@@ -263,9 +271,9 @@ void render_scene(SceneViewWindow *view) {
 	v2s mouse_position = v2s{
 		window->mouse_position.x,
 		((s32)window->client_size.y - window->mouse_position.y),
-	} - view->viewport.position;
+	} - view->viewport.min;
 
-	m4 camera_projection_matrix = m4::perspective_right_handed((f32)view->viewport.size.x / view->viewport.size.y, camera.fov, 0.1f, 100.0f);
+	m4 camera_projection_matrix = m4::perspective_right_handed((f32)view->viewport.size().x / view->viewport.size().y, camera.fov, 0.1f, 100.0f);
 	m4 camera_translation_matrix = m4::translation(-camera_entity.position);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_entity.rotation);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-to_euler_angles(camera_entity.rotation));
@@ -366,7 +374,7 @@ void render_scene(SceneViewWindow *view) {
 			}
 
 			t3d::set_render_target(t3d::back_buffer);
-			t3d::set_viewport(view->viewport);
+			t3d::set_viewport(current_viewport);
 			t3d::set_shader(blit_texture_shader);
 			t3d::set_texture(camera.source_target->color, 0);
 			t3d::draw(3);
@@ -393,11 +401,11 @@ void render_scene(SceneViewWindow *view) {
 	});
 	t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_source_alpha, t3d::Blend_one_minus_source_alpha);
 
-	if (selected_entity) {
-		auto new_transform = manipulate_transform(selected_entity->position, selected_entity->rotation, selected_entity->scale, view->manipulator_kind);
-		selected_entity->position = new_transform.position;
-		selected_entity->rotation = new_transform.rotation;
-		selected_entity->scale    = new_transform.scale;
+	if (selection.kind == Selection_entity) {
+		auto new_transform = manipulate_transform(selection.entity->position, selection.entity->rotation, selection.entity->scale, view->manipulator_kind);
+		selection.entity->position = new_transform.position;
+		selection.entity->rotation = new_transform.rotation;
+		selection.entity->scale    = new_transform.scale;
 
 		for (auto &request : manipulator_draw_requests) {
 			v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
@@ -415,7 +423,7 @@ void render_scene(SceneViewWindow *view) {
 		
 			u32 selected_element = request.highlighted_part_index;
 
-			v3f to_camera = normalize(camera_entity.position - selected_entity->position);
+			v3f to_camera = normalize(camera_entity.position - selection.entity->position);
 			switch (request.kind) {
 				case Manipulate_position: {
 					t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
@@ -528,8 +536,7 @@ void run() {
 
 	input_string = {};
 	
-	construct(textures);
-	textures_by_path = {};
+	construct(assets);
 	
 	construct(meshes);
 	meshes_by_name = {};
@@ -554,6 +561,8 @@ void run() {
 			.debug = BUILD_DEBUG,
 		}));
 		
+		t3d::enable_scissor();
+
 		init_font();
 
 		debug_lines_vertex_buffer = t3d::create_vertex_buffer(
@@ -578,13 +587,17 @@ void run() {
 		t3d::set_compute_buffer(average_shader_buffer, AVERAGE_COMPUTE_SLOT);
 
 		main_window = create_split_view(
-			create_scene_view(),
+			create_split_view(
+				create_file_view(),
+				create_scene_view(),
+				{ .split_t = 0 }
+			),
 			create_split_view(
 				create_hierarchy_view(),
 				create_property_view(),
 				{ .horizontal = true }
 			),
-			{ .split_t = 0.9f }
+			{ .split_t = 1 }
 		);
 
 		switch (graphics_api) {
@@ -945,12 +958,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}
 
 		u32 white_pixel = ~0;
-		white_texture = &textures.add();
+		white_texture = &assets.textures.all.add();
 		white_texture->texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &white_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
 		white_texture->name = as_list(u8"white"s);
 
 		u32 black_pixel = 0xFF000000;
-		black_texture = &textures.add();
+		black_texture = &assets.textures.all.add();
 		black_texture->texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &black_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
 		black_texture->name = as_list(u8"black"s);
 		
@@ -986,19 +999,23 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				auto &mr = add_component<MeshRenderer>(suzanne);
 				mr.mesh = get_submesh(scene_meshes, u8"Suzanne"s);
 				mr.material = &surface_material;
-				mr.lightmap = load_texture(tl_file_string("../data/suzanne_lightmap.png"s));
+				mr.lightmap = assets.textures.get(u8"../data/suzanne_lightmap.png"s);
+
+				auto &rotator = add_component<Rotator>(suzanne);
+				rotator.axis = {1, 1, 1};
+				rotator.degrees_per_second = 30;
 			}
-			selected_entity = &suzanne;
+			selection.set(&suzanne);
 
 			auto &floor = create_entity("floor");
 			{
 				auto &mr = add_component<MeshRenderer>(floor);
 				mr.mesh = get_submesh(scene_meshes, u8"Room"s);
 				mr.material = &surface_material;
-				mr.lightmap = load_texture(tl_file_string("../data/floor_lightmap.png"s));
+				mr.lightmap = assets.textures.get(u8"../data/floor_lightmap.png"s);
 			}
 			
-			auto light_texture = load_texture(tl_file_string("../data/spotlight_mask.png"s));
+			auto light_texture = assets.textures.get(u8"../data/spotlight_mask.png"s);
 
 			{
 				auto &light = create_entity("light1");
@@ -1027,15 +1044,17 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		if (any_true(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
 
-			main_window->resize({.position = {}, .size = window.client_size});
+			main_window->resize({.min = {}, .max = (v2s)window.client_size});
 
 			t3d::resize_render_targets(window.client_size);
 		}
 		
-		current_viewport = {
-			.position = {},
-			.size = window.client_size,
+		current_viewport = current_scissor = {
+			.min = {},
+			.max = (v2s)window.client_size,
 		};
+		t3d::set_viewport(current_viewport);
+		t3d::set_scissor(current_scissor);
 
 		current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
 		
@@ -1054,13 +1073,30 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			for_each(entities, [](Entity &e) {
 				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).value, e.flags, e.position, degrees(to_euler_angles(e.rotation)));
 				for (auto &c : e.components) {
-					print("\tparent: %, type: %, index: %\n", c.entity_index, c.type, c.index);
+					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, component_names[c.type], c.index);
 				}
 			});
 		}
 
+		if (key_down(Key_f3, {.anywhere = true})) {
+		}
+
+		window.min_window_size = client_size_to_window_size(window, main_window->get_min_size());
+
+		input_user_index = 0;
+		focusable_input_user_index = 0;
 
 		timed_block("frame"s);
+
+#define c(name) \
+	for_each_component_of_type(name, comp) { \
+		component_update(comp); \
+	};
+#define sep
+		ENUMERATE_COMPONENTS
+#undef sep
+#undef c
+
 
 		{
 			timed_block("Shadows"s);
@@ -1090,11 +1126,6 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				for_each_component_of_type(MeshRenderer, mesh_renderer) {
 					auto &mesh_entity = entities[mesh_renderer.entity_index];
 
-					if (key_down(Key_f3)) {
-						auto &e = mesh_entity;
-						print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).value, e.flags, e.position, degrees(to_euler_angles(e.rotation)));
-					}
-
 					t3d::update_shader_constants(entity_constants, {
 						.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
 					});
@@ -1112,6 +1143,11 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		
 		debug_frame();
 		
+		if (drag_and_dropping && (key_state[256].state & KeyState_up)) {
+			drag_and_dropping = false;
+			unlock_input_nocheck();
+		}
+
 		for (auto &state : key_state) {
 			if (state.state & KeyState_down) {
 				state.state &= ~KeyState_down;
@@ -1121,6 +1157,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			if (state.state & KeyState_repeated) {
 				state.state &= ~KeyState_repeated;
 			}
+			state.state &= ~KeyState_begin_drag;
 			if ((state.state & KeyState_held) && !(state.state & KeyState_drag) && (distance_squared(state.start_position, current_mouse_position) >= pow2(8))) {
 				state.state |= KeyState_drag | KeyState_begin_drag;
 			}
@@ -1141,6 +1178,8 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		set_title(&window, tformat(u8"frame_time: % ms, fps: %", frame_time * 1000, fps_counter_result));
 
+		set_cursor(window, current_cursor);
+
 		fps_timer += frame_time;
 		if (fps_timer >= 1) {
 			fps_counter_result = fps_counter;
@@ -1148,9 +1187,10 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			fps_counter = 0;
 		}
 	};
-	info.get_cursor = [](Window &window) -> Cursor {
-		return current_cursor;
-	};
+	//info.get_cursor = [](Window &window) -> Cursor {
+	//	print("get cursor %\n", get_time_string());
+	//	return current_cursor;
+	//};
 
 	window = create_window(info);
 	defer { free(window); };

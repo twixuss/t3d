@@ -84,6 +84,7 @@ struct State {
 	Blend blend_source;
 	Blend blend_destination;
 	GLuint topology = GL_TRIANGLES;
+	bool scissor_enabled;
 };
 static State state;
 
@@ -302,6 +303,8 @@ bool init(InitInfo init_info) {
 
 	glEnable(GL_DEPTH_TEST);
 	glDepthFunc(GL_LESS);
+	
+	glEnable(GL_SCISSOR_TEST);
 
 	_clear = [](RenderTarget *_render_target, ClearFlags flags, v4f color, f32 depth) {
 		assert(_render_target);
@@ -331,7 +334,9 @@ bool init(InitInfo init_info) {
 		glDrawElements(state.topology, index_count, state.current_index_buffer->type, 0);
 	};
 	_set_viewport = [](Viewport viewport) {
-		glViewport(viewport.x, viewport.y, viewport.w, viewport.h);
+		assert(viewport.max.x - viewport.min.x > 0);
+		assert(viewport.max.y - viewport.min.y > 0);
+		glViewport(viewport.min.x, viewport.min.y, viewport.size().x, viewport.size().y);
 	};
 	_resize_render_targets = [](u32 width, u32 height) {
 		for (auto texture : state.window_sized_textures) {
@@ -675,6 +680,26 @@ bool init(InitInfo init_info) {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		glGenerateMipmap(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, 0);
+	};
+	_set_scissor = [](Viewport viewport) {
+		assert(viewport.max.x - viewport.min.x > 0);
+		assert(viewport.max.y - viewport.min.y > 0);
+		if (!state.scissor_enabled) {
+			print(Print_warning, "t3d::set_scissor was called when scessor test is not enabled\n");
+		}
+		glScissor(viewport.min.x, viewport.min.y, viewport.size().x, viewport.size().y);
+	};
+	_enable_scissor = [] {
+		if (!state.scissor_enabled) {
+			state.scissor_enabled = true;
+			glEnable(GL_SCISSOR_TEST);
+		}
+	};
+	_disable_scissor = [] {
+		if (state.scissor_enabled) {
+			state.scissor_enabled = false;
+			glDisable(GL_SCISSOR_TEST);
+		}
 	};
 	return true;
 }

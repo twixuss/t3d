@@ -30,6 +30,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\t3d.h" />
+    <ClInclude Include="src\assets.h" />
+    <ClInclude Include="src\components\rotator.h" />
     <ClInclude Include="src\texture.h" />
     <ClInclude Include="src\blit.h" />
     <ClInclude Include="src\component.h" />

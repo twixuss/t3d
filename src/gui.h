@@ -2,6 +2,7 @@
 #include "font.h"
 #include "blit.h"
 #include "editor/current.h"
+#include "assets.h"
 
 struct ButtonTheme {
 	v4f color = {.18f, .18f, .18f, 1};
@@ -116,7 +117,7 @@ void draw_text(Span<PlacedChar> placed_text, SizedFont *font, DrawTextParams par
 	t3d::set_shader(text_shader);
 	t3d::set_shader_constants(text_shader_constants, 0);
 	t3d::update_shader_constants(text_shader_constants, {
-		.inv_half_viewport_size = v2f{2,-2} / (v2f)current_viewport.size,
+		.inv_half_viewport_size = v2f{2,-2} / (v2f)current_viewport.size(),
 		.offset = (v2f)params.position,
 	});
 	t3d::set_vertex_buffer(text_vertex_buffer);
@@ -136,7 +137,7 @@ bool button(Span<utf8> text, ButtonTheme const &theme = default_button_theme) {
 	v4f color = theme.color;
 	if (mouse_held(0)) {
 		color = theme.pressed_color;
-	} else if (in_bounds(current_mouse_position, current_viewport.aabb())) {
+	} else if (in_bounds(current_mouse_position, current_scissor)) {
 		color = theme.hovered_color;
 	}
 			
@@ -150,7 +151,7 @@ bool button(t3d::Texture *texture, ButtonTheme const &theme = default_button_the
 	v4f color = theme.color;
 	if (mouse_held(0)) {
 		color = theme.pressed_color;
-	} else if (in_bounds(current_mouse_position, current_viewport.aabb())) {
+	} else if (in_bounds(current_mouse_position, current_scissor)) {
 		color = theme.hovered_color;
 	}
 	
@@ -237,42 +238,48 @@ Optional<f32> parse_f32(Span<utf8> string) {
 }
 
 bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
+	begin_input_user(true);
+
 	auto &state = float_field_states.get_or_insert({id, location});
+
 	bool value_changed = false;
 	bool stop_edit = false;
 	bool apply_input = false;
+	bool set_caret_from_mouse = false;
 	if (state.editing) {
-		if (mouse_down_no_lock(0)) {
-			apply_input = true;
-			stop_edit = true;
-			key_state[256 + 0].start_position = current_mouse_position;
+		if ((key_state[256 + 0].state & KeyState_down)) {
+			if (in_bounds(current_mouse_position, current_scissor)) {
+				set_caret_from_mouse = true;
+			} else {
+				apply_input = true;
+				stop_edit = true;
+				key_state[256 + 0].start_position = current_mouse_position;
+			}
 		}
-		if (mouse_down_no_lock(1)) {
+		if ((key_state[256 + 1].state & KeyState_down)) {
 			apply_input = true;
 			stop_edit = true;
+		}
+		if (mouse_click(0)) {
+			print("click\n");
 		}
 		if (key_down(Key_escape)) {
 			stop_edit = true;
 		}
 	} else {
 		if (mouse_begin_drag(0)) {
-			lock_input(&state, key_state[256 + 0].start_position);
-			print("begin drag\n");
+			lock_input();
 		}
-		if (input_locker == &state) {
-			if (mouse_drag_no_lock(0)) {
-				value += window->mouse_delta.x * (key_held(Key_shift) ? 0.01f : 0.1f);
-				value_changed = true;
-				print("drag\n");
-			}
-			if (mouse_end_drag_no_lock(0)) {
-				unlock_input();
-				print("end drag\n");
-			}
+		if (mouse_drag(0)) {
+			value += window->mouse_delta.x * (key_held(Key_shift, {.anywhere = true}) ? 0.01f : 0.1f);
+			value_changed = true;
+		}
+		if (mouse_end_drag(0)) {
+			unlock_input();
 		}
 	}
-	if (mouse_click(0)) {
-		lock_input(&state);
+	if (mouse_click(0) || should_focus()) {
+		lock_input();
 		
 		apply_input = false;
 		stop_edit = false;
@@ -287,7 +294,7 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 	}
 
 	if (state.editing) {
-		if (key_repeat(Key_left_arrow)) {
+		if (key_state[Key_left_arrow].state & KeyState_repeated) {
 			if (state.caret_position) {
 				if (state.selection_start == state.caret_position) {
 					state.caret_position -= 1;
@@ -304,7 +311,7 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 				state.selection_start = state.caret_position;
 			}
 		}
-		if (key_repeat(Key_right_arrow)) {
+		if (key_state[Key_right_arrow].state & KeyState_repeated) {
 			if (state.caret_position != state.string.size) {
 				if (state.selection_start == state.caret_position) {
 					state.caret_position += 1;
@@ -398,6 +405,16 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 					}
 					break;
 				}
+				case '\t': {
+					stop_edit = true;
+					apply_input = true;
+					if (key_state[Key_shift].state & KeyState_held) {
+						should_switch_focus_to = focusable_input_user_index - 1;
+					} else {
+						should_switch_focus_to = focusable_input_user_index + 1;
+					}
+					break;
+				}
 				default: {
 					if (state.caret_position == state.selection_start) {
 						state.string.insert_at(c, state.caret_position);
@@ -414,7 +431,9 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 				}
 			}
 		}
-		if (key_repeat(Key_delete)) {
+		input_string.clear();
+
+		if (key_state[Key_delete].state & KeyState_repeated) {
 			erase = Erase_delete;
 		}
 
@@ -471,7 +490,7 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 	v4f color = theme.color;
 	if (state.editing) {
 		color = theme.edit_color;
-	} else if (in_bounds(current_mouse_position, current_viewport.aabb())) {
+	} else if (in_bounds(current_mouse_position, current_scissor)) {
 		color = theme.hovered_color;
 	}
 			
@@ -479,8 +498,8 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 
 	if (state.editing) {
 		t3d::Viewport caret_viewport = current_viewport;
-		caret_viewport.w = 1;
-		caret_viewport.x = current_viewport.x;
+		caret_viewport.min.x = current_viewport.min.x;
+		caret_viewport.max.x = caret_viewport.min.x + 1;
 
 
 		if (state.string.size) {
@@ -488,12 +507,40 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 			ensure_all_chars_present(state.string, font);
 			auto placed_chars = with(temporary_allocator, place_text(state.string, font));
 
+			if (set_caret_from_mouse) {
+				u32 new_caret_position = placed_chars.size;
+
+				for (u32 char_index = 0; char_index < placed_chars.size; char_index += 1) {
+					if (placed_chars[char_index].position.center().x > (current_mouse_position.x - current_viewport.min.x)) {
+						new_caret_position = char_index;
+						break;
+					}
+				}
+
+				state.caret_blink_time = 0;
+				state.caret_position = state.selection_start = new_caret_position;
+			}
+
 			u32 caret_x = 0;
 			if (state.caret_position != 0) {
 				caret_x = placed_chars[state.caret_position - 1].position.max.x;
 			}
-		
-			caret_viewport.x += caret_x;
+
+			v2s text_offset = {};
+				
+			s32 offset = 0;
+			if (placed_chars.back().position.max.x > current_viewport.size().x) {
+				offset = clamp<s32>(
+					(s32)current_viewport.size().x / 2 - (s32)caret_x, 
+					0, 
+					-placed_chars.back().position.max.x + current_viewport.size().x - 1
+				);
+			}
+
+			text_offset.x = offset;
+
+			caret_viewport.min.x += offset + caret_x;
+			caret_viewport.max.x += offset + caret_x;
 
 			if (state.caret_position != state.selection_start) {
 				u32 sel_min, sel_max;
@@ -503,13 +550,13 @@ bool edit_float(f32 &value, umm id = 0, TextFieldTheme const &theme = default_te
 				u32 max_x = placed_chars[sel_max - 1].position.max.x;
 
 				t3d::Viewport selection_viewport = current_viewport;
-				selection_viewport.x = current_viewport.x + min_x;
-				selection_viewport.w = max_x - min_x;
+				selection_viewport.min.x = current_viewport.min.x + min_x;
+				selection_viewport.max.x = selection_viewport.min.x + max_x - min_x;
 
 				push_current_viewport(selection_viewport) blit({0.25f,0.25f,0.5f,1});
 			}
 		
-			draw_text(placed_chars, font);
+			draw_text(placed_chars, font, {.position = text_offset});
 		}
 		
 
@@ -546,7 +593,7 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 		}
 	}
 	if (mouse_click(0)) {
-		lock_input(&state);
+		lock_input();
 		
 		apply_input = false;
 		stop_edit = false;
@@ -742,7 +789,7 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 	v4f color = theme.color;
 	if (state.editing) {
 		color = theme.edit_color;
-	} else if (in_bounds(current_mouse_position, current_viewport.aabb())) {
+	} else if (in_bounds(current_mouse_position, current_scissor)) {
 		color = theme.hovered_color;
 	}
 			
@@ -750,8 +797,8 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 
 	if (state.editing) {
 		t3d::Viewport caret_viewport = current_viewport;
-		caret_viewport.w = 1;
-		caret_viewport.x = current_viewport.x;
+		caret_viewport.min.x = current_viewport.min.x;
+		caret_viewport.max.x = caret_viewport.min.x + 1;
 
 
 		if (state.string.size) {
@@ -764,7 +811,7 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 				caret_x = placed_chars[state.caret_position - 1].position.max.x;
 			}
 		
-			caret_viewport.x += caret_x;
+			caret_viewport.min.x += caret_x;
 
 			if (state.caret_position != state.selection_start) {
 				u32 sel_min, sel_max;
@@ -774,8 +821,8 @@ void text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 				u32 max_x = placed_chars[sel_max - 1].position.max.x;
 
 				t3d::Viewport selection_viewport = current_viewport;
-				selection_viewport.x = current_viewport.x + min_x;
-				selection_viewport.w = max_x - min_x;
+				selection_viewport.min.x = current_viewport.min.x + min_x;
+				selection_viewport.max.x = selection_viewport.min.x + max_x - min_x;
 
 				push_current_viewport(selection_viewport) blit({0.25f,0.25f,0.5f,1});
 			}
@@ -806,8 +853,8 @@ s32 const line_height = 16;
 
 void header(Span<utf8> text) {
 	t3d::Viewport line_viewport = current_viewport;
-	line_viewport.h = line_height;
-	line_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
+	line_viewport.min.y = current_viewport.max.y - line_height - current_property_y;
+	line_viewport.max.y = line_viewport.min.y + line_height;
 	push_current_viewport(line_viewport) draw_text(text);
 	current_property_y += line_height + 2;
 }
@@ -815,33 +862,34 @@ void header(Span<utf8> text) {
 void property_separator() {
 	s32 const separator_height = 2;
 	t3d::Viewport line_viewport = current_viewport;
-	line_viewport.h = separator_height;
-	line_viewport.y = current_viewport.y + current_viewport.h - separator_height - current_property_y;
+	line_viewport.min.y = current_viewport.max.y - separator_height - current_property_y;
+	line_viewport.max.y = line_viewport.min.y + separator_height;
 	push_current_viewport(line_viewport) blit({.05, .05, .05, 1});
 	current_property_y += separator_height + 2;
 }
 
 void draw_property(Span<utf8> name, f32 &value, std::source_location location) {
 	t3d::Viewport line_viewport = current_viewport;
-	line_viewport.h = line_height;
-	line_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
-	s32 text_width;
+	line_viewport.min.y = current_viewport.max.y - line_height - current_property_y;
+	line_viewport.max.y = line_viewport.min.y + line_height;
+
 	push_current_viewport(line_viewport) {
+		s32 text_width = 0;
+
 		auto font = get_font_at_size(font_collection, font_size);
 		ensure_all_chars_present(name, font);
 		auto placed_text = with(temporary_allocator, place_text(name, font));
 		text_width = placed_text.back().position.max.x;
 		draw_text(placed_text, font);
-	};
 
-	line_viewport = current_viewport;
-	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
-	line_viewport.h = line_height;
-	line_viewport.x += text_width + 2;
-	line_viewport.w -= text_width + 2;
+		auto value_viewport = line_viewport;
+		value_viewport.min.x += text_width + 2;
 
-	push_current_viewport(line_viewport) edit_float(value, (umm)location.line() * (umm)location.file_name());
-
+		push_current_viewport(value_viewport) {
+			edit_float(value, (umm)location.line() * (umm)location.file_name());
+		}
+	}
+	
 	current_property_y += line_height + 2;
 }
 
@@ -849,32 +897,29 @@ void draw_property(Span<utf8> name, v3f &value, std::source_location location) {
 	header(name);
 
 	auto line_viewport = current_viewport;
-	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
-	line_viewport.h = line_height;
+	line_viewport.min.y = line_viewport.max.y - line_height - current_property_y;
+	line_viewport.max.y = line_viewport.min.y + line_height;
 
 
 	auto x_viewport = line_viewport;
 	auto y_viewport = line_viewport;
 	auto z_viewport = line_viewport;
 
-	x_viewport.w = line_viewport.w / 3;
+	x_viewport.max.x = x_viewport.min.x + line_viewport.size().x / 3;
 
-	y_viewport.x = x_viewport.x + x_viewport.w;
-	y_viewport.w = line_viewport.w * 2 / 3 - x_viewport.w;
+	y_viewport.min.x = x_viewport.max.x;
+	y_viewport.max.x = x_viewport.min.x + line_viewport.size().x * 2 / 3;
 
-	z_viewport.x = y_viewport.x + y_viewport.w;
-	z_viewport.w = line_viewport.w - (x_viewport.w + y_viewport.w);
+	z_viewport.min.x = y_viewport.max.x;
+	z_viewport.max.x = line_viewport.max.x;
 
 	push_current_viewport(x_viewport) draw_text("X");
 	push_current_viewport(y_viewport) draw_text("Y");
 	push_current_viewport(z_viewport) draw_text("Z");
 	
-	x_viewport.x += font_size;
-	x_viewport.w -= font_size;
-	y_viewport.x += font_size;
-	y_viewport.w -= font_size;
-	z_viewport.x += font_size;
-	z_viewport.w -= font_size;
+	x_viewport.min.x += font_size;
+	y_viewport.min.x += font_size;
+	z_viewport.min.x += font_size;
 
 	push_current_viewport(x_viewport) edit_float(value.x, (umm)location.line() * (umm)location.file_name());
 	push_current_viewport(y_viewport) edit_float(value.y, (umm)location.line() * (umm)location.file_name());
@@ -886,112 +931,70 @@ void draw_property(Span<utf8> name, v3f &value, std::source_location location) {
 void draw_property(Span<utf8> name, quaternion &value, std::source_location location) {
 	header(name);
 
-	t3d::Viewport line_viewport = current_viewport;
-	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
-	line_viewport.h = line_height;
-
-
-	auto x_viewport = line_viewport;
-	auto y_viewport = line_viewport;
-	auto z_viewport = line_viewport;
-
-	x_viewport.w = line_viewport.w / 3;
-
-	y_viewport.x = x_viewport.x + x_viewport.w;
-	y_viewport.w = line_viewport.w * 2 / 3 - x_viewport.w;
-
-	z_viewport.x = y_viewport.x + y_viewport.w;
-	z_viewport.w = line_viewport.w - (x_viewport.w + y_viewport.w);
-
-	push_current_viewport(x_viewport) draw_text("X");
-	push_current_viewport(y_viewport) draw_text("Y");
-	push_current_viewport(z_viewport) draw_text("Z");
-	
-	x_viewport.x += font_size;
-	x_viewport.w -= font_size;
-	y_viewport.x += font_size;
-	y_viewport.w -= font_size;
-	z_viewport.x += font_size;
-	z_viewport.w -= font_size;
-
 	v3f angles = degrees(to_euler_angles(value));
-	push_current_viewport(x_viewport) if (edit_float(angles.x, (umm)location.line() * (umm)location.file_name())) value = quaternion_from_euler(radians(angles));
-	push_current_viewport(y_viewport) if (edit_float(angles.y, (umm)location.line() * (umm)location.file_name())) value = quaternion_from_euler(radians(angles));
-	push_current_viewport(z_viewport) if (edit_float(angles.z, (umm)location.line() * (umm)location.file_name())) value = quaternion_from_euler(radians(angles));
-
-	current_property_y += line_height + 2;
+	draw_property(name, angles, location);
+	value = quaternion_from_euler(radians(angles));
 }
 
 void draw_property(Span<utf8> name, List<utf8> &value, std::source_location location) {
 	header(name);
 
 	t3d::Viewport line_viewport = current_viewport;
-	line_viewport.y = line_viewport.y + line_viewport.h - line_height - current_property_y;
-	line_viewport.h = line_height;
+	line_viewport.min.y = line_viewport.max.y - line_height - current_property_y;
+	line_viewport.max.y = line_viewport.min.y + line_height;
 
 	push_current_viewport(line_viewport) text_field(value, (umm)location.line() * (umm)location.file_name());
 
 	current_property_y += line_height + 2;
 }
 
-void draw_property(Span<utf8> name, Texture *&value, std::source_location location) {
-	t3d::Viewport name_viewport = current_viewport;
-	name_viewport.h = line_height;
-	name_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
-	s32 text_width;
-	push_current_viewport(name_viewport) {
+template <class Fn>
+void draw_asset_property(Span<utf8> name, Span<utf8> path, std::source_location location, Fn &&update) {
+	t3d::Viewport line_viewport = current_viewport;
+	line_viewport.min.y = current_viewport.max.y - line_height - current_property_y;
+	line_viewport.max.y = line_viewport.min.y + line_height;
+	push_current_viewport(line_viewport) {
+		s32 text_width;
+
 		auto font = get_font_at_size(font_collection, font_size);
 		ensure_all_chars_present(name, font);
 		auto placed_text = with(temporary_allocator, place_text(name, font));
 		text_width = placed_text.back().position.max.x;
 		draw_text(placed_text, font);
-	};
 
-	auto value_viewport = current_viewport;
-	value_viewport.y = value_viewport.y + value_viewport.h - line_height - current_property_y;
-	value_viewport.h = line_height;
-	value_viewport.x += text_width + 2;
-	value_viewport.w -= text_width + 2;
+		auto value_viewport = current_viewport;
+		value_viewport.min.x += text_width + 2;
 
-	push_current_viewport(value_viewport) {
-		blit({.05, .05, .05, 1});
-		if (value) {
-			draw_text(value->name);
-		} else {
-			draw_text("null");
+		push_current_viewport(value_viewport) {
+			blit({.05, .05, .05, 1});
+			draw_text(path);
+	
+			bool result = (key_state[256 + 0].state & KeyState_up) && in_bounds(current_mouse_position, current_scissor);
+
+			if (result) {
+				int x = 5;
+			}
+
+			if (accept_drag_and_drop()) {
+				update(get_drag_and_drop_file());
+			}
 		}
 	}
 	
 	current_property_y += line_height + 2;
 }
 
-void draw_property(Span<utf8> name, Mesh *&value, std::source_location location) {
-	t3d::Viewport name_viewport = current_viewport;
-	name_viewport.h = line_height;
-	name_viewport.y = current_viewport.y + current_viewport.h - line_height - current_property_y;
-	s32 text_width;
-	push_current_viewport(name_viewport) {
-		auto font = get_font_at_size(font_collection, font_size);
-		ensure_all_chars_present(name, font);
-		auto placed_text = with(temporary_allocator, place_text(name, font));
-		text_width = placed_text.back().position.max.x;
-		draw_text(placed_text, font);
-	};
-
-	auto value_viewport = current_viewport;
-	value_viewport.y = value_viewport.y + value_viewport.h - line_height - current_property_y;
-	value_viewport.h = line_height;
-	value_viewport.x += text_width + 2;
-	value_viewport.w -= text_width + 2;
-
-	push_current_viewport(value_viewport) {
-		blit({.05, .05, .05, 1});
-		if (value) {
-			draw_text(value->name);
-		} else {
-			draw_text("null");
+void draw_property(Span<utf8> name, Texture *&value, std::source_location location) {
+	draw_asset_property(name, value ? value->name : u8"null"s, location, [&] (Span<utf8> path) {
+		auto new_texture = assets.textures.get(path);	
+		if (new_texture) {
+			value = new_texture;
 		}
-	}
-	
-	current_property_y += line_height + 2;
+	});
+}
+
+void draw_property(Span<utf8> name, Mesh *&value, std::source_location location) {
+	draw_asset_property(name, value ? value->name : u8"null"s, location, [&] (Span<utf8> path) {
+		
+	});
 }

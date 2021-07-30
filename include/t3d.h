@@ -133,26 +133,7 @@ union CubeTexturePaths {
 };
 
 // position is bottom left
-union Viewport {
-	struct {
-		s32 x, y;
-		u32 w, h;
-	};
-	struct {
-		v2s position;
-		v2u size;
-	};
-	v2s top_left() const {
-		return { x, y + (s32)h };
-	}
-	v2s bottom_right() const {
-		return { x + (s32)w, y };
-	}
-
-	aabb<v2s> aabb() {
-		return {position, position + (v2s)size};
-	}
-};
+using Viewport = aabb<v2s>;
 
 #define APIS(A) \
 A(void, clear, (RenderTarget *render_target, ClearFlags flags, v4f color, f32 depth), (render_target, flags, color, depth)) \
@@ -193,6 +174,9 @@ A(void, set_topology, (Topology topology), (topology)) \
 A(void, update_vertex_buffer, (VertexBuffer *buffer, Span<u8> data), (buffer, data)) \
 A(void, update_texture, (Texture *texture, u32 width, u32 height, void *data), (texture, width, height, data)) \
 A(void, generate_mipmaps, (Texture *texture), (texture)) \
+A(void, set_scissor, (Viewport viewport), (viewport)) \
+A(void, enable_scissor, (), ()) \
+A(void, disable_scissor, (), ()) \
 
 #define A(ret, name, args, values) extern T3D_API ret (*_##name) args;
 APIS(A)
@@ -206,8 +190,8 @@ extern T3D_API RenderTarget *back_buffer;
 extern T3D_API v2u min_texture_size;
 
 inline void draw(u32 vertex_count) { return _draw(vertex_count, 0); }
-inline void set_viewport(u32 w, u32 h) { return _set_viewport({.position = {}, .size = {w, h}}); }
-inline void set_viewport(v2u size) { return _set_viewport({.position={}, .size=size}); }
+inline void set_viewport(u32 w, u32 h) { return _set_viewport({.min = {}, .max = {(s32)w, (s32)h}}); }
+inline void set_viewport(v2u size) { return _set_viewport({.min={}, .max=(v2s)size}); }
 inline void resize_render_targets(v2u size) { return _resize_render_targets(size.x, size.y); }
 template <class T>
 inline void update_shader_constants(ShaderConstants *constants, ShaderValueLocation dest, T const &source) {

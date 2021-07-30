@@ -93,20 +93,27 @@ struct Token {
 };
 
 
-template <class Component, class ...Args, class = EnableIf<std::is_base_of_v<::Component, Component>>>
-void on_create(Component &component, Args const &...args) {
-}
+template <class Component, class = EnableIf<std::is_base_of_v<::Component, Component>>>
+void component_init(Component &component) {}
+
+template <class Component, class = EnableIf<std::is_base_of_v<::Component, Component>>>
+void component_free(Component &component) {}
+
+template <class Component, class = EnableIf<std::is_base_of_v<::Component, Component>>>
+void component_update(Component &component) {}
 
 using ComponentSerialize = void(*)(StringBuilder &builder, void *component);
 using ComponentDeserialize = bool(*)(Token *&from, Token *end, void *component);
 using ComponentDrawProperties = void(*)(void *component);
-using ComponentOnCreate = void(*)(void *component);
+using ComponentInit = void(*)(void *component);
+using ComponentFree = void(*)(void *component);
 
 struct ComponentFunctions {
 	ComponentSerialize serialize;
 	ComponentDeserialize deserialize;
 	ComponentDrawProperties draw_properties;
-	ComponentOnCreate on_create;
+	ComponentInit init;
+	ComponentFree free;
 };
 
 template <class Component>
@@ -121,9 +128,14 @@ template <class Component>
 void adapt_component_property_drawer(void *component) {
 	return ((Component *)component)->draw_properties();
 }
+
 template <class Component>
-void adapt_component_on_create(void *component) {
-	return on_create<Component>(*(Component *)component);
+void adapt_component_init(void *component) {
+	return component_init<Component>(*(Component *)component);
+}
+template <class Component>
+void adapt_component_free(void *component) {
+	return component_free<Component>(*(Component *)component);
 }
 
 
@@ -131,7 +143,8 @@ void adapt_component_on_create(void *component) {
 	adapt_component_serializer<name>, \
 	adapt_component_deserializer<name>, \
 	adapt_component_property_drawer<name>, \
-	adapt_component_on_create<name>, \
+	adapt_component_init<name>, \
+	adapt_component_free<name>, \
 }
 #define sep ,
 ComponentFunctions component_functions[] = {
@@ -163,7 +176,6 @@ struct ComponentStorage {
 	Allocator allocator = current_allocator;
 	umm bytes_per_entry = 0;
 	List<Block *> blocks;
-	void (*free_entry)(void *entry);
 
 	struct Added {
 		void *pointer;
@@ -224,8 +236,6 @@ struct ComponentStorage {
 		bounds_check(mask & ((Mask)1 << bit_index), "attempt to remove non-existant component");
 		mask &= ~((Mask)1 << bit_index);
 		block->masks()[mask_index] = mask;
-
-		free_entry((u8 *)block->values() + value_index * bytes_per_entry);
 	}
 
 	void *get(umm index) {
@@ -247,16 +257,10 @@ struct ComponentStorage {
 ComponentStorage component_storages[component_type_count];
 
 template <class Component>
-void free_component(void *data) {
-	((Component *)data)->free();
-}
-
-template <class Component>
 void init_component_storage(u32 index) {
 	auto &storage = component_storages[index];
 	construct(storage);
 	storage.bytes_per_entry = sizeof(Component);
-	storage.free_entry = free_component<Component>;
 }
 
 
@@ -320,11 +324,13 @@ void draw_property(Span<utf8> name, Texture *&value, std::source_location locati
 void draw_property(Span<utf8> name, Mesh *&value, std::source_location location = std::source_location::current());
 
 void serialize(StringBuilder &builder, f32 value);
+void serialize(StringBuilder &builder, v3f value);
 void serialize(StringBuilder &builder, Mesh *value);
 void serialize(StringBuilder &builder, Material *value);
 void serialize(StringBuilder &builder, Texture *value);
 
 bool deserialize(f32 &value, Token *&from, Token *end);
+bool deserialize(v3f &value, Token *&from, Token *end);
 bool deserialize(Mesh *&value, Token *&from, Token *end);
 bool deserialize(Material *&value, Token *&from, Token *end);
 bool deserialize(Texture *&value, Token *&from, Token *end);
@@ -361,6 +367,10 @@ struct ComponentBase<name> : Component { \
 	}  \
 	bool deserialize(Token *&from, Token *end) { \
 		while (from->kind != '}') { \
+			if (from->kind != Token_identifier) { \
+				print(Print_error, "Expected an identifier while parsing " #name "'s properties, but got '%'\n", from->string); \
+				return false; \
+			} \
 			if (false) {} \
 			FIELDS(DESERIALIZE_FIELD) \
 		} \

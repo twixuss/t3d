@@ -19,7 +19,7 @@ struct HierarchyViewWindow : EditorWindow {
 
 		s32 const button_height = 16;
 		s32 const button_padding = 2;
-		v2s next_pos = viewport.top_left() + v2s{button_padding, -(button_padding + button_height)};
+		v2s next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
 
 		for_each(entities, [&](Entity &entity) {
 			if (entity.flags & Entity_editor) {
@@ -27,26 +27,26 @@ struct HierarchyViewWindow : EditorWindow {
 			}
 
 			t3d::Viewport button_viewport;
-			button_viewport.position = next_pos;
-			button_viewport.size = {viewport.size.x - (u32)button_padding * 2, (u32)button_height};
+			button_viewport.min = next_pos;
+			button_viewport.max = button_viewport.min + v2s{viewport.size().x - button_padding * 2, button_height};
 			
 
 			ButtonTheme theme = default_button_theme;
-			if (&entity == selected_entity) {
+			if (selection.kind == Selection_entity && &entity == selection.entity) {
 				theme.color.xy *= 1.5f;
 				theme.hovered_color.xy *= 1.5f;
 				theme.pressed_color.xy *= 1.5f;
 			}
 
 			if (button(button_viewport, entity.name, theme)) {
-				selected_entity = &entity;
+				selection.set(&entity);
 			}
 
 			next_pos.y -= button_height + button_padding;
 		});
 
 		if (mouse_click(0)) {
-			selected_entity = 0;
+			selection.unset();
 		}
 	}
 };

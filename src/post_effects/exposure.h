@@ -7,7 +7,6 @@ struct Exposure {
 	inline static constexpr u32 min_texture_size = 16;
 	struct Constants {
 		f32 exposure_offset;
-		f32 exposure_scale;
 	};
 
 	enum ApproachKind {
@@ -28,10 +27,11 @@ struct Exposure {
 	t3d::Shader *shader;
 	t3d::TypedShaderConstants<Constants> constants;
 	f32 exposure = 1;
-	f32 scale;
+	f32 adapted_exposure = 1;
 	f32 limit_min = 0;
 	f32 limit_max = 1 << 24;
 	List<t3d::RenderTarget *> downsampled_targets;
+	bool auto_adjustment;
 
 	void init() {
 		constants = t3d::create_shader_constants<Exposure::Constants>();
@@ -44,7 +44,6 @@ struct Exposure {
 
 layout (std140, binding=0) uniform _ {
 	float exposure_offset;
-	float exposure_scale;
 };
 
 layout(binding=0) uniform sampler2D main_texture;
@@ -82,84 +81,86 @@ void main() {
 
 	void render(t3d::RenderTarget *source, t3d::RenderTarget *destination) {
 		timed_block("Exposure::render"s);
+		
+		t3d::set_rasterizer(
+			t3d::get_rasterizer()
+				.set_depth_test(false)
+				.set_depth_write(false)
+		);
 
-		{
-			timed_block("Downsample"s);
-			t3d::set_rasterizer(
-				t3d::get_rasterizer()
-					.set_depth_test(false)
-					.set_depth_write(false)
-			);
+		if (auto_adjustment) {
+			{
+				timed_block("Downsample"s);
 
-			t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+				t3d::set_blend(t3d::BlendFunction_disable, {}, {});
 
-			t3d::set_shader(blit_texture_shader);
+				t3d::set_shader(blit_texture_shader);
 
-			auto sample_from = source;
-			for (auto &target : downsampled_targets) {
-				timed_block("blit"s);
-				t3d::set_render_target(target);
-				t3d::set_viewport(target->color->size);
-				t3d::set_texture(sample_from->color, 0);
-				t3d::draw(3);
-				sample_from = target;
-			}
-		}
-
-		v3f texels[Exposure::min_texture_size * Exposure::min_texture_size];
-
-		{
-			timed_block("t3d::read_texture"s);
-			t3d::read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
-		}
-		{
-			timed_block("average"s);
-			f32 target_exposure = 0;
-			switch (mask_kind) {
-				case Exposure::Mask_one: {
-					f32 sum_luminance = 0;
-					for (auto texel : texels) {
-						sum_luminance += max(texel.x, texel.y, texel.z);
-					}
-					if (sum_luminance == 0) {
-						target_exposure = limit_max;
-					} else {
-						target_exposure = clamp(1 / sum_luminance * count_of(texels), limit_min, limit_max);
-					}
-					break;
+				auto sample_from = source;
+				for (auto &target : downsampled_targets) {
+					timed_block("blit"s);
+					t3d::set_render_target(target);
+					t3d::set_viewport(target->color->size);
+					t3d::set_texture(sample_from->color, 0);
+					t3d::draw(3);
+					sample_from = target;
 				}
-				case Exposure::Mask_proximity: {
-					f32 sum_luminance = 0;
-					f32 sum_mask = 0;
-					for (u32 y = 0; y < Exposure::min_texture_size; ++y) {
-						for (u32 x = 0; x < Exposure::min_texture_size; ++x) {
-							auto texel = texels[y*Exposure::min_texture_size+x];
-							f32 dist = distance(V2f(x,y), V2f(63)*0.5);
+			}
 
-							constexpr f32 inv_diagonal = 1 / max(1, CE::sqrt(pow2(Exposure::min_texture_size * 0.5f - 0.5f) * 2));
+			v3f texels[Exposure::min_texture_size * Exposure::min_texture_size];
 
-							f32 mask = map_clamped(dist * inv_diagonal, mask_radius, 0.0f, 0.0f, 1.0f);
-							sum_mask += mask;
-							sum_luminance += mask * max(texel.x, texel.y, texel.z);
+			{
+				timed_block("t3d::read_texture"s);
+				t3d::read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
+			}
+			{
+				timed_block("average"s);
+				f32 target_exposure = 0;
+				switch (mask_kind) {
+					case Exposure::Mask_one: {
+						f32 sum_luminance = 0;
+						for (auto texel : texels) {
+							sum_luminance += max(texel.x, texel.y, texel.z);
 						}
+						if (sum_luminance == 0) {
+							target_exposure = limit_max;
+						} else {
+							target_exposure = clamp(1 / sum_luminance * count_of(texels), limit_min, limit_max);
+						}
+						break;
 					}
-					if (sum_luminance == 0) {
-						target_exposure = limit_max;
-					} else {
-						target_exposure = clamp(1 / sum_luminance * sum_mask, limit_min, limit_max);
+					case Exposure::Mask_proximity: {
+						f32 sum_luminance = 0;
+						f32 sum_mask = 0;
+						for (u32 y = 0; y < Exposure::min_texture_size; ++y) {
+							for (u32 x = 0; x < Exposure::min_texture_size; ++x) {
+								auto texel = texels[y*Exposure::min_texture_size+x];
+								f32 dist = distance(V2f(x,y), V2f(63)*0.5);
+
+								constexpr f32 inv_diagonal = 1 / max(1, CE::sqrt(pow2(Exposure::min_texture_size * 0.5f - 0.5f) * 2));
+
+								f32 mask = map_clamped(dist * inv_diagonal, mask_radius, 0.0f, 0.0f, 1.0f);
+								sum_mask += mask;
+								sum_luminance += mask * max(texel.x, texel.y, texel.z);
+							}
+						}
+						if (sum_luminance == 0) {
+							target_exposure = limit_max;
+						} else {
+							target_exposure = clamp(1 / sum_luminance * sum_mask, limit_min, limit_max);
+						}
+						break;
 					}
-					break;
+					default:
+						invalid_code_path("mask_kind is invalid");
+						break;
 				}
-				default:
-					invalid_code_path("mask_kind is invalid");
-					break;
+				adapted_exposure = pow(2, lerp(log2(adapted_exposure), log2(target_exposure), frame_time));
 			}
-			exposure = pow(2, lerp(log2(exposure), log2(target_exposure), frame_time));
 		}
 
 		t3d::update_shader_constants(constants, {
-			.exposure_offset = +exposure * scale,
-			.exposure_scale = scale
+			.exposure_offset = adapted_exposure * exposure,
 		});
 
 		t3d::set_shader(shader);

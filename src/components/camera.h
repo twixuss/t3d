@@ -46,7 +46,7 @@ DECLARE_COMPONENT(Camera) {
 };
 
 template <>
-void on_create(Camera &camera) {
+void component_init(Camera &camera) {
 	auto create_hdr_target = [&]() {
 		auto hdr_color = t3d::create_texture(t3d::CreateTexture_default, 1, 1, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_linear, t3d::Comparison_none);
 		auto hdr_depth = t3d::create_texture(t3d::CreateTexture_default, 1, 1, 0, t3d::TextureFormat_depth,   t3d::TextureFiltering_none,   t3d::Comparison_none);
@@ -56,7 +56,8 @@ void on_create(Camera &camera) {
 	camera.destination_target = create_hdr_target();
 
 	auto &exposure = camera.add_post_effect<Exposure>();
-	exposure.scale = 0.5f;
+	exposure.auto_adjustment = false;
+	exposure.exposure = 1.5;
 	exposure.limit_min = 1.0f / 16;
 	exposure.limit_max = 1024;
 	exposure.approach_kind = Exposure::Approach_log_lerp;
@@ -64,7 +65,6 @@ void on_create(Camera &camera) {
 	exposure.mask_radius = 1;
 
 	auto &bloom = camera.add_post_effect<Bloom>();
-	bloom.threshold = 1;
 
 	auto &dither = camera.add_post_effect<Dither>();
 }

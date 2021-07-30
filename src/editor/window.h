@@ -10,6 +10,7 @@ enum EditorWindowKind : u16 {
 	EditorWindow_scene_view,
 	EditorWindow_hierarchy_view,
 	EditorWindow_property_view,
+	EditorWindow_file_view,
 };
 
 struct EditorWindow/* : InputHandler */{

@@ -47,8 +47,6 @@ void free() {
 }
 
 Pixels load_pixels(Span<pathchar> path, LoadPixelsParams params) {
-	print(Print_info, "Loading texture %.\n", path);
-
 	Pixels result;
 
 	auto file = read_entire_file(path);

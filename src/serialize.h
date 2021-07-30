@@ -22,6 +22,14 @@ void serialize(StringBuilder &builder, f32 value) {
 	append(builder, value);
 }
 
+void serialize(StringBuilder &builder, v3f value) {
+	append(builder, value.x);
+	append(builder, ' ');
+	append(builder, value.y);
+	append(builder, ' ');
+	append(builder, value.z);
+}
+
 void serialize(StringBuilder &builder, Texture *value) {
 	if (value) {
 		escape_string(builder, value->name);
@@ -58,11 +66,17 @@ List<utf8> serialize_scene() {
 
 		append(builder, "entity ");
 		escape_string(builder, entity.name);
-		append(builder, " {\n");
-		append_format(builder, "\tposition % % %\n", entity.position.x, entity.position.y, entity.position.z);
+		
+		append(builder, " {\n\tposition ");
+		serialize(builder, entity.position);
+		append(builder, '\n');
+		
 		auto angles = degrees(to_euler_angles(entity.rotation));
-		append_format(builder, "\trotation % % %\n", angles.x, angles.y, angles.z);
-		append_format(builder, "\tscale % % %\n", entity.scale.x, entity.scale.y, entity.scale.z);
+		append_format(builder, "\trotation % % %\n\tscale ", angles.x, angles.y, angles.z);
+		
+		serialize(builder, entity.scale);
+		append(builder, '\n');
+
 		for (auto &component : entity.components) {
 			append(builder, "\t");
 			append(builder, component_names[component.type]);
@@ -323,7 +337,7 @@ bool deserialize_scene(Span<utf8> source) {
 							if (!component_functions[component_type].deserialize(t, end, added.pointer)) {
 								return false;
 							}
-							component_functions[component_type].on_create(added.pointer);
+							component_functions[component_type].init(added.pointer);
 							break;
 						}
 					}
@@ -361,6 +375,13 @@ bool deserialize(f32 &value, Token *&from, Token *end) {
 	return true;
 }
 
+bool deserialize(v3f &value, Token *&from, Token *end) {
+	if (!deserialize(value.x, from, end)) return false;
+	if (!deserialize(value.y, from, end)) return false;
+	if (!deserialize(value.z, from, end)) return false;
+	return true;
+}
+
 bool deserialize(Texture *&value, Token *&from, Token *end) {
 	if (from->kind == Token_null) {
 		value = 0;
@@ -371,13 +392,8 @@ bool deserialize(Texture *&value, Token *&from, Token *end) {
 	if (!successful_path) {
 		return false;
 	}
-	auto path = to_utf16(successful_path.value);
-	auto found = textures_by_path.find(path);
-	if (found) {
-		value = *found;
-	} else {
-		value = load_texture(path);
-	}
+
+	value = assets.textures.get(successful_path.value);
 
 	from += 1;
 

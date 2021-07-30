@@ -11,13 +11,9 @@ f(Texture *, lightmap, 0) \
 
 DECLARE_COMPONENT(MeshRenderer) {
 	Material *material = 0;
-
-	void free() {
-
-	}
 };
 
 template <>
-void on_create(MeshRenderer &mesh_renderer) {
+void component_init(MeshRenderer &mesh_renderer) {
 	if (!mesh_renderer.lightmap) mesh_renderer.lightmap = black_texture;
 }
