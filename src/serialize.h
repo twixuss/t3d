@@ -1,11 +1,11 @@
 #pragma once
-#include <t3d.h>
+#include "tl.h"
 #include "entity.h"
 #include "material.h"
 #include "texture.h"
 
 inline void serialize_component(StringBuilder &builder, u32 component_type, void *data) {
-	component_functions[component_type].serialize(builder, data);
+	component_info[component_type].serialize(builder, data);
 }
 
 void escape_string(StringBuilder &builder, Span<utf8> string) {
@@ -30,7 +30,7 @@ void serialize(StringBuilder &builder, v3f value) {
 	append(builder, value.z);
 }
 
-void serialize(StringBuilder &builder, Texture *value) {
+void serialize(StringBuilder &builder, Texture2D *value) {
 	if (value) {
 		escape_string(builder, value->name);
 	} else {
@@ -61,8 +61,9 @@ List<utf8> serialize_scene() {
 	//}
 
 	for_each(entities, [&](Entity &entity) {
-		if (entity.flags & Entity_editor)
+		if (is_editor_entity(entity)) {
 			return;
+		}
 
 		append(builder, "entity ");
 		escape_string(builder, entity.name);
@@ -79,7 +80,7 @@ List<utf8> serialize_scene() {
 
 		for (auto &component : entity.components) {
 			append(builder, "\t");
-			append(builder, component_names[component.type]);
+			append(builder, component_info[component.type].name);
 			append(builder, " {\n");
 			serialize_component(builder, component.type, component_storages[component.type].get(component.index));
 			append(builder, "\t}\n");
@@ -88,6 +89,18 @@ List<utf8> serialize_scene() {
 	});
 
 	return (List<utf8>)to_string(builder, current_allocator);
+}
+
+constexpr auto window_layout_path = tl_file_string("window_layout"s);
+
+void serialize_window_layout() {
+	scoped_allocator(temporary_allocator);
+
+	StringBuilder builder;
+
+	main_window->serialize(builder);
+	
+	write_entire_file(window_layout_path, as_bytes(to_string(builder)));
 }
 
 Optional<List<utf8>> unescape_string(Span<utf8> literal) {
@@ -102,12 +115,24 @@ Optional<List<utf8>> unescape_string(Span<utf8> literal) {
 	return unescaped_name;
 }
 
-bool deserialize_scene(Span<utf8> source) {
+bool deserialize_scene(Span<utf8> path) {
+	auto source = (Span<utf8>)with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
+
+	if (!source.data) {
+		print(Print_error, "Failed to read scene file '%'\n", path);
+		return false;
+	}
+
 	List<Token> tokens;
 	tokens.allocator = temporary_allocator;
 
 	utf8 *c = source.data;
 	utf8 *end = source.end();
+
+	HashMap<Span<utf8>, TokenKind> string_to_token_kind;
+	string_to_token_kind.allocator = temporary_allocator;
+	string_to_token_kind.get_or_insert(u8"null"s)   = Token_null;
+	string_to_token_kind.get_or_insert(u8"entity"s) = Token_entity;
 
 	while (c != end) {
 		while (c != end && is_whitespace(*c)) {
@@ -119,7 +144,6 @@ bool deserialize_scene(Span<utf8> source) {
 
 		if (is_alpha(*c) || *c == '_') {
 			Token token;
-			token.kind = Token_identifier;
 			token.string.data = c;
 
 			c += 1;
@@ -129,10 +153,11 @@ bool deserialize_scene(Span<utf8> source) {
 
 			token.string.size = c - token.string.data;
 			
-			if (token.string == u8"null"s) {
-				token.kind = Token_null;
-			} else if (token.string == u8"entity"s) {
-				token.kind = Token_entity;
+			auto found = string_to_token_kind.find(token.string);
+			if (found) {
+				token.kind = *found;
+			} else {
+				token.kind = Token_identifier;
 			}
 
 			tokens.add(token);
@@ -219,12 +244,14 @@ bool deserialize_scene(Span<utf8> source) {
 		};
 
 		while (t != end) {
+
 			if (t->kind != Token_entity) {
 				print(Print_error, "Expected 'entity' keyword, but got '%'\n", t->string);
 				return false;
 			}
-			t += 1;
 			
+			t += 1;
+
 			if (t == end) {
 				print(Print_error, "Expected entity name in quotes after 'entity' keyword, but got end of file\n");
 				return false;
@@ -242,6 +269,7 @@ bool deserialize_scene(Span<utf8> source) {
 			List<utf8> unescaped_name = successfully_unescaped_name.value;
 
 			++t;
+			
 			if (t == end) {
 				print(Print_error, "Expected '{' after entity name, but got end of file\n");
 				return false;
@@ -250,9 +278,8 @@ bool deserialize_scene(Span<utf8> source) {
 				print(Print_error, "Expected '{' after entity name, but got '%'\n", t->string);
 				return false;
 			}
-			
 			++t;
-			
+
 			print(unescaped_name);
 			auto &entity = create_entity(unescaped_name);
 			added_entities.add(&entity);
@@ -307,7 +334,7 @@ bool deserialize_scene(Span<utf8> source) {
 					if (!parse_float(entity.scale.z)) return false;
 				} else {
 					for (u32 component_type = 0; component_type < component_type_count; component_type += 1) {
-						auto component_name = component_names[component_type];
+						auto component_name = component_info[component_type].name;
 						if (t->string == component_name) {
 							t += 1;
 							if (t == end) {
@@ -326,6 +353,7 @@ bool deserialize_scene(Span<utf8> source) {
 
 							auto added = component_storages[component_type].add();
 
+							component_info[component_type].construct(added.pointer);
 							((Component *)added.pointer)->entity_index = entity_index;
 
 							entity.components.add(ComponentIndex{
@@ -334,10 +362,10 @@ bool deserialize_scene(Span<utf8> source) {
 								.entity_index = entity_index,
 							});
 
-							if (!component_functions[component_type].deserialize(t, end, added.pointer)) {
+							if (!component_info[component_type].deserialize(t, end, added.pointer)) {
 								return false;
 							}
-							component_functions[component_type].init(added.pointer);
+							component_info[component_type].init(added.pointer);
 							break;
 						}
 					}
@@ -382,7 +410,7 @@ bool deserialize(v3f &value, Token *&from, Token *end) {
 	return true;
 }
 
-bool deserialize(Texture *&value, Token *&from, Token *end) {
+bool deserialize(Texture2D *&value, Token *&from, Token *end) {
 	if (from->kind == Token_null) {
 		value = 0;
 		return true;
@@ -393,7 +421,7 @@ bool deserialize(Texture *&value, Token *&from, Token *end) {
 		return false;
 	}
 
-	value = assets.textures.get(successful_path.value);
+	value = assets.textures_2d.get(successful_path.value);
 
 	from += 1;
 
@@ -410,42 +438,68 @@ bool deserialize(Mesh *&value, Token *&from, Token *end) {
 	if (!successful_path) {
 		return false;
 	}
-	auto path = successful_path.value;
-
-	auto found = meshes_by_name.find(path);
-	if (found) {
-		value = *found;
-	} else {
-		auto submesh_separator = find(path, u8':');
-		if (submesh_separator) {
-			auto scene_path   = Span<utf8>{path.data, submesh_separator};
-			auto submesh_name = Span<utf8>{submesh_separator + 1, path.end()};
-
-
-			auto found_scene = scenes3d_by_name.find(scene_path);
-			Scene3D *scene = 0;
-			if (found_scene) {
-				scene = *found_scene;
-			} else {
-				scene = &scenes3d.add();
-				auto parsed = parse_glb_from_file(scene_path);
-				if (!parsed) {
-					print(Print_error, "Failed to parse scene file '%'\n", scene_path);
-					return false;
-				}
-				*scene = parsed.value;
-				scenes3d_by_name.get_or_insert(scene_path) = scene;
-			}
-
-			assert(scene);
-
-			value = get_submesh(*scene, submesh_name);
-		} else {
-			value = load_mesh(path);
-		}
-	}
+	
+	value = assets.meshes.get(successful_path.value);
 
 	from += 1;
 
 	return true;
+}
+
+EditorWindow *deserialize_editor_window(Stream &stream) {
+#define read_bytes(value) if (!stream.b_read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
+
+	EditorWindowKind kind;
+	read_bytes(kind);
+	
+	EditorWindowId window_id;
+	read_bytes(window_id);
+
+	// TODO: make this scalable, like components
+	EditorWindow *window;
+	switch (kind) {
+		case EditorWindow_file_view:      window = create_editor_window<FileView>(kind, window_id); break;
+		case EditorWindow_hierarchy_view: window = create_editor_window<HierarchyView>(kind, window_id); break;
+		case EditorWindow_property_view:  window = create_editor_window<PropertyView>(kind, window_id); break;
+		case EditorWindow_scene_view:     window = create_editor_window<SceneView>(kind, window_id); break;
+		case EditorWindow_split_view:     window = create_editor_window<SplitView>(kind, window_id); break;
+		case EditorWindow_tab_view:       window = create_editor_window<TabView>(kind, window_id); break;
+		default: {
+			print(Print_error, "Failed to deserialize editor window: invalid kind (%)\n", (u32)kind);
+			return 0;
+		}
+	}
+		
+	EditorWindowId parent_id;
+	read_bytes(parent_id);
+
+	if (parent_id != (EditorWindowId)-1) {
+		auto found = editor_windows.find(parent_id);
+		if (!found) {
+			print(Print_error, "Failed to deserialize editor window: parent_id is invalid (%)\n", parent_id);
+			return 0;
+		}
+		window->parent = *found;
+	}
+#undef read_bytes
+
+	if (!window->deserialize(stream)) {
+		return 0;
+	}
+
+	return window;
+}
+
+bool deserialize_window_layout() {
+	auto buffer = with(temporary_allocator, read_entire_file(window_layout_path));
+	if (!buffer.data) {
+		print(Print_error, "Failed to deserialize window layout: file % does not exist\n", window_layout_path);
+		return false;
+	}
+
+	auto stream = create_memory_stream(buffer);
+
+	main_window = deserialize_editor_window(*stream);
+
+	return stream->remaining_bytes() == 0 && main_window != 0;
 }

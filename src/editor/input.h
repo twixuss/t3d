@@ -40,8 +40,16 @@ u32 focusable_input_user_index;
 u32 should_switch_focus_to = -1;
 u32 input_locker;
 
-bool drag_and_dropping;
-List<utf8> drag_and_drop_path;
+enum DragAndDropKind {
+	DragAndDrop_none,
+	DragAndDrop_file,
+	DragAndDrop_tab,
+};
+DragAndDropKind drag_and_drop_kind;
+
+List<u8> drag_and_drop_data;
+
+bool should_unlock_input;
 
 void begin_input_user(bool focusable = false) {
 	input_user_index += 1;
@@ -112,8 +120,7 @@ void lock_input(v2s position = current_mouse_position) {
 	input_locker = input_user_index;
 }
 void unlock_input_nocheck() {
-	input_is_locked = false;
-	input_locker = 0;
+	should_unlock_input = true;
 }
 void unlock_input() {
 	assert(input_locker == input_user_index);
@@ -129,14 +136,18 @@ bool should_focus() {
 	}
 }
 
-bool begin_drag_and_drop() {
-	if (drag_and_dropping) {
+bool drag_and_dropping() {
+	return drag_and_drop_kind != DragAndDrop_none;
+}
+
+bool begin_drag_and_drop(DragAndDropKind kind) {
+	if (input_is_locked || drag_and_dropping()) {
 		return false;
 	}
 
 	bool result = mouse_begin_drag(0);
 	if (result) {
-		drag_and_dropping = true;
+		drag_and_drop_kind = kind;
 		lock_input();
 		return true;
 	} else {
@@ -144,25 +155,17 @@ bool begin_drag_and_drop() {
 	}
 }
 
-void set_drag_and_drop_file(Span<utf8> path) {
-	drag_and_drop_path = as_list(path);
-}
-
-bool accept_drag_and_drop() {
-	if (!drag_and_dropping)
+bool accept_drag_and_drop(DragAndDropKind kind) {
+	if (!drag_and_dropping() || drag_and_drop_kind != kind)
 		return false;
 
 	bool result = (key_state[256 + 0].state & KeyState_up) && in_bounds(current_mouse_position, current_scissor);
 	if (result) {
-		drag_and_dropping = false;
+		drag_and_drop_kind = DragAndDrop_none;
 		unlock_input_nocheck();
 		return true;
 	} else {
 		return false;
 	}
-}
-
-List<utf8> get_drag_and_drop_file() {
-	return drag_and_drop_path;
 }
 

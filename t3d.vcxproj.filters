@@ -3,15 +3,11 @@
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\tl.cpp" />
-    <ClCompile Include="src\t3d.cpp" />
-    <ClCompile Include="src\d3d11.cpp" />
-    <ClCompile Include="src\gl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\t3d.h" />
     <ClInclude Include="src\tl.h" />
     <ClInclude Include="src\material.h" />
     <ClInclude Include="src\component.h" />
@@ -63,6 +59,8 @@
     <ClInclude Include="src\gui.h" />
     <ClInclude Include="src\components\rotator.h" />
     <ClInclude Include="src\assets.h" />
+    <ClInclude Include="src\editor\window_list.h" />
+    <ClInclude Include="src\editor\tab_view.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

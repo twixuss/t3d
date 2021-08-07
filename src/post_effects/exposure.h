@@ -1,5 +1,5 @@
 #pragma once
-#include <t3d.h>
+#include "../post_effect.h"
 #include "../src/time.h" // TODO without  ../src/  crt's time.h will be included
 #include "blit.h"
 
@@ -24,18 +24,18 @@ struct Exposure {
 	MaskKind mask_kind;
 	f32 mask_radius;
 
-	t3d::Shader *shader;
-	t3d::TypedShaderConstants<Constants> constants;
+	tg::Shader *shader;
+	tg::TypedShaderConstants<Constants> constants;
 	f32 exposure = 1;
 	f32 adapted_exposure = 1;
 	f32 limit_min = 0;
 	f32 limit_max = 1 << 24;
-	List<t3d::RenderTarget *> downsampled_targets;
+	List<tg::RenderTarget *> downsampled_targets;
 	bool auto_adjustment;
 
 	void init() {
-		constants = t3d::create_shader_constants<Exposure::Constants>();
-		shader = t3d::create_shader(u8R"(
+		constants = tg::create_shader_constants<Exposure::Constants>();
+		shader = tg::create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -79,11 +79,11 @@ void main() {
 	}
 
 
-	void render(t3d::RenderTarget *source, t3d::RenderTarget *destination) {
+	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
 		timed_block("Exposure::render"s);
 		
-		t3d::set_rasterizer(
-			t3d::get_rasterizer()
+		tg::set_rasterizer(
+			tg::get_rasterizer()
 				.set_depth_test(false)
 				.set_depth_write(false)
 		);
@@ -91,18 +91,18 @@ void main() {
 		if (auto_adjustment) {
 			{
 				timed_block("Downsample"s);
+				
+				tg::disable_blend();
 
-				t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-
-				t3d::set_shader(blit_texture_shader);
+				tg::set_shader(blit_texture_shader);
 
 				auto sample_from = source;
 				for (auto &target : downsampled_targets) {
 					timed_block("blit"s);
-					t3d::set_render_target(target);
-					t3d::set_viewport(target->color->size);
-					t3d::set_texture(sample_from->color, 0);
-					t3d::draw(3);
+					tg::set_render_target(target);
+					tg::set_viewport(target->color->size);
+					tg::set_texture(sample_from->color, 0);
+					tg::draw(3);
 					sample_from = target;
 				}
 			}
@@ -110,8 +110,8 @@ void main() {
 			v3f texels[Exposure::min_texture_size * Exposure::min_texture_size];
 
 			{
-				timed_block("t3d::read_texture"s);
-				t3d::read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
+				timed_block("tg::read_texture"s);
+				tg::read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
 			}
 			{
 				timed_block("average"s);
@@ -137,7 +137,7 @@ void main() {
 								auto texel = texels[y*Exposure::min_texture_size+x];
 								f32 dist = distance(V2f(x,y), V2f(63)*0.5);
 
-								constexpr f32 inv_diagonal = 1 / max(1, CE::sqrt(pow2(Exposure::min_texture_size * 0.5f - 0.5f) * 2));
+								constexpr f32 inv_diagonal = 1 / max(1, ce::sqrt(pow2(Exposure::min_texture_size * 0.5f - 0.5f) * 2));
 
 								f32 mask = map_clamped(dist * inv_diagonal, mask_radius, 0.0f, 0.0f, 1.0f);
 								sum_mask += mask;
@@ -159,16 +159,16 @@ void main() {
 			}
 		}
 
-		t3d::update_shader_constants(constants, {
+		tg::update_shader_constants(constants, {
 			.exposure_offset = adapted_exposure * exposure,
 		});
 
-		t3d::set_shader(shader);
-		t3d::set_shader_constants(constants, 0);
-		t3d::set_render_target(destination);
-		t3d::set_viewport(destination->color->size);
-		t3d::set_texture(source->color, 0);
-		t3d::draw(3);
+		tg::set_shader(shader);
+		tg::set_shader_constants(constants, 0);
+		tg::set_render_target(destination);
+		tg::set_viewport(destination->color->size);
+		tg::set_texture(source->color, 0);
+		tg::draw(3);
 	}
 
 	void resize(v2u size) {
@@ -178,10 +178,10 @@ void main() {
 		u32 target_index = 0;
 		while (1) {
 			if (target_index < downsampled_targets.size) {
-				t3d::resize_texture(downsampled_targets[target_index]->color, next_size);
+				tg::resize_texture(downsampled_targets[target_index]->color, next_size);
 			} else {
-				downsampled_targets.add(t3d::create_render_target(
-					t3d::create_texture(t3d::CreateTexture_default, next_size.x, next_size.y, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_linear, t3d::Comparison_none),
+				downsampled_targets.add(tg::create_render_target(
+					tg::create_texture_2d(next_size.x, next_size.y, 0, tg::Format_rgb_f16, tg::Filtering_linear),
 					0
 				));
 			}

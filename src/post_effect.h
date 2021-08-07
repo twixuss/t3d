@@ -1,12 +1,12 @@
 #pragma once
-#include <t3d.h>
+#include "tl.h"
 
 struct PostEffect {
 	Allocator allocator = current_allocator;
 	void *data;
 	void (*_init)(void *data);
 	void (*_free)(void *data);
-	void (*_render)(void *data, t3d::RenderTarget *source, t3d::RenderTarget *destination);
+	void (*_render)(void *data, tg::RenderTarget *source, tg::RenderTarget *destination);
 	void (*_resize)(void *data, v2u size);
 
 	void init() {
@@ -16,7 +16,7 @@ struct PostEffect {
 		_free(data);
 		allocator.free(data);
 	}
-	void render(t3d::RenderTarget *source, t3d::RenderTarget *destination) {
+	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
 		_render(data, source, destination);
 	}
 	void resize(v2u size) {
@@ -26,5 +26,5 @@ struct PostEffect {
 
 template <class Effect> void post_effect_init(void *data) { ((Effect *)data)->init(); }
 template <class Effect> void post_effect_free(void *data) { ((Effect *)data)->free(); }
-template <class Effect> void post_effect_render(void *data, t3d::RenderTarget *source, t3d::RenderTarget *destination) { ((Effect *)data)->render(source, destination); }
+template <class Effect> void post_effect_render(void *data, tg::RenderTarget *source, tg::RenderTarget *destination) { ((Effect *)data)->render(source, destination); }
 template <class Effect> void post_effect_resize(void *data, v2u size) { ((Effect *)data)->resize(size); }

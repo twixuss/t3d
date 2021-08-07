@@ -16,11 +16,32 @@ tl::umm get_hash(struct ManipulatorStateKey const &);
 #include "editor/split_view.h"
 #include "editor/property_view.h"
 #include "editor/file_view.h"
+#include "editor/tab_view.h"
 #include "editor/input.h"
 #include "serialize.h"
 #include "assets.h"
 
-using namespace tl;
+#define c(name) { \
+.init         = adapt_editor_window_init<name>, \
+.get_min_size = editor_window_get_min_size<name>, \
+.resize       = editor_window_resize<name>, \
+.render       = editor_window_render<name>, \
+.free         = editor_window_free<name>, \
+.debug_print  = editor_window_debug_print<name>, \
+.serialize    = editor_window_serialize<name>, \
+.deserialize  = editor_window_deserialize<name>, \
+.size         = sizeof(name), \
+.alignment    = alignof(name), \
+}
+#define sep ,
+
+EditorWindowMetadata editor_window_metadata[editor_window_type_count] = {
+	ENUMERATE_WINDOWS
+};
+
+
+#undef sep
+#undef c
 
 static PreciseTimer frame_timer;
 bool is_editor;
@@ -34,7 +55,7 @@ struct GlobalConstants {
 
 	v3f camera_forward;
 };
-t3d::TypedShaderConstants<GlobalConstants> global_constants;
+tg::TypedShaderConstants<GlobalConstants> global_constants;
 #define GLOBAL_CONSTANTS_SLOT 15
 
 
@@ -44,7 +65,7 @@ struct EntityConstants {
 	m4 local_to_world_normal_matrix;
 	m4 object_rotation_matrix;
 };
-t3d::TypedShaderConstants<EntityConstants> entity_constants;
+tg::TypedShaderConstants<EntityConstants> entity_constants;
 #define ENTITY_CONSTANTS_SLOT 14
 
 
@@ -56,7 +77,7 @@ struct LightConstants {
 
 	u32 light_index;
 };
-t3d::TypedShaderConstants<LightConstants> light_constants;
+tg::TypedShaderConstants<LightConstants> light_constants;
 #define LIGHT_CONSTANTS_SLOT 13
 
 
@@ -65,7 +86,7 @@ struct AverageComputeData {
 };
 #define AVERAGE_COMPUTE_SLOT 12
 
-t3d::Shader *shadow_map_shader;
+tg::Shader *shadow_map_shader;
 
 struct HandleConstants {
 	m4 matrix = m4::identity();
@@ -76,15 +97,15 @@ struct HandleConstants {
 	v3f to_camera;
 	f32 is_rotation;
 };
-t3d::TypedShaderConstants<HandleConstants> handle_constants;
-t3d::Shader *handle_shader;
+tg::TypedShaderConstants<HandleConstants> handle_constants;
+tg::Shader *handle_shader;
 
 Material surface_material;
 struct SurfaceConstants {
 	v4f color;
 };
 
-#define shader_value_location(struct, member) t3d::ShaderValueLocation{offsetof(struct, member), sizeof(struct::member)}
+#define shader_value_location(struct, member) tg::ShaderValueLocation{offsetof(struct, member), sizeof(struct::member)}
 
 u32 fps_counter;
 u32 fps_counter_result;
@@ -118,7 +139,7 @@ m4 local_to_world_normal(quaternion rotation, v3f scale) {
 #define LIGHT_TEXTURE_SLOT      14
 #define LIGHTMAP_TEXTURE_SLOT	13
 
-t3d::Shader *create_shader(Span<utf8> source) {
+tg::Shader *create_shader(Span<utf8> source) {
 	auto shader_header = u8R"(
 #ifdef GL_core_profile
 #extension GL_ARB_shading_language_420pack : enable
@@ -241,26 +262,21 @@ float sample_shadow_map(sampler2DShadow shadow_map, float3 light_space, float bi
 #endif
 
 )"s;
-	return t3d::create_shader(with(temporary_allocator, concatenate(shader_header, source)));
+	return tg::create_shader(with(temporary_allocator, concatenate(shader_header, source)));
 }
 
-t3d::ComputeShader *average_shader;
-t3d::ComputeBuffer *average_shader_buffer;
+tg::ComputeShader *average_shader;
+tg::ComputeBuffer *average_shader_buffer;
 
-t3d::Texture *sky_box_texture;
-t3d::Shader *sky_box_shader;
+tg::TextureCube *sky_box_texture;
+tg::Shader *sky_box_shader;
 
-t3d::Texture *floor_lightmap;
+tg::Texture2D *floor_lightmap;
 
-EditorWindow *main_window;
-
-void render_scene(SceneViewWindow *view) {
+void render_scene(SceneView *view) {
 	timed_function();
 
-	t3d::disable_scissor();
-	defer {
-		t3d::enable_scissor();
-	};
+	tg::disable_scissor();
 
 	//print("%\n", to_euler_angles(quaternion_from_euler(0, time, time)));
 	//selected_entity->qrotation = quaternion_from_euler(to_euler_angles(quaternion_from_euler(0, time, time)));
@@ -280,7 +296,7 @@ void render_scene(SceneViewWindow *view) {
 	m4 camera_rotation_matrix = transpose((m4)camera_entity.rotation);
 	camera.world_to_camera_matrix = camera_projection_matrix * camera_rotation_matrix * camera_translation_matrix;
 
-	t3d::update_shader_constants(global_constants, {
+	tg::update_shader_constants(global_constants, {
 		.camera_rotation_projection_matrix = camera_projection_matrix * camera_rotation_matrix,
 		.world_to_camera_matrix = camera.world_to_camera_matrix, 
 		.camera_position = camera_entity.position,
@@ -288,18 +304,18 @@ void render_scene(SceneViewWindow *view) {
 		.camera_forward = camera_entity.rotation * v3f{0,0,-1},
 	});
 
-	t3d::set_render_target(camera.destination_target);
-	t3d::set_viewport(camera.destination_target->color->size);
-	t3d::clear(camera.destination_target, t3d::ClearFlags_color | t3d::ClearFlags_depth, {.9,.1,.9,1}, 1);
+	tg::set_render_target(camera.destination_target);
+	tg::set_viewport(camera.destination_target->color->size);
+	tg::clear(camera.destination_target, tg::ClearFlags_color | tg::ClearFlags_depth, {.9,.1,.9,1}, 1);
 	
-	t3d::set_topology(t3d::Topology_triangle_list);
+	tg::set_topology(tg::Topology_triangle_list);
 
-	t3d::set_rasterizer({
+	tg::set_rasterizer({
 		.depth_test = true,
 		.depth_write = true,
-		.depth_func = t3d::Comparison_less,
+		.depth_func = tg::Comparison_less,
 	});
-	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+	tg::disable_blend();
 
 	u32 light_index = 0;
 	for_each_component_of_type(Light, light) {
@@ -311,7 +327,7 @@ void render_scene(SceneViewWindow *view) {
 
 		auto &light_entity = entities[light.entity_index];
 
-		t3d::update_shader_constants(light_constants, {
+		tg::update_shader_constants(light_constants, {
 			.world_to_light_matrix = light.world_to_light_matrix,
 			.light_position = light_entity.position,
 			.light_intensity = light.intensity,
@@ -319,8 +335,8 @@ void render_scene(SceneViewWindow *view) {
 		});
 
 
-		t3d::set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
-		t3d::set_texture(light.mask->texture, LIGHT_TEXTURE_SLOT);
+		tg::set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
+		tg::set_texture(light.mask, LIGHT_TEXTURE_SLOT);
 		for_each_component_of_type(MeshRenderer, mesh_renderer) {
 			timed_block("MeshRenderer"s);
 			auto &mesh_entity = entities[mesh_renderer.entity_index];
@@ -330,38 +346,38 @@ void render_scene(SceneViewWindow *view) {
 				material = &surface_material;
 			}
 
-			t3d::set_shader(material->shader);
-			t3d::set_shader_constants(material->constants, 0);
+			tg::set_shader(material->shader);
+			tg::set_shader_constants(material->constants, 0);
 
 
 			//entity_data.local_to_camera_matrix = camera.world_to_camera_matrix * m4::translation(mesh_entity.position) * m4::rotation_r_zxy(mesh_entity.rotation);
 			m4 local_to_world = m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale);
-			t3d::update_shader_constants(entity_constants, {
+			tg::update_shader_constants(entity_constants, {
 				.local_to_camera_matrix = camera.world_to_camera_matrix * local_to_world,
 				.local_to_world_position_matrix = local_to_world,
 				.local_to_world_normal_matrix = (m4)mesh_entity.rotation * m4::scale(1 / mesh_entity.scale),
 			});
-			t3d::set_texture(mesh_renderer.lightmap->texture, LIGHTMAP_TEXTURE_SLOT);
+			tg::set_texture(mesh_renderer.lightmap, LIGHTMAP_TEXTURE_SLOT);
 			draw_mesh(mesh_renderer.mesh);
 		};
-		t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
-		t3d::set_rasterizer(t3d::get_rasterizer()
+		tg::set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
+		tg::set_rasterizer(tg::get_rasterizer()
 			.set_depth_test(true)
 			.set_depth_write(false)
-			.set_depth_func(t3d::Comparison_equal)
+			.set_depth_func(tg::Comparison_equal)
 		);
 	};
 
-	t3d::set_rasterizer(t3d::get_rasterizer()
+	tg::set_rasterizer(tg::get_rasterizer()
 		.set_depth_test(true)
 		.set_depth_write(false)
-		.set_depth_func(t3d::Comparison_equal)
+		.set_depth_func(tg::Comparison_equal)
 	);
-	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+	tg::disable_blend();
 
-	t3d::set_shader(sky_box_shader);
-	t3d::set_texture(sky_box_texture, 0);
-	t3d::draw(36);
+	tg::set_shader(sky_box_shader);
+	tg::set_texture(sky_box_texture, 0);
+	tg::draw(36);
 
 	swap(camera.source_target, camera.destination_target);
 
@@ -373,15 +389,13 @@ void render_scene(SceneViewWindow *view) {
 				swap(camera.source_target, camera.destination_target);
 			}
 
-			t3d::set_render_target(t3d::back_buffer);
-			t3d::set_viewport(current_viewport);
-			t3d::set_shader(blit_texture_shader);
-			t3d::set_texture(camera.source_target->color, 0);
-			t3d::draw(3);
+			tg::set_render_target(tg::back_buffer);
+			tg::set_viewport(current_viewport);
+			blit(camera.source_target->color);
 		} else {
 			for (auto &effect : camera.post_effects) {
 				if (&effect == &camera.post_effects.back()) {
-					effect.render(camera.source_target, t3d::back_buffer);
+					effect.render(camera.source_target, tg::back_buffer);
 				} else {
 					effect.render(camera.source_target, camera.destination_target);
 				}
@@ -389,17 +403,17 @@ void render_scene(SceneViewWindow *view) {
 			}
 		}
 	}
+	
+	tg::disable_blend();
 
-	t3d::set_blend(t3d::BlendFunction_disable, {}, {});
+	//tg::clear(tg::back_buffer, tg::ClearFlags_depth, {}, 1);
 
-	//t3d::clear(t3d::back_buffer, t3d::ClearFlags_depth, {}, 1);
-
-	t3d::set_rasterizer({
+	tg::set_rasterizer({
 		.depth_test = true,
 		.depth_write = true,
-		.depth_func = t3d::Comparison_less,
+		.depth_func = tg::Comparison_less,
 	});
-	t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_source_alpha, t3d::Blend_one_minus_source_alpha);
+	tg::set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
 
 	if (selection.kind == Selection_entity) {
 		auto new_transform = manipulate_transform(selection.entity->position, selection.entity->rotation, selection.entity->scale, view->manipulator_kind);
@@ -409,7 +423,7 @@ void render_scene(SceneViewWindow *view) {
 
 		for (auto &request : manipulator_draw_requests) {
 			v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
-			t3d::update_shader_constants(entity_constants, {
+			tg::update_shader_constants(entity_constants, {
 				.local_to_camera_matrix = 
 					camera.world_to_camera_matrix
 					* m4::translation(camera_entity.position + camera_to_handle_direction)
@@ -418,59 +432,59 @@ void render_scene(SceneViewWindow *view) {
 				.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
 				.object_rotation_matrix = (m4)request.rotation,
 			});
-			t3d::set_shader(handle_shader);
-			t3d::set_shader_constants(handle_constants, 0);
+			tg::set_shader(handle_shader);
+			tg::set_shader_constants(handle_constants, 0);
 		
 			u32 selected_element = request.highlighted_part_index;
 
 			v3f to_camera = normalize(camera_entity.position - selection.entity->position);
 			switch (request.kind) {
 				case Manipulate_position: {
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 		
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_axis_x_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_axis_y_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_axis_z_mesh);
 				
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_arrow_x_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_arrow_y_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_arrow_z_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
 					draw_mesh(handle_plane_x_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
 					draw_mesh(handle_plane_y_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
 					draw_mesh(handle_plane_z_mesh);
 					break;
 				}
 				case Manipulate_rotation: {
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 				
 					if (request.dragging) {
 						quaternion rotation = quaternion_look(request.tangent.direction);
 						v3f position = request.tangent.origin;
-						t3d::update_shader_constants(entity_constants, {
+						tg::update_shader_constants(entity_constants, {
 							.local_to_camera_matrix = 
 								camera.world_to_camera_matrix
 								* m4::translation(camera_entity.position + camera_to_handle_direction)
@@ -478,41 +492,41 @@ void render_scene(SceneViewWindow *view) {
 							.local_to_world_normal_matrix = local_to_world_normal(rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
 							.object_rotation_matrix = (m4)rotation,
 						});
-						t3d::update_shader_constants(handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
+						tg::update_shader_constants(handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
 						draw_mesh(handle_tangent_mesh);
 					}
 
 					break;
 				}
 				case Manipulate_scale: {
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 		
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_axis_x_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_axis_y_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_axis_z_mesh);
 				
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
 					draw_mesh(handle_plane_x_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
 					draw_mesh(handle_plane_y_mesh);
 
-					t3d::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					tg::update_shader_constants(handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
 					draw_mesh(handle_plane_z_mesh);
 					break;
 				}
@@ -531,19 +545,18 @@ void run() {
 	manipulator_states = {};
 	debug_lines = {};
 
+	button_states = {};
 	float_field_states = {};
 	text_field_states  = {};
 
 	input_string = {};
 	
+	drag_and_drop_data = {};
+	tab_moves = {};
+	editor_windows = {};
+
 	construct(assets);
 	
-	construct(meshes);
-	meshes_by_name = {};
-
-	construct(scenes3d);
-	scenes3d_by_name = {};
-
 	init_component_storages<
 #define c(name) name
 #define sep ,
@@ -554,56 +567,42 @@ void run() {
 
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
-		auto graphics_api = t3d::GraphicsApi_opengl;
-		assert_always(t3d::init(graphics_api, {
+		auto graphics_api = tg::GraphicsApi_opengl;
+		assert_always(tg::init(graphics_api, {
 			.window = window.handle,
-			.window_size = window.client_size,
 			.debug = BUILD_DEBUG,
 		}));
 		
-		t3d::enable_scissor();
+		tg::set_scissor(aabb_min_max({}, (v2s)window.client_size));
+		tg::set_cull(tg::Cull_back);
 
 		init_font();
 
-		debug_lines_vertex_buffer = t3d::create_vertex_buffer(
+		debug_lines_vertex_buffer = tg::create_vertex_buffer(
 			{},
 			{
-				t3d::Element_f32x3, // position
-				t3d::Element_f32x3, // color
+				tg::Element_f32x3, // position
+				tg::Element_f32x3, // color
 			}
 		);
-		//t3d::set_vsync(false);
+		//tg::set_vsync(false);
 
-		global_constants = t3d::create_shader_constants<GlobalConstants>();
-		t3d::set_shader_constants(global_constants, GLOBAL_CONSTANTS_SLOT);
+		global_constants = tg::create_shader_constants<GlobalConstants>();
+		tg::set_shader_constants(global_constants, GLOBAL_CONSTANTS_SLOT);
 
-		entity_constants = t3d::create_shader_constants<EntityConstants>();
-		t3d::set_shader_constants(entity_constants, ENTITY_CONSTANTS_SLOT);
+		entity_constants = tg::create_shader_constants<EntityConstants>();
+		tg::set_shader_constants(entity_constants, ENTITY_CONSTANTS_SLOT);
 
-		light_constants = t3d::create_shader_constants<LightConstants>();
-		t3d::set_shader_constants(light_constants, LIGHT_CONSTANTS_SLOT);
+		light_constants = tg::create_shader_constants<LightConstants>();
+		tg::set_shader_constants(light_constants, LIGHT_CONSTANTS_SLOT);
 
-		average_shader_buffer = t3d::create_compute_buffer(sizeof(u32));
-		t3d::set_compute_buffer(average_shader_buffer, AVERAGE_COMPUTE_SLOT);
-
-		main_window = create_split_view(
-			create_split_view(
-				create_file_view(),
-				create_scene_view(),
-				{ .split_t = 0 }
-			),
-			create_split_view(
-				create_hierarchy_view(),
-				create_property_view(),
-				{ .horizontal = true }
-			),
-			{ .split_t = 1 }
-		);
+		average_shader_buffer = tg::create_compute_buffer(sizeof(u32));
+		tg::set_compute_buffer(average_shader_buffer, AVERAGE_COMPUTE_SLOT);
 
 		switch (graphics_api) {
-			case t3d::GraphicsApi_opengl: {
-				surface_material.constants = t3d::create_shader_constants(sizeof(SurfaceConstants));
-				t3d::update_shader_constants(surface_material.constants, SurfaceConstants{.color = {1,1,1,1}});
+			case tg::GraphicsApi_opengl: {
+				surface_material.constants = tg::create_shader_constants(sizeof(SurfaceConstants));
+				tg::update_shader_constants(surface_material.constants, SurfaceConstants{.color = {1,1,1,1}});
 				surface_material.shader = create_shader(u8R"(
 layout (std140, binding=0) uniform _ {
 	vec4 u_color;
@@ -644,7 +643,7 @@ void main() {
 	vec3 light_space = (vertex_position_in_light_space.xyz / vertex_position_in_light_space.w) * 0.5 + 0.5;
 
 	float light = sample_shadow_map(shadow_map, light_space, 0.001f);
-	light *= light_intensity / length_squared(vertex_to_light_direction);
+	light *= light_intensity / pow2(length(vertex_to_light_direction) + 1);
 	fragment_color *= light * texture(light_texture, light_space.xy);
 
 	if (light_index == 0) {
@@ -655,7 +654,7 @@ void main() {
 }
 #endif
 )"s);
-				handle_constants = t3d::create_shader_constants<HandleConstants>();
+				handle_constants = tg::create_shader_constants<HandleConstants>();
 				handle_shader = create_shader(u8R"(
 layout (std140, binding=0) uniform _ {
 	mat4 object_matrix;
@@ -700,7 +699,7 @@ void main() {
 }
 #endif
 )"s);
-				blit_texture_shader = t3d::create_shader(u8R"(
+				blit_texture_shader = tg::create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -731,8 +730,8 @@ void main() {
 }
 #endif
 )"s);
-				blit_color_constants = t3d::create_shader_constants<BlitColorConstants>();
-				blit_color_shader = t3d::create_shader(u8R"(
+				blit_color_constants = tg::create_shader_constants<BlitColorConstants>();
+				blit_color_shader = tg::create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -761,8 +760,8 @@ void main() {
 }
 #endif
 )"s);
-				blit_texture_color_constants = t3d::create_shader_constants<BlitTextureColorConstants>();
-				blit_texture_color_shader = t3d::create_shader(u8R"(
+				blit_texture_color_constants = tg::create_shader_constants<BlitTextureColorConstants>();
+				blit_texture_color_shader = tg::create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -852,7 +851,7 @@ void main() {
 }
 #endif
 )"s);
-				average_shader = t3d::create_compute_shader(u8R"(
+				average_shader = tg::create_compute_shader(u8R"(
 layout(std430, binding = )" STRINGIZE(AVERAGE_COMPUTE_SLOT) R"() writeonly buffer sum_buffer {
 	uint dest_sum;
 };
@@ -893,8 +892,8 @@ void main() {
 				break;
 			}
 			/*
-			case t3d::GraphicsApi_d3d11: {
-				surface_shader = t3d::create_shader<SurfaceShaderValues>(concatenate(shader_header, u8R"(
+			case tg::GraphicsApi_d3d11: {
+				surface_shader = tg::create_shader<SurfaceShaderValues>(concatenate(shader_header, u8R"(
 cbuffer _ : register(b0) {
 	float4x4 u_matrix;
 	float4 albedo;
@@ -958,30 +957,27 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}
 
 		u32 white_pixel = ~0;
-		white_texture = &assets.textures.all.add();
-		white_texture->texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &white_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+		white_texture = tg::create_texture_2d(1, 1, &white_pixel, tg::Format_rgba_u8n, tg::Filtering_nearest);
 		white_texture->name = as_list(u8"white"s);
 
 		u32 black_pixel = 0xFF000000;
-		black_texture = &assets.textures.all.add();
-		black_texture->texture = t3d::create_texture(t3d::CreateTexture_default, 1, 1, &black_pixel, t3d::TextureFormat_rgba_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+		black_texture = tg::create_texture_2d(1, 1, &black_pixel, tg::Format_rgba_u8n, tg::Filtering_nearest);
 		black_texture->name = as_list(u8"black"s);
 		
-		auto handle_meshes = parse_glb_from_file(u8"../data/handle.glb"s).get();
-		handle_sphere_mesh  = get_submesh(handle_meshes, u8"Sphere"s);
-		handle_circle_mesh  = get_submesh(handle_meshes, u8"Circle"s);
-		handle_tangent_mesh = get_submesh(handle_meshes, u8"Tangent"s);
-		handle_axis_x_mesh  = get_submesh(handle_meshes, u8"AxisX"s );
-		handle_axis_y_mesh  = get_submesh(handle_meshes, u8"AxisY"s );
-		handle_axis_z_mesh  = get_submesh(handle_meshes, u8"AxisZ"s );
-		handle_arrow_x_mesh = get_submesh(handle_meshes, u8"ArrowX"s );
-		handle_arrow_y_mesh = get_submesh(handle_meshes, u8"ArrowY"s );
-		handle_arrow_z_mesh = get_submesh(handle_meshes, u8"ArrowZ"s );
-		handle_plane_x_mesh = get_submesh(handle_meshes, u8"PlaneX"s);
-		handle_plane_y_mesh = get_submesh(handle_meshes, u8"PlaneY"s);
-		handle_plane_z_mesh = get_submesh(handle_meshes, u8"PlaneZ"s);
+		handle_sphere_mesh  = assets.meshes.get(u8"../data/handle.glb:Sphere"s);
+		handle_circle_mesh  = assets.meshes.get(u8"../data/handle.glb:Circle"s);
+		handle_tangent_mesh = assets.meshes.get(u8"../data/handle.glb:Tangent"s);
+		handle_axis_x_mesh  = assets.meshes.get(u8"../data/handle.glb:AxisX"s );
+		handle_axis_y_mesh  = assets.meshes.get(u8"../data/handle.glb:AxisY"s );
+		handle_axis_z_mesh  = assets.meshes.get(u8"../data/handle.glb:AxisZ"s );
+		handle_arrow_x_mesh = assets.meshes.get(u8"../data/handle.glb:ArrowX"s );
+		handle_arrow_y_mesh = assets.meshes.get(u8"../data/handle.glb:ArrowY"s );
+		handle_arrow_z_mesh = assets.meshes.get(u8"../data/handle.glb:ArrowZ"s );
+		handle_plane_x_mesh = assets.meshes.get(u8"../data/handle.glb:PlaneX"s);
+		handle_plane_y_mesh = assets.meshes.get(u8"../data/handle.glb:PlaneY"s);
+		handle_plane_z_mesh = assets.meshes.get(u8"../data/handle.glb:PlaneZ"s);
 		
-		sky_box_texture = t3d::load_texture({
+		sky_box_texture = tg::load_texture_cube({
 			.left   = tl_file_string("../data/sky_x+.hdr"s),
 			.right  = tl_file_string("../data/sky_x-.hdr"s),
 			.top    = tl_file_string("../data/sky_y+.hdr"s),
@@ -991,15 +987,13 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		});
 
 		auto create_default_scene = [&]() {
-			auto scene_meshes = parse_glb_from_file(u8"../data/scene.glb"s).get();
-
 			auto &suzanne = create_entity("suzan\"ne");
 			suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
 			{
 				auto &mr = add_component<MeshRenderer>(suzanne);
-				mr.mesh = get_submesh(scene_meshes, u8"Suzanne"s);
+				mr.mesh = assets.meshes.get(u8"../data/scene.glb:Suzanne"s);
 				mr.material = &surface_material;
-				mr.lightmap = assets.textures.get(u8"../data/suzanne_lightmap.png"s);
+				mr.lightmap = assets.textures_2d.get(u8"../data/suzanne_lightmap.png"s);
 
 				auto &rotator = add_component<Rotator>(suzanne);
 				rotator.axis = {1, 1, 1};
@@ -1010,12 +1004,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			auto &floor = create_entity("floor");
 			{
 				auto &mr = add_component<MeshRenderer>(floor);
-				mr.mesh = get_submesh(scene_meshes, u8"Room"s);
+				mr.mesh = assets.meshes.get(u8"../data/scene.glb:Room"s);
 				mr.material = &surface_material;
-				mr.lightmap = assets.textures.get(u8"../data/floor_lightmap.png"s);
+				mr.lightmap = assets.textures_2d.get(u8"../data/floor_lightmap.png"s);
 			}
 			
-			auto light_texture = assets.textures.get(u8"../data/spotlight_mask.png"s);
+			auto light_texture = assets.textures_2d.get(u8"../data/spotlight_mask.png"s);
 
 			{
 				auto &light = create_entity("light1");
@@ -1031,10 +1025,41 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 				light.rotation = quaternion_from_euler(-pi/10,pi*0.75,0);
 				add_component<Light>(light).mask = light_texture;
 			}
+			
+			auto &camera_entity = create_entity("main camera");
 
+			auto &camera = add_component<Camera>(camera_entity);
+
+			auto &exposure = camera.add_post_effect<Exposure>();
+			exposure.auto_adjustment = false;
+			exposure.exposure = 1.5;
+			exposure.limit_min = 1.0f / 16;
+			exposure.limit_max = 1024;
+			exposure.approach_kind = Exposure::Approach_log_lerp;
+			exposure.mask_kind = Exposure::Mask_one;
+			exposure.mask_radius = 1;
+
+			auto &bloom = camera.add_post_effect<Bloom>();
+
+			auto &dither = camera.add_post_effect<Dither>();
 		};
 
-		if (!deserialize_scene((Span<utf8>)with(temporary_allocator, read_entire_file(tl_file_string("test.scene"s)))))
+		//if (!deserialize_window_layout())
+			main_window = create_split_view(
+				create_split_view(
+					create_tab_view(create_file_view()),
+					create_tab_view(create_scene_view()),
+					{ .split_t = 0 }
+				),
+				create_split_view(
+					create_tab_view(create_hierarchy_view()),
+					create_tab_view(create_property_view()),
+					{ .horizontal = true }
+				),
+				{ .split_t = 1 }
+			);
+
+		if (!deserialize_scene(u8"test.scene"s))
 			create_default_scene();
 	};
 	info.on_draw = [](Window &window) {
@@ -1046,15 +1071,15 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 			main_window->resize({.min = {}, .max = (v2s)window.client_size});
 
-			t3d::resize_render_targets(window.client_size);
+			tg::resize_render_targets(window.client_size);
 		}
 		
 		current_viewport = current_scissor = {
 			.min = {},
 			.max = (v2s)window.client_size,
 		};
-		t3d::set_viewport(current_viewport);
-		t3d::set_scissor(current_scissor);
+		tg::set_viewport(current_viewport);
+		tg::set_scissor(current_scissor);
 
 		current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
 		
@@ -1073,7 +1098,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			for_each(entities, [](Entity &e) {
 				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).value, e.flags, e.position, degrees(to_euler_angles(e.rotation)));
 				for (auto &c : e.components) {
-					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, component_names[c.type], c.index);
+					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, component_info[c.type].name, c.index);
 				}
 			});
 		}
@@ -1089,9 +1114,11 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		timed_block("frame"s);
 
 #define c(name) \
-	for_each_component_of_type(name, comp) { \
-		component_update(comp); \
-	};
+	if constexpr (is_statically_overridden(update, name, Component)) { \
+		for_each_component_of_type(name, comp) { \
+			comp.update(); \
+		}; \
+	}
 #define sep
 		ENUMERATE_COMPONENTS
 #undef sep
@@ -1100,33 +1127,32 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		{
 			timed_block("Shadows"s);
-
-			t3d::set_rasterizer(
-				t3d::get_rasterizer()
+			tg::disable_scissor();
+			tg::set_rasterizer(
+				tg::get_rasterizer()
 					.set_depth_test(true)
 					.set_depth_write(true)
-					.set_depth_func(t3d::Comparison_less)
+					.set_depth_func(tg::Comparison_less)
 			);
-			t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-			t3d::set_topology(t3d::Topology_triangle_list);
+			tg::disable_blend();
+			tg::set_topology(tg::Topology_triangle_list);
 
 			for_each_component_of_type(Light, light) {
 				timed_block("Light"s);
 				auto &light_entity = entities[light.entity_index];
 
-				t3d::set_render_target(light.shadow_map);
-				t3d::set_viewport(shadow_map_resolution, shadow_map_resolution);
-				t3d::clear(light.shadow_map, t3d::ClearFlags_depth, {}, 1);
+				tg::set_render_target(light.shadow_map);
+				tg::set_viewport(shadow_map_resolution, shadow_map_resolution);
+				tg::clear(light.shadow_map, tg::ClearFlags_depth, {}, 1);
 
-				t3d::set_shader(shadow_map_shader);
+				tg::set_shader(shadow_map_shader);
 
-				//light.world_to_light_matrix = m4::perspective_right_handed(1, radians(90), 0.1f, 100.0f) * m4::rotation_r_yxz(-light_entity.rotation) * m4::translation(-light_entity.position);
-				light.world_to_light_matrix = m4::perspective_right_handed(1, radians(90), 0.1f, 100.0f) * (m4)-light_entity.rotation * m4::translation(-light_entity.position);
+				light.world_to_light_matrix = m4::perspective_right_handed(1, light.fov, 0.1f, 100.0f) * (m4)-light_entity.rotation * m4::translation(-light_entity.position);
 
 				for_each_component_of_type(MeshRenderer, mesh_renderer) {
 					auto &mesh_entity = entities[mesh_renderer.entity_index];
 
-					t3d::update_shader_constants(entity_constants, {
+					tg::update_shader_constants(entity_constants, {
 						.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
 					});
 					draw_mesh(mesh_renderer.mesh);
@@ -1134,18 +1160,174 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			};
 		}
 
-		t3d::clear(t3d::back_buffer, t3d::ClearFlags_color | t3d::ClearFlags_depth, V4f(.2), 1);
+		tg::clear(tg::back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
 		
 		{
 			timed_block("main_window->render()"s);
 			main_window->render();
 		}
 		
+		switch (drag_and_drop_kind) {
+			case DragAndDrop_file: {
+				auto texture = assets.textures_2d.get(as_utf8(drag_and_drop_data));
+				if (texture) {
+					aabb<v2s> thumbnail_viewport;
+					thumbnail_viewport.min = thumbnail_viewport.max = current_mouse_position;
+					thumbnail_viewport.max.x += 128;
+					thumbnail_viewport.min.y -= 128;
+					push_current_viewport(thumbnail_viewport) {
+						blit(texture);
+					}
+				}
+				break;
+			}
+			case DragAndDrop_tab: {
+				auto tab_info = *(DragDropTabInfo *)drag_and_drop_data.data;
+				auto tab = tab_info.tab_view->tabs[tab_info.tab_index];
+
+				auto font = get_font_at_size(font_collection, font_size);
+				ensure_all_chars_present(tab.window->name, font);
+				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
+
+				tg::Viewport tab_viewport;
+				tab_viewport.min = tab_viewport.max = current_mouse_position;
+
+				tab_viewport.min.y -= TabView::tab_height;
+				tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
+
+				push_current_viewport(tab_viewport) {
+					blit({.1,.1,.1,1});
+					draw_text(placed_chars, font, {.position = {2, 0}});
+				}
+				break;
+			}
+		}
+
+		if (drag_and_dropping()) {
+			if (key_state[256].state & KeyState_up) {
+				drag_and_drop_kind = DragAndDrop_none;
+				unlock_input_nocheck();
+			}
+		}
+
 		debug_frame();
 		
-		if (drag_and_dropping && (key_state[256].state & KeyState_up)) {
-			drag_and_dropping = false;
-			unlock_input_nocheck();
+		bool debug_print_editor_window_hierarchy = frame_index == 0;
+		for (auto &move : tab_moves) {
+			auto from = move.from;
+			auto tab_index = move.tab_index;
+			auto to = move.to;
+			auto direction = move.direction;
+			
+			auto tab = from->tabs[tab_index];
+
+			auto remove_tab_view = [&]() {
+				auto split_view = (SplitView *)from->parent;
+				assert(split_view);
+				assert(split_view->kind == EditorWindow_split_view);
+
+				EditorWindow *what_is_left = split_view->get_other_part(from);
+
+				what_is_left->parent = split_view->parent;
+
+				if (split_view->parent) {
+					switch (split_view->parent->kind) {
+						case EditorWindow_split_view: {
+							auto parent_view = (SplitView *)split_view->parent;
+							parent_view->get_part(split_view) = what_is_left;
+							parent_view->resize(parent_view->viewport);
+							break;
+						}
+						default: {
+							invalid_code_path();
+							break;
+						}
+					}
+				} else {
+					auto main_window_viewport = main_window->viewport;
+					main_window = what_is_left;
+					main_window->resize(main_window_viewport);
+				}
+			};
+
+			if (direction == (u32)-1) {
+				if (!tab.window->parent->parent)
+					return;
+
+				to->tabs.add(tab);
+				from->tabs.erase_at(tab_index);
+				from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
+
+				if (from->tabs.size == 0) {
+					remove_tab_view();
+				}
+			} else {
+				bool horizontal = (direction & 1);
+				bool swap_parts = direction >= 2;
+
+				TabView *new_tab_view;
+				if (from->tabs.size == 1) {
+					new_tab_view = from;
+
+					auto from_parent = (SplitView *)from->parent;
+					assert(from_parent);
+					assert(from_parent->kind == EditorWindow_split_view);
+					auto what_is_left = from_parent->get_other_part(from);
+					auto from_parent_parent = (SplitView *)from_parent->parent;
+					assert(from_parent_parent);
+					assert(from_parent_parent->kind == EditorWindow_split_view);
+					from_parent_parent->replace_child(from_parent, what_is_left);
+				} else {
+					from->tabs.erase_at(tab_index);
+					from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
+					if (from->tabs.size == 0) {
+						remove_tab_view();
+					}
+					new_tab_view = create_tab_view(tab.window);
+				}
+
+				auto left = to;
+				auto right = new_tab_view;
+				if (swap_parts) {
+					swap(left, right);
+				}
+
+				if (to->parent) {
+					auto to_parent = (SplitView *)to->parent;
+					assert(to_parent->kind == EditorWindow_split_view);
+
+					to_parent->replace_child(to, create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal}));
+				} else {
+					assert(to == main_window);
+					main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
+				}
+
+				tg::Viewport window_viewport = {};
+				window_viewport.max = (v2s)max(main_window->get_min_size(), window.client_size);
+				main_window->resize(window_viewport);
+				resize(window, (v2u)window_viewport.max);
+
+				//to_parent->resize(to_parent->viewport);
+			}
+
+			//split_view->free();
+
+			debug_print_editor_window_hierarchy = true;
+		}
+		tab_moves.clear();
+
+
+		if (should_unlock_input) {
+			should_unlock_input = false;
+			input_is_locked = false;
+			input_locker = 0;
+		}
+		
+		if (debug_print_editor_window_hierarchy || (key_state[Key_f4].state & KeyState_down)) {
+			debug_print_editor_window_hierarchy = false;
+			debug_print_editor_window_hierarchy_tab = 0;
+
+			main_window->debug_print();
 		}
 
 		for (auto &state : key_state) {
@@ -1169,12 +1351,13 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 		{
 			timed_block("present"s);
-			t3d::present();
+			tg::present();
 		}
 
 		frame_time = min(max_frame_time, reset(frame_timer));
 		time += frame_time;
 		++fps_counter;
+		frame_index += 1;
 
 		set_title(&window, tformat(u8"frame_time: % ms, fps: %", frame_time * 1000, fps_counter_result));
 
@@ -1228,6 +1411,8 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	}
 
 	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene())));
+	
+	serialize_window_layout();
 
 	for_each(entities, [](Entity &e) {
 		destroy(e);
@@ -1266,20 +1451,20 @@ s32 tl_main(Span<Span<utf8>> arguments) {
  - Vendor: %
  - Thread count: %
  - Cache line size: %
-)", as_span(cpu_info.brand), to_string(cpu_info.vendor), cpu_info.logicalProcessorCount, cpu_info.cacheLineSize);
+)", as_span(cpu_info.brand), to_string(cpu_info.vendor), cpu_info.logical_processor_count, cpu_info.cache_line_size);
 	
 	print("Cache:\n");
 
 	for (u32 level = 0; level != CpuCacheLevel_count; ++level) {
 		for (u32 type_index = 0; type_index != CpuCacheType_count; ++type_index) {
-			auto &cache = cpu_info.cache[level][type_index];
+			auto &cache = cpu_info.caches_by_level_and_type[level][type_index];
 			if (cache.count == 0 || cache.size == 0)
 				continue;
 			print("L% %: % x %\n", level + 1, to_string((CpuCacheType)type_index), cache.count, format_bytes(cache.size));
 		}
 	}
 
-#define f(x) print(" - " #x ": %\n", cpu_info.hasFeature(CpuFeature_##x));
+#define f(x) print(" - " #x ": %\n", cpu_info.has_feature(CpuFeature_##x));
 	tl_all_cpu_features(f)
 #undef f
 

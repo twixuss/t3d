@@ -1,14 +1,14 @@
 entity "suzan\"ne" {
 	position 0 0 0
-	rotation -37.623 22.62 -31.681
+	rotation -46.396 87.713 -28.062
 	scale 1 1 1
 	MeshRenderer {
 		mesh "../data/scene.glb:Suzanne"
 		lightmap "../data/suzanne_lightmap.png"
 	}
 	Rotator {
-		axis 0 1 0
-		degrees_per_second 0
+		axis 1 1 1
+		degrees_per_second 30
 	}
 }
 entity "floor" {
@@ -21,20 +21,30 @@ entity "floor" {
 	}
 }
 entity "light1" {
-	position 0 0.892 -3.684
-	rotation 11.869 33.904 0
+	position 0 2 6
+	rotation -0 0 0
 	scale 1 1 1
 	Light {
-		intensity 99.249
+		intensity 100
+		fov 1.57
 		mask "../data/spotlight_mask.png"
 	}
 }
 entity "light2" {
-	position 7.164 -3.072 -7.164
-	rotation 15.969 -73.221 -8.402
+	position 1.735 3.055 -0.976
+	rotation -89.999 0 0
 	scale 1 1 1
 	Light {
-		intensity 152.567
+		intensity 10
+		fov 1.57
 		mask "../data/spotlight_mask.png"
+	}
+}
+entity "main camera" {
+	position 0 0 0
+	rotation -0 0 0
+	scale 1 1 1
+	Camera {
+		fov 1.57
 	}
 }

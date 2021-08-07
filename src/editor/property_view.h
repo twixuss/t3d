@@ -5,16 +5,16 @@
 #include "../gui.h"
 #include "../selection.h"
 
-struct PropertyViewWindow : EditorWindow {
+struct PropertyView : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(t3d::Viewport viewport) {
+	void resize(tg::Viewport viewport) {
 		this->viewport = viewport;
 	}
 	void render() {
-		t3d::set_render_target(t3d::back_buffer);
-		blit(background_color);
+		tg::set_render_target(tg::back_buffer);
+		blit(middle_color);
 		
 		current_viewport.min += 2;
 		current_viewport.max -= 2;
@@ -31,8 +31,8 @@ struct PropertyViewWindow : EditorWindow {
 					property_separator();
 
 					for (auto component : selection.entity->components) {
-						header(component_names[component.type]);
-						component_functions[component.type].draw_properties(component_storages[component.type].get(component.index));
+						header(component_info[component.type].name);
+						component_info[component.type].draw_properties(component_storages[component.type].get(component.index));
 						property_separator();
 					}
 					break;
@@ -41,9 +41,9 @@ struct PropertyViewWindow : EditorWindow {
 					header(selection.texture->name);
 					auto viewport = current_viewport;
 					viewport.max.y -= current_property_y;
-					viewport.min.y = viewport.max.y - viewport.size().x * selection.texture->texture->size.y / selection.texture->texture->size.x;
+					viewport.min.y = viewport.max.y - viewport.size().x * selection.texture->size.y / selection.texture->size.x;
 					push_current_viewport(viewport) {
-						blit(selection.texture->texture);
+						blit(selection.texture);
 					}
 					break;
 				}
@@ -52,6 +52,8 @@ struct PropertyViewWindow : EditorWindow {
 	}
 };
 
-PropertyViewWindow *create_property_view() {
-	return create_editor_window<PropertyViewWindow>(EditorWindow_property_view);
+PropertyView *create_property_view() {
+	auto result = create_editor_window<PropertyView>(EditorWindow_property_view);
+	result->name = u8"Properties"s;
+	return result;
 }

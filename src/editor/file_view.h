@@ -5,7 +5,7 @@
 #include "../gui.h"
 #include "../selection.h"
 
-struct FileViewWindow : EditorWindow {
+struct FileView : EditorWindow {
 
 	struct Entry {
 		List<utf8> path;
@@ -39,13 +39,12 @@ struct FileViewWindow : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(t3d::Viewport viewport) {
+	void resize(tg::Viewport viewport) {
 		this->viewport = viewport;
 	}
 	void render() {
-		t3d::set_render_target(t3d::back_buffer);
-
-		blit(background_color);
+		tg::set_render_target(tg::back_buffer);
+		blit(middle_color);
 
 		next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
 		tab = 0;
@@ -55,30 +54,29 @@ struct FileViewWindow : EditorWindow {
 
 	void render_entries(List<Entry> entries) {
 		for (auto &entry : entries) {
-			t3d::Viewport button_viewport;
+			tg::Viewport button_viewport;
 			button_viewport.min = next_pos;
 			button_viewport.min.x += tab * button_height;
 			button_viewport.max = v2s{viewport.max.x - button_padding, button_viewport.min.y + button_height};
 
 			push_current_viewport(button_viewport) {
-				if (button(entry.name)) {
-					auto found = find_if(assets.textures.all, [&] (Texture &texture) {
-						return texture.name == entry.path;
-					});
+				if (button(entry.name, (umm)&entry)) {
+					auto found = assets.textures_2d.by_path.find(entry.path);
 
-					if (!found) {
-						found = assets.textures.get(entry.path);
+					Texture2D *texture = 0;
+					if (found) {
+						texture = *found;
+					} else {
+						texture = assets.textures_2d.get(entry.path);
 					}
 
-					if (found) {
-						selection.set(found);
+					if (texture) {
+						selection.set(texture);
 					}
 				}
 
-				if (begin_drag_and_drop()) {
-					print("begin_drag_and_drop\n");
-
-					set_drag_and_drop_file(entry.path);
+				if (begin_drag_and_drop(DragAndDrop_file)) {
+					drag_and_drop_data.set(as_bytes(entry.path));
 				}
 			}
 
@@ -93,11 +91,12 @@ struct FileViewWindow : EditorWindow {
 	}
 };
 
-FileViewWindow *create_file_view() {
-	auto result = create_editor_window<FileViewWindow>(EditorWindow_file_view);
+FileView *create_file_view() {
+	auto result = create_editor_window<FileView>(EditorWindow_file_view);
 	result->root.is_directory = true;
 	result->root.name = as_list(u8"../data"s);
 	result->root.path = as_list(u8"../data"s);
 	result->add_files(result->root);
+	result->name = u8"Files"s;
 	return result;
 }

@@ -7,15 +7,15 @@ Window *window;
 Entity *current_camera_entity;
 Camera *current_camera;
 v2s current_mouse_position;
-t3d::Viewport current_viewport;
-t3d::Viewport current_scissor;
+tg::Viewport current_viewport;
+tg::Viewport current_scissor;
 Cursor current_cursor;
 
 struct ViewportPusher {
-	t3d::Viewport old_viewport;
-	t3d::Viewport old_scissor;
+	tg::Viewport old_viewport;
+	tg::Viewport old_scissor;
 	bool has_area;
-	ViewportPusher(t3d::Viewport new_viewport) {
+	ViewportPusher(tg::Viewport new_viewport) {
 		old_viewport = current_viewport;
 		old_scissor  = current_scissor;
 		
@@ -25,15 +25,15 @@ struct ViewportPusher {
 		has_area = volume(current_scissor) > 0;
 
 		if (has_area) {
-			t3d::set_viewport(new_viewport);
-			t3d::set_scissor(current_scissor);
+			tg::set_viewport(new_viewport);
+			tg::set_scissor(current_scissor);
 		}
 	}
 	~ViewportPusher() {
 		current_viewport = old_viewport;
 		current_scissor = old_scissor;
-		t3d::set_viewport(old_viewport);
-		t3d::set_scissor(old_scissor);
+		tg::set_viewport(old_viewport);
+		tg::set_scissor(old_scissor);
 	}
 	operator bool(){return has_area;}
 };

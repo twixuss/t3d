@@ -11,7 +11,7 @@ struct {
 	SelectionKind kind;
 	union {
 		Entity *entity;
-		Texture *texture;
+		Texture2D *texture;
 	};
 	
 	void unset() {
@@ -23,7 +23,7 @@ struct {
 		this->entity = entity;
 	}
 
-	void set(Texture *texture) {
+	void set(Texture2D *texture) {
 		kind = Selection_texture;
 		this->texture = texture;
 	}

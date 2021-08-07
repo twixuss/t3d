@@ -159,6 +159,7 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 					begin_drag = true;
 					state.dragging_part_index = closest_element;
 					save_transform();
+					lock_input();
 				}
 
 			}
@@ -300,13 +301,12 @@ ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f
 		}
 	}
 
-	if (mouse_up(0)) {
-		state.dragging_part_index = null_manipulator_part;
-		unlock_input();
-	}
 	
 	if (state.dragging_part_index != null_manipulator_part) {
-		if (mouse_down_no_lock(1, {.anywhere = true})) {
+		if (mouse_up(0)) {
+			state.dragging_part_index = null_manipulator_part;
+			unlock_input();
+		} else if (mouse_down(1)) {
 			unlock_input();
 			manipulated_transform = state.original_transform;
 			state.dragging_part_index = null_manipulator_part;

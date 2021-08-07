@@ -1,9 +1,9 @@
 #pragma once
-#include "../include/t3d.h"
+#include "tl.h"
 
 struct Material {
-	t3d::Shader *shader;
-	t3d::ShaderConstants *constants;
+	tg::Shader *shader;
+	tg::ShaderConstants *constants;
 };
 
 MaskedBlockList<Material, 256> materials;

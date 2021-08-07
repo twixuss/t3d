@@ -39,8 +39,16 @@ struct Entity;
 struct Component {
 	u32 entity_index = -1;
 	Entity &entity() const;
+
+	// 
+	// These functions are not called and only needed to check if derived component overrides them
+	//
+	void init() { invalid_code_path(); }
+	void update() { invalid_code_path(); }
+	void free() { invalid_code_path(); }
 };
 
+#define is_statically_overridden(function, derived, base) (&base::function != &derived::function)
 
 #define c(name) struct name;
 #define sep
@@ -68,17 +76,6 @@ inline static constexpr u32 component_type_count = type_count<
 #undef c
 
 
-#define c(name) u8#name##s
-#define sep ,
-
-Span<utf8> component_names[] {
-	ENUMERATE_COMPONENTS
-};
-
-#undef sep
-#undef c
-
-
 using TokenKind = u16;
 enum : TokenKind {
 	Token_identifier = 0x100,
@@ -93,27 +90,21 @@ struct Token {
 };
 
 
-template <class Component, class = EnableIf<std::is_base_of_v<::Component, Component>>>
-void component_init(Component &component) {}
-
-template <class Component, class = EnableIf<std::is_base_of_v<::Component, Component>>>
-void component_free(Component &component) {}
-
-template <class Component, class = EnableIf<std::is_base_of_v<::Component, Component>>>
-void component_update(Component &component) {}
-
 using ComponentSerialize = void(*)(StringBuilder &builder, void *component);
 using ComponentDeserialize = bool(*)(Token *&from, Token *end, void *component);
 using ComponentDrawProperties = void(*)(void *component);
+using ComponentConstruct = void(*)(void *component);
 using ComponentInit = void(*)(void *component);
 using ComponentFree = void(*)(void *component);
 
-struct ComponentFunctions {
+struct ComponentInfo {
 	ComponentSerialize serialize;
 	ComponentDeserialize deserialize;
 	ComponentDrawProperties draw_properties;
+	ComponentConstruct construct;
 	ComponentInit init;
 	ComponentFree free;
+	Span<utf8> name;
 };
 
 template <class Component>
@@ -130,24 +121,35 @@ void adapt_component_property_drawer(void *component) {
 }
 
 template <class Component>
+void adapt_component_construct(void *component) {
+	assert(((umm)component % alignof(Component)) == 0);
+	new (component) Component();
+}
+template <class Component>
 void adapt_component_init(void *component) {
-	return component_init<Component>(*(Component *)component);
+	if constexpr (is_statically_overridden(init, Component, ::Component)) {
+		return ((Component *)component)->init();
+	}
 }
 template <class Component>
 void adapt_component_free(void *component) {
-	return component_free<Component>(*(Component *)component);
+	if constexpr (is_statically_overridden(free, Component, ::Component)) {
+		return ((Component *)component)->free();
+	}
 }
 
 
-#define c(name) { \
-	adapt_component_serializer<name>, \
-	adapt_component_deserializer<name>, \
-	adapt_component_property_drawer<name>, \
-	adapt_component_init<name>, \
-	adapt_component_free<name>, \
+#define c(component) { \
+	.serialize       = adapt_component_serializer<component>, \
+	.deserialize     = adapt_component_deserializer<component>, \
+	.draw_properties = adapt_component_property_drawer<component>, \
+	.construct       = adapt_component_construct<component>, \
+	.init            = adapt_component_init<component>, \
+	.free            = adapt_component_free<component>, \
+	.name            = u8#component##s, \
 }
 #define sep ,
-ComponentFunctions component_functions[] = {
+ComponentInfo component_info[] = {
 	ENUMERATE_COMPONENTS
 };
 #undef sep
@@ -168,13 +170,13 @@ struct ComponentStorage {
 
 	struct Block {
 		umm unfull_mask_count;
-		void *data() { return this + 1; }
-		Span<Mask> masks() { return {(Mask *)data(), masks_per_block}; }
-		void *values() { return (Mask *)data() + masks_per_block; }
+		Mask *masks;
+		void *values;
 	};
 
 	Allocator allocator = current_allocator;
-	umm bytes_per_entry = 0;
+	u32 bytes_per_entry = 0;
+	u32 entry_alignment = 0;
 	List<Block *> blocks;
 
 	struct Added {
@@ -192,7 +194,7 @@ struct ComponentStorage {
 
 			// Search for free space in current block
 			for (u32 mask_index = 0; mask_index < masks_per_block; mask_index += 1) {
-				auto &mask = block->masks()[mask_index];
+				auto &mask = block->masks[mask_index];
 
 				if (mask == ~0)
 					continue;
@@ -205,19 +207,32 @@ struct ComponentStorage {
 				if (mask == ~0)
 					block->unfull_mask_count -= 1;
 
-				result.pointer = (u8 *)block->values() + value_index * bytes_per_entry;
+				result.pointer = (u8 *)block->values + value_index * bytes_per_entry;
 				result.index = block_index * values_per_block + value_index;
 				return result;
 			}
 		}
 
-		auto block_index = blocks.size;
-		auto block = blocks.add((Block *)allocator.allocate(Allocate_uninitialized, sizeof(Block) + sizeof(Mask) * masks_per_block + bytes_per_entry * values_per_block));
-		block->unfull_mask_count = masks_per_block;
-		memset(block->masks().data, 0, sizeof(Mask) * masks_per_block);
-		block->masks()[0] = 1;
+		umm memory_aligment = max(alignof(Block), entry_alignment);
 
-		result.pointer = block->values();
+		umm memory_size = ceil(sizeof(Block) + sizeof(Mask) * masks_per_block + bytes_per_entry * values_per_block, memory_aligment);
+
+		auto memory = (u8 *)allocator.allocate(Allocate_uninitialized, memory_size, memory_aligment);
+
+		auto block_index = blocks.size;
+		auto block = blocks.add((Block *)memory);
+
+		block->masks = (Mask *)((u8 *)block + sizeof(Block));
+
+		block->values = ceil((u8 *)block->masks + sizeof(Mask) * masks_per_block, entry_alignment);
+
+		assert((u8 *)block->values + bytes_per_entry * values_per_block <= memory + memory_size);
+
+		block->unfull_mask_count = masks_per_block;
+		memset(block->masks, 0, sizeof(Mask) * masks_per_block);
+		block->masks[0] = 1;
+
+		result.pointer = block->values;
 		result.index = block_index * values_per_block;
 
 		return result;
@@ -232,10 +247,10 @@ struct ComponentStorage {
 
 		auto &block = blocks[block_index];
 
-		auto mask = block->masks()[mask_index];
+		auto mask = block->masks[mask_index];
 		bounds_check(mask & ((Mask)1 << bit_index), "attempt to remove non-existant component");
 		mask &= ~((Mask)1 << bit_index);
-		block->masks()[mask_index] = mask;
+		block->masks[mask_index] = mask;
 	}
 
 	void *get(umm index) {
@@ -247,10 +262,10 @@ struct ComponentStorage {
 
 		auto &block = blocks[block_index];
 
-		auto mask = block->masks()[mask_index];
+		auto mask = block->masks[mask_index];
 		bounds_check(mask & ((Mask)1 << bit_index), "attempt to get non-existant component");
 
-		return (u8 *)block->values() + value_index * bytes_per_entry;
+		return (u8 *)block->values + value_index * bytes_per_entry;
 	}
 };
 
@@ -261,6 +276,7 @@ void init_component_storage(u32 index) {
 	auto &storage = component_storages[index];
 	construct(storage);
 	storage.bytes_per_entry = sizeof(Component);
+	storage.entry_alignment = alignof(Component);
 }
 
 
@@ -285,12 +301,13 @@ struct ComponentStorageIterator {
 				continue;
 
 			u32 mask_index = 0;
-			for (auto mask : block->masks()) {
+			for (u32 mask_index = 0; mask_index < storage.masks_per_block; mask_index += 1) {
+				auto mask = block->masks[mask_index];
 				if (mask == 0)
 					continue;
 				for (u32 bit_index = 0; bit_index != storage.bits_in_mask; bit_index += 1) {
 					if (mask & ((ComponentStorage::Mask)1 << bit_index)) {
-						fn(((Component *)block->values())[mask_index * storage.bits_in_mask + bit_index]);
+						fn(((Component *)block->values)[mask_index * storage.bits_in_mask + bit_index]);
 					}
 				}
 				++mask_index;
@@ -311,29 +328,28 @@ void free_component_storages() {
 #define for_each_component_of_type(type, name) ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
 #define for_all_components() ComponentStorageIterator<type> CONCAT(_component_iterator_, __COUNTER__) = [&](type &name)
 
-struct Texture;
 struct Mesh;
 struct Material;
 
 // TODO: this should not be here... fucking c++
-void draw_property(Span<utf8> name, f32 &value, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, v3f &value, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, quaternion &value, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, List<utf8> &value, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, Texture *&value, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, Mesh *&value, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, f32 &value, umm id = 0, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, v3f &value, umm id = 0, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, quaternion &value, umm id = 0, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, List<utf8> &value, umm id = 0, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, tg::Texture2D *&value, umm id = 0, std::source_location location = std::source_location::current());
+void draw_property(Span<utf8> name, Mesh *&value, umm id = 0, std::source_location location = std::source_location::current());
 
 void serialize(StringBuilder &builder, f32 value);
 void serialize(StringBuilder &builder, v3f value);
 void serialize(StringBuilder &builder, Mesh *value);
 void serialize(StringBuilder &builder, Material *value);
-void serialize(StringBuilder &builder, Texture *value);
+void serialize(StringBuilder &builder, tg::Texture2D *value);
 
 bool deserialize(f32 &value, Token *&from, Token *end);
 bool deserialize(v3f &value, Token *&from, Token *end);
 bool deserialize(Mesh *&value, Token *&from, Token *end);
 bool deserialize(Material *&value, Token *&from, Token *end);
-bool deserialize(Texture *&value, Token *&from, Token *end);
+bool deserialize(tg::Texture2D *&value, Token *&from, Token *end);
 
 template <class Derived>
 struct ComponentBase : Component {};
@@ -356,11 +372,12 @@ else if (from->string == u8#name##s) { \
 }
 
 #define DRAW_FIELD(type, name, default) \
-draw_property(u8#name##s, name); \
+draw_property(u8#name##s, name, __COUNTER__); \
 
 #define DECLARE_COMPONENT(name) \
 template <> \
 struct ComponentBase<name> : Component { \
+	static u32 type_index; \
 	FIELDS(DECLARE_FIELD) \
 	void serialize(StringBuilder &builder) { \
 		FIELDS(SERIALIZE_FIELD) \

@@ -1,15 +1,14 @@
 #pragma once
 #include "tl.h"
-#include <t3d.h>
 
 FontCollection *font_collection;
-t3d::VertexBuffer *text_vertex_buffer;
-t3d::Shader *text_shader;
+tg::VertexBuffer *text_vertex_buffer;
+tg::Shader *text_shader;
 struct TextShaderConstants {
 	v2f inv_half_viewport_size;
 	v2f offset;
 };
-t3d::TypedShaderConstants<TextShaderConstants> text_shader_constants;
+tg::TypedShaderConstants<TextShaderConstants> text_shader_constants;
 
 void init_font() {
 	Span<pathchar> font_paths[] = {
@@ -18,15 +17,15 @@ void init_font() {
 	font_collection = create_font_collection(font_paths);
 	font_collection->update_atlas = [](TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size) -> TL_FONT_TEXTURE_HANDLE {
 		if (texture) {
-			t3d::update_texture(texture, size.x, size.y, data);
+			tg::update_texture(texture, size, data);
 		} else {
-			texture = t3d::create_texture(t3d::CreateTexture_default, size.x, size.y, data, t3d::TextureFormat_rgb_u8n, t3d::TextureFiltering_nearest, t3d::Comparison_none);
+			texture = tg::create_texture_2d(size, data, tg::Format_rgb_u8n, tg::Filtering_nearest);
 		}
 		return texture;
 	};
 	
-	text_shader_constants = t3d::create_shader_constants<TextShaderConstants>();
-	text_shader = t3d::create_shader(u8R"(
+	text_shader_constants = tg::create_shader_constants<TextShaderConstants>();
+	text_shader = tg::create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else

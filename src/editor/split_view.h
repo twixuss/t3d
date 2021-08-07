@@ -18,16 +18,16 @@ struct SplitView : EditorWindow {
 		auto size1 = part1->get_min_size();
 		auto size2 = part2->get_min_size();
 
-		if(horizontal) {
+		if (horizontal) {
 			result.x = max(size1.x, size2.x);
-			result.y = size1.y + size2.y;
+			result.y = size1.y + size2.y + 2;
 		} else {
-			result.x = size1.x + size2.x;
+			result.x = size1.x + size2.x + 2;
 			result.y = max(size1.y, size2.y);
 		}
 		return result;
 	}
-	void resize(t3d::Viewport viewport) {
+	void resize(tg::Viewport viewport) {
 		resize_children();
 	}
 	void resize_children() {
@@ -41,7 +41,7 @@ struct SplitView : EditorWindow {
 			clamped_split_t = clamp(split_t, (f32)size1.x / viewport.size().x, 1 - (f32)size2.x / viewport.size().x);
 		}
 
-		t3d::Viewport viewport1 = viewport;
+		tg::Viewport viewport1 = viewport;
 		if (horizontal) {
 			viewport1.max.y = lerp<f32>(viewport1.min.y, viewport1.max.y, clamped_split_t) - 1;
 		} else {
@@ -50,7 +50,7 @@ struct SplitView : EditorWindow {
 
 		part1->resize(viewport1);
 
-		t3d::Viewport viewport2 = viewport;
+		tg::Viewport viewport2 = viewport;
 		if (horizontal) {
 			viewport2.min.y = viewport1.max.y + 2;
 			viewport2.max.y = viewport.max.y;
@@ -97,7 +97,7 @@ struct SplitView : EditorWindow {
 		}
 
 		if (is_sizing) {
-			if (mouse_up_no_lock(0, {.anywhere = true})) {
+			if (mouse_up(0)) {
 				is_sizing = false;
 				unlock_input();
 			}
@@ -116,6 +116,39 @@ struct SplitView : EditorWindow {
 		push_current_viewport(part1->viewport) part1->render();
 		push_current_viewport(part2->viewport) part2->render();
 	}
+
+	void debug_print() {
+		debug_print_editor_window_tabs();
+		print("part1:\n");
+		++debug_print_editor_window_hierarchy_tab;
+		part1->debug_print();
+		--debug_print_editor_window_hierarchy_tab;
+
+		debug_print_editor_window_tabs();
+		print("part2:\n");
+		++debug_print_editor_window_hierarchy_tab;
+		part2->debug_print();
+		--debug_print_editor_window_hierarchy_tab;
+	}
+	
+	EditorWindow *&get_part(EditorWindow *window) {
+		if (window == part1) {
+			return part1;
+		}
+		assert(window == part2);
+		return part2;
+	}
+	EditorWindow *&get_other_part(EditorWindow *window) {
+		if (window == part1) {
+			return part2;
+		}
+		assert(window == part2);
+		return part1;
+	}
+	void replace_child(EditorWindow *old, EditorWindow *_new) {
+		get_part(old) = _new;
+		_new->parent = this;
+	}
 };
 
 struct CreateSplitViewParams {
@@ -126,10 +159,13 @@ struct CreateSplitViewParams {
 
 SplitView *create_split_view(EditorWindow *left, EditorWindow *right, CreateSplitViewParams params = {}) {
 	auto result = create_editor_window<SplitView>(EditorWindow_split_view);
+	left->parent = result;
+	right->parent = result;
 	result->part1 = left;
 	result->part2 = right;
 	result->split_t = params.split_t;
 	result->clamped_split_t = params.split_t;
 	result->horizontal = params.horizontal;
+	result->name = u8"Split view"s;
 	return result;
 }

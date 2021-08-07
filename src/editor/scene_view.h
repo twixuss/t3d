@@ -3,14 +3,15 @@
 #include "../entity.h"
 #include "manipulator.h"
 #include "gui.h"
+#include "../selection.h"
 
-void render_scene(struct SceneViewWindow *);
+void render_scene(struct SceneView *);
 
-t3d::Texture *translate_icon;
-t3d::Texture *rotate_icon;
-t3d::Texture *scale_icon;
+tg::Texture2D *translate_icon;
+tg::Texture2D *rotate_icon;
+tg::Texture2D *scale_icon;
 
-struct SceneViewWindow : EditorWindow {
+struct SceneView : EditorWindow {
 	enum MovementState : u8 {
 		Movement_none,
 		Movement_flying,
@@ -27,15 +28,15 @@ struct SceneViewWindow : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(t3d::Viewport viewport) {
+	void resize(tg::Viewport viewport) {
 		this->viewport = viewport;
 		for (auto &effect : camera->post_effects) {
 			effect.resize((v2u)viewport.size());
 		}
-		t3d::resize_texture(camera->source_target->color, (v2u)viewport.size());
-		t3d::resize_texture(camera->source_target->depth, (v2u)viewport.size());
-		t3d::resize_texture(camera->destination_target->color, (v2u)viewport.size());
-		t3d::resize_texture(camera->destination_target->depth, (v2u)viewport.size());
+		tg::resize_texture(camera->source_target->color, (v2u)viewport.size());
+		tg::resize_texture(camera->source_target->depth, (v2u)viewport.size());
+		tg::resize_texture(camera->destination_target->color, (v2u)viewport.size());
+		tg::resize_texture(camera->destination_target->depth, (v2u)viewport.size());
 	}
 	void render() {
 		begin_input_user();
@@ -56,7 +57,9 @@ struct SceneViewWindow : EditorWindow {
 			if (mouse_down(1)) movement_state = Movement_flying;
 			if (mouse_down(2)) movement_state = key_held(Key_shift) ? Movement_panning : Movement_orbiting;
 
-			if (movement_state != Movement_none) {
+			if (movement_state == Movement_none) {
+				select_entity();
+			} else {
 				lock_input();
 			}
 		}
@@ -146,9 +149,9 @@ struct SceneViewWindow : EditorWindow {
 		u32 const button_size = 32;
 
 		if (!translate_icon) {
-			translate_icon = t3d::load_texture(tl_file_string("../data/icons/translate.png"ts), {.generate_mipmaps = true, .flip_y = true});
-			rotate_icon    = t3d::load_texture(tl_file_string("../data/icons/rotate.png"ts)   , {.generate_mipmaps = true, .flip_y = true});
-			scale_icon     = t3d::load_texture(tl_file_string("../data/icons/scale.png"ts)    , {.generate_mipmaps = true, .flip_y = true});
+			translate_icon = tg::load_texture_2d(tl_file_string("../data/icons/translate.png"ts), {.generate_mipmaps = true, .flip_y = true});
+			rotate_icon    = tg::load_texture_2d(tl_file_string("../data/icons/rotate.png"ts)   , {.generate_mipmaps = true, .flip_y = true});
+			scale_icon     = tg::load_texture_2d(tl_file_string("../data/icons/scale.png"ts)    , {.generate_mipmaps = true, .flip_y = true});
 		}
 
 		auto translate_viewport = current_viewport;
@@ -156,23 +159,49 @@ struct SceneViewWindow : EditorWindow {
 		translate_viewport.min.y = current_viewport.max.y - 2 - button_size;
 		translate_viewport.max.x = translate_viewport.min.x + button_size;
 		translate_viewport.max.y = translate_viewport.min.y + button_size;
-		if (button(translate_viewport, translate_icon)) manipulator_kind = Manipulate_position;
+		if (button(translate_viewport, translate_icon, (umm)this)) manipulator_kind = Manipulate_position;
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, rotate_icon)) manipulator_kind = Manipulate_rotation;
+		if (button(translate_viewport, rotate_icon, (umm)this)) manipulator_kind = Manipulate_rotation;
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, scale_icon)) manipulator_kind = Manipulate_scale;
+		if (button(translate_viewport, scale_icon, (umm)this)) manipulator_kind = Manipulate_scale;
+		translate_viewport.min.x += button_size + 2;
+		translate_viewport.max.x += button_size + 2;
+		if (button(translate_viewport, u8"Camera"s, (umm)this)) selection.set(camera_entity);
+	}
+	void select_entity() {
+		for_each_component_of_type(MeshRenderer, renderer) {
+			renderer.mesh->positions;
+		};
 	}
 	void free() {
 		destroy(*camera_entity);
 	}
+	void serialize(StringBuilder &builder) {
+		append_bytes(builder, camera_entity->position);
+		append_bytes(builder, camera_entity->rotation);
+		append_bytes(builder, camera->fov);
+	}
+	bool deserialize(Stream &stream) {
+
+#define read_bytes(value) if (!stream.b_read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
+
+		read_bytes(camera_entity->position);
+		read_bytes(camera_entity->rotation);
+		read_bytes(camera->fov);
+
+#undef read_bytes
+
+	}
 };
 
-SceneViewWindow *create_scene_view() {
-	auto result = create_editor_window<SceneViewWindow>(EditorWindow_scene_view);
-	result->camera_entity = &create_entity("scene_camera_%", result);
-	result->camera_entity->flags |= Entity_editor;
+SceneView *create_scene_view() {
+	auto result = create_editor_window<SceneView>(EditorWindow_scene_view);
+	result->camera_entity = &create_entity("scene_camera_%", result->id);
+	result->camera_entity->flags |= Entity_editor_camera;
 	result->camera = &add_component<Camera>(*result->camera_entity);
+	result->camera->add_post_effect<Dither>();
+	result->name = u8"Scene"s;
 	return result;
 }

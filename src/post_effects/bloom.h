@@ -1,5 +1,5 @@
 #pragma once
-#include <t3d.h>
+#include "../post_effect.h"
 
 struct Bloom {
 	struct Constants {
@@ -7,22 +7,22 @@ struct Bloom {
 		f32 threshold;
 	};
 
-	t3d::Shader *downsample_shader;
-	t3d::Shader *downsample_filter_shader;
-	t3d::Shader *blur_x_shader;
-	t3d::Shader *blur_y_shader;
-	t3d::TypedShaderConstants<Constants> constants;
+	tg::Shader *downsample_shader;
+	tg::Shader *downsample_filter_shader;
+	tg::Shader *blur_x_shader;
+	tg::Shader *blur_y_shader;
+	tg::TypedShaderConstants<Constants> constants;
 
 	struct TempRenderTarget {
-		t3d::RenderTarget *source;
-		t3d::RenderTarget *destination;
+		tg::RenderTarget *source;
+		tg::RenderTarget *destination;
 	};
 	List<TempRenderTarget> temp_targets;
 	f32 threshold = 1;
 	f32 intensity = 0.2f;
 
 	void init() {
-		constants = t3d::create_shader_constants<Bloom::Constants>();
+		constants = tg::create_shader_constants<Bloom::Constants>();
 
 		constexpr auto header = u8R"(
 #ifdef VERTEX_SHADER
@@ -113,7 +113,7 @@ vec4 blurred_sample(vec2 vertex_uv) {
 }
 
 )"s;
-		downsample_shader = t3d::create_shader(tconcatenate(header, u8R"(
+		downsample_shader = tg::create_shader(tconcatenate(header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -121,7 +121,7 @@ void main() {
 }
 #endif
 )"s));
-		downsample_filter_shader = t3d::create_shader(tconcatenate(header, u8R"(
+		downsample_filter_shader = tg::create_shader(tconcatenate(header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -129,7 +129,7 @@ void main() {
 }
 #endif
 )"s));
-		blur_x_shader = t3d::create_shader(tconcatenate(u8"#define BLUR_X\n"s, header, u8R"(
+		blur_x_shader = tg::create_shader(tconcatenate(u8"#define BLUR_X\n"s, header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -137,7 +137,7 @@ void main() {
 }
 #endif
 )"s));
-		blur_y_shader = t3d::create_shader(tconcatenate(header, u8R"(
+		blur_y_shader = tg::create_shader(tconcatenate(header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -147,69 +147,69 @@ void main() {
 )"s));
 	}
 
-	void render(t3d::RenderTarget *source, t3d::RenderTarget *destination) {
+	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
 		timed_block("Bloom::render"s);
 
 		{
 			timed_block("Downsample"s);
-			t3d::set_rasterizer(
-				t3d::get_rasterizer()
+			tg::set_rasterizer(
+				tg::get_rasterizer()
 					.set_depth_test(false)
 					.set_depth_write(false)
 			);
 
-			t3d::set_shader(downsample_filter_shader);
-			t3d::set_shader_constants(constants, 0);
+			tg::set_shader(downsample_filter_shader);
+			tg::set_shader_constants(constants, 0);
 
 			auto sample_from = source;
 			for (auto &target : temp_targets) {
-				t3d::set_render_target(target.destination);
-				t3d::set_viewport(target.destination->color->size);
-				t3d::set_texture(sample_from->color, 0);
-				t3d::update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
-				t3d::draw(3);
+				tg::set_render_target(target.destination);
+				tg::set_viewport(target.destination->color->size);
+				tg::set_texture(sample_from->color, 0);
+				tg::update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
+				tg::draw(3);
 
 				swap(target.source, target.destination);
 
 				sample_from = target.source;
 
 				if (&target == &temp_targets.front())
-					t3d::set_shader(downsample_shader);
+					tg::set_shader(downsample_shader);
 			}
 
-			t3d::set_shader(blur_x_shader);
+			tg::set_shader(blur_x_shader);
 			for (auto &target : temp_targets) {
-				t3d::set_render_target(target.destination);
-				t3d::set_viewport(target.destination->color->size);
-				t3d::set_texture(target.source->color, 0);
-				t3d::draw(3);
+				tg::set_render_target(target.destination);
+				tg::set_viewport(target.destination->color->size);
+				tg::set_texture(target.source->color, 0);
+				tg::draw(3);
 				swap(target.source, target.destination);
 			}
 
-			t3d::set_shader(blur_y_shader);
+			tg::set_shader(blur_y_shader);
 			for (auto &target : temp_targets) {
-				t3d::set_render_target(target.destination);
-				t3d::set_viewport(target.destination->color->size);
-				t3d::set_texture(target.source->color, 0);
-				t3d::draw(3);
+				tg::set_render_target(target.destination);
+				tg::set_viewport(target.destination->color->size);
+				tg::set_texture(target.source->color, 0);
+				tg::draw(3);
 				swap(target.source, target.destination);
 			}
 		}
 
-		t3d::set_shader(blit_texture_shader);
-		t3d::set_render_target(destination);
-		t3d::set_viewport(destination->color->size);
-		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-		t3d::set_texture(source->color, 0);
-		t3d::draw(3);
+		tg::set_shader(blit_texture_shader);
+		tg::set_render_target(destination);
+		tg::set_viewport(destination->color->size);
+		tg::disable_blend();
+		tg::set_texture(source->color, 0);
+		tg::draw(3);
 
-		t3d::set_shader(blit_texture_color_shader);
-		t3d::update_shader_constants(blit_texture_color_constants, {.color = V4f(intensity)});
-		t3d::set_shader_constants(blit_texture_color_constants, 0);
-		t3d::set_blend(t3d::BlendFunction_add, t3d::Blend_one, t3d::Blend_one);
+		tg::set_shader(blit_texture_color_shader);
+		tg::update_shader_constants(blit_texture_color_constants, {.color = V4f(intensity)});
+		tg::set_shader_constants(blit_texture_color_constants, 0);
+		tg::set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
 		for (auto &target : temp_targets) {
-			t3d::set_texture(target.source->color, 0);
-			t3d::draw(3);
+			tg::set_texture(target.source->color, 0);
+			tg::draw(3);
 		}
 	}
 
@@ -219,12 +219,12 @@ void main() {
 
 		for (u32 target_index = 0; target_index < 8; ++target_index) {
 			if (target_index < temp_targets.size) {
-				t3d::resize_texture(temp_targets[target_index].source     ->color, next_size);
-				t3d::resize_texture(temp_targets[target_index].destination->color, next_size);
+				tg::resize_texture(temp_targets[target_index].source     ->color, next_size);
+				tg::resize_texture(temp_targets[target_index].destination->color, next_size);
 			} else {
 				auto create_temp_target = [&]() {
-					return t3d::create_render_target(
-						t3d::create_texture(t3d::CreateTexture_default, next_size.x, next_size.y, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_linear, t3d::Comparison_none),
+					return tg::create_render_target(
+						tg::create_texture_2d(next_size.x, next_size.y, 0, tg::Format_rgb_f16, tg::Filtering_linear),
 						0
 					);
 				};

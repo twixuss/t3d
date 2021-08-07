@@ -1,5 +1,5 @@
 #pragma once
-#include "../include/t3d.h"
+#include "tl.h"
 #include "component.h"
 #include "post_effect.h"
 #include "post_effects/exposure.h"
@@ -12,8 +12,8 @@ F(f32, fov, pi * 0.5f) \
 DECLARE_COMPONENT(Camera) {
 	m4 world_to_camera_matrix;
 
-	t3d::RenderTarget *source_target;
-	t3d::RenderTarget *destination_target;
+	tg::RenderTarget *source_target;
+	tg::RenderTarget *destination_target;
 	List<PostEffect> post_effects;
 
 	template <class Effect>
@@ -36,6 +36,16 @@ DECLARE_COMPONENT(Camera) {
 	v3f world_to_camera(v3f point) {
 		return world_to_camera(V4f(point, 1));
 	}
+	
+	void init() {
+		auto create_hdr_target = [&]() {
+			auto hdr_color = tg::create_texture_2d(1, 1, 0, tg::Format_rgb_f16, tg::Filtering_linear);
+			auto hdr_depth = tg::create_texture_2d(1, 1, 0, tg::Format_depth,   tg::Filtering_none  );
+			return tg::create_render_target(hdr_color, hdr_depth);
+		};
+		source_target      = create_hdr_target();
+		destination_target = create_hdr_target();
+	}
 
 	void free() {
 		for (auto &effect : post_effects) {
@@ -45,26 +55,3 @@ DECLARE_COMPONENT(Camera) {
 	}
 };
 
-template <>
-void component_init(Camera &camera) {
-	auto create_hdr_target = [&]() {
-		auto hdr_color = t3d::create_texture(t3d::CreateTexture_default, 1, 1, 0, t3d::TextureFormat_rgb_f16, t3d::TextureFiltering_linear, t3d::Comparison_none);
-		auto hdr_depth = t3d::create_texture(t3d::CreateTexture_default, 1, 1, 0, t3d::TextureFormat_depth,   t3d::TextureFiltering_none,   t3d::Comparison_none);
-		return t3d::create_render_target(hdr_color, hdr_depth);
-	};
-	camera.source_target      = create_hdr_target();
-	camera.destination_target = create_hdr_target();
-
-	auto &exposure = camera.add_post_effect<Exposure>();
-	exposure.auto_adjustment = false;
-	exposure.exposure = 1.5;
-	exposure.limit_min = 1.0f / 16;
-	exposure.limit_max = 1024;
-	exposure.approach_kind = Exposure::Approach_log_lerp;
-	exposure.mask_kind = Exposure::Mask_one;
-	exposure.mask_radius = 1;
-
-	auto &bloom = camera.add_post_effect<Bloom>();
-
-	auto &dither = camera.add_post_effect<Dither>();
-}

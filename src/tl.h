@@ -1,8 +1,9 @@
 #pragma once
 #define TL_ENABLE_VEC4_SIMD
 #define TL_OPENGL_LOG_LEVEL 3
-namespace t3d { struct Texture; }
-#define TL_FONT_TEXTURE_HANDLE t3d::Texture *
+namespace tgraphics { struct Texture2D; }
+namespace tg = tgraphics;
+#define TL_FONT_TEXTURE_HANDLE tg::Texture2D *
 #include <tl/common.h>
 #include <tl/window.h>
 #include <tl/console.h>
@@ -35,10 +36,19 @@ inline umm get_hash(Span<utf16> value) {
 #include <tl/cpu.h>
 #include <tl/ram.h>
 #include <source_location>
-#define T3D_TEXTURE_EXTENSION ::TextureExtension
-#include "../include/t3d.h"
+
+struct Texture2DExtension {
+	List<utf8> name;
+	bool serializable;
+};
+
+#define TGRAPHICS_TEXTURE_2D_EXTENSION ::Texture2DExtension
+#include <tgraphics/tgraphics.h>
 #include "component_list.h"
 
 inline bool operator==(std::source_location a, std::source_location b) {
 	return a.line() == b.line() && a.column() == b.column() && tl::as_span(a.file_name()) == tl::as_span(b.file_name());
 }
+
+
+using Texture2D = tg::Texture2D;

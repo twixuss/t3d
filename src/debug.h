@@ -12,8 +12,8 @@ struct DebugLine {
 };
 
 List<DebugLine> debug_lines;
-t3d::VertexBuffer *debug_lines_vertex_buffer;
-t3d::Shader *debug_line_shader;
+tg::VertexBuffer *debug_lines_vertex_buffer;
+tg::Shader *debug_line_shader;
 
 void debug_line(v3f a, v3f b) {
 	debug_lines.add({.a = {.position = a}, .b = {.position = b}, .time = 0});
@@ -39,13 +39,13 @@ void debug_draw_lines() {
 	}
 
 	if (vertices.size) {
-		t3d::set_topology(t3d::Topology_line_list);
-		t3d::set_rasterizer({.depth_test = false});
-		t3d::set_blend(t3d::BlendFunction_disable, {}, {});
-		t3d::set_vertex_buffer(debug_lines_vertex_buffer);
-		t3d::update_vertex_buffer(debug_lines_vertex_buffer, as_bytes(vertices));
-		t3d::set_shader(debug_line_shader);
-		t3d::draw(vertices.size * 2);
+		tg::set_topology(tg::Topology_line_list);
+		tg::set_rasterizer({.depth_test = false});
+		tg::disable_blend();
+		tg::set_vertex_buffer(debug_lines_vertex_buffer);
+		tg::update_vertex_buffer(debug_lines_vertex_buffer, as_bytes(vertices));
+		tg::set_shader(debug_line_shader);
+		tg::draw(vertices.size * 2);
 	}
 }
 

@@ -1,11 +1,5 @@
 #pragma once
-#include "../include/t3d.h"
+#include "tl.h"
 
-struct Texture {
-	t3d::Texture *texture;
-	List<utf8> name;
-	bool serializable;
-};
-
-Texture *white_texture;
-Texture *black_texture;
+tg::Texture2D *white_texture;
+tg::Texture2D *black_texture;

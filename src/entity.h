@@ -1,10 +1,11 @@
 #pragma once
-#include <t3d.h>
+#include "tl.h"
 #include <tl/quaternion.h>
 
 using EntityFlags = u32;
 enum : EntityFlags {
-	Entity_editor = 0x1,
+	Entity_editor_camera = 0x1,
+	Entity_editor_mask   = 0x2 - 1,
 };
 
 struct Entity {
@@ -22,6 +23,10 @@ struct Entity {
 	forceinline v3f    down() { return rotation * v3f{0,-1,0}; }
 	forceinline v3f forward() { return rotation * v3f{0,0,-1}; }
 };
+
+bool is_editor_entity(Entity &entity) {
+	return entity.flags & Entity_editor_mask;
+}
 
 MaskedBlockList<Entity, 256> entities;
 
@@ -61,7 +66,7 @@ Entity &create_entity(char const *fmt, Args const &...args) {
 void destroy(Entity &entity) {
 	for (auto &component_index : entity.components) {
 		auto &storage = component_storages[component_index.type];
-		component_functions[component_index.type].free(storage.get(component_index.index));
+		component_info[component_index.type].free(storage.get(component_index.index));
 		storage.remove_at(component_index.index);
 	}
 	free(entity.name);
@@ -73,7 +78,6 @@ T &add_component(Entity &entity, u32 entity_index) {
 	static constexpr u32 component_type = get_component_type_index<T>();
 
 	auto added = component_storages[component_type].add();
-	T &component = construct(*(T *)added.pointer);
 
 	ComponentIndex component_index = {
 		.type = component_type,
@@ -82,8 +86,11 @@ T &add_component(Entity &entity, u32 entity_index) {
 	};
 	entity.components.add(component_index);
 
+	T &component = construct(*(T *)added.pointer);
 	component.entity_index = entity_index;
-	component_init<T>(component);
+	if constexpr (is_statically_overridden(init, T, ::Component)) {
+		component.init();
+	}
 
 	return component;
 }
