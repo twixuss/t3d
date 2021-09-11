@@ -1,5 +1,5 @@
 #pragma once
-#include "../tl.h"
+#include "../common.h"
 #include "current.h"
 #include "window_list.h"
 #include <tl/memory_stream.h>
@@ -24,11 +24,6 @@ struct EditorWindow;
 
 using EditorWindowId = u32;
 
-template <>
-umm get_hash(EditorWindowId id) {
-	return id;
-}
-
 HashMap<EditorWindowId, EditorWindow *> editor_windows;
 EditorWindowId editor_window_id_counter;
 
@@ -46,7 +41,7 @@ struct EditorWindow {
 	v2u get_min_size() {
 		return _get_min_size(this);
 	}
-	
+
 	void (*_resize)(void *_this, tg::Viewport viewport);
 	void resize(tg::Viewport viewport) {
 		this->viewport = viewport;
@@ -59,12 +54,12 @@ struct EditorWindow {
 			return _render(this);
 		};
 	}
-	
+
 	void (*_free)(void *_this);
 	void free() {
 		return _free(this);
 	}
-	
+
 	void (*_debug_print)(void *_this);
 	void debug_print() {
 		return _debug_print(this);

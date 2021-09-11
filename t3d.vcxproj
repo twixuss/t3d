@@ -19,8 +19,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\tl.cpp" />
+    <ClCompile Include="src\main_editor.cpp" />
+    <None Include="src\main_runtime.cpp" />
+    <ClCompile Include="src\common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
@@ -30,6 +31,8 @@
     <ClInclude Include="src\components\rotator.h" />
     <ClInclude Include="src\editor\tab_view.h" />
     <ClInclude Include="src\editor\window_list.h" />
+    <ClInclude Include="src\runtime.h" />
+    <ClInclude Include="src\skybox.h" />
     <ClInclude Include="src\texture.h" />
     <ClInclude Include="src\blit.h" />
     <ClInclude Include="src\component.h" />
@@ -59,7 +62,7 @@
     <ClInclude Include="src\selection.h" />
     <ClInclude Include="src\serialize.h" />
     <ClInclude Include="src\time.h" />
-    <ClInclude Include="src\tl.h" />
+    <ClInclude Include="src\common.h" />
     <ClInclude Include="src\viewport.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
@@ -122,34 +125,34 @@
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/tgraphics/bin/;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/tgraphics/bin/;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/tgraphics/bin/;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
     <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/tgraphics/bin/;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=1;;TL_DEBUG=BUILD_DEBUG</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=1;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
@@ -165,7 +168,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
@@ -183,7 +186,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=1;;TL_DEBUG=BUILD_DEBUG</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=1;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
@@ -199,7 +202,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>

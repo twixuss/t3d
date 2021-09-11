@@ -1,5 +1,5 @@
 #pragma once
-#include "tl.h"
+#include "common.h"
 #include <tl/quaternion.h>
 
 using EntityFlags = u32;

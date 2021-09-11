@@ -1,5 +1,6 @@
 #pragma once
-#include "tl.h"
+#include "common.h"
+#include <tl/masked_block_list.h>
 
 struct Material {
 	tg::Shader *shader;

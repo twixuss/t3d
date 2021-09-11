@@ -1,6 +1,24 @@
 #pragma once
 #include "texture.h"
 
+#if T3D_EDITOR
+
+Span<u8> get_asset_data(Span<utf8> path) {
+	return with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
+}
+
+#else
+
+HashMap<Span<utf8>, Span<u8>> asset_path_to_data;
+
+Span<u8> get_asset_data(Span<utf8> path) {
+	auto found = asset_path_to_data.find(path);
+	assert_always(found, "Asset '%' was not found", path);
+	return *found;
+}
+
+#endif
+
 struct {
 	struct {
 		HashMap<Span<utf8>, Texture2D *> by_path;
@@ -9,10 +27,10 @@ struct {
 			if (found) {
 				return *found;
 			}
-		
+			
 			print(Print_info, "Loading texture %.\n", path);
+			auto result = tg::load_texture_2d(get_asset_data(path));
 
-			auto result = tg::load_texture_2d(with(temporary_allocator, to_pathchars(path, true)));
 			if (!result) {
 				return 0;
 			}
@@ -69,22 +87,29 @@ struct {
 					auto scene_path   = Span<utf8>{path.data, submesh_separator};
 					auto submesh_name = Span<utf8>{submesh_separator + 1, path.end()};
 
+					auto scene_data = get_asset_data(scene_path);
 
 					auto &scene = scenes3d_by_name.get_or_insert(scene_path);
 					if (!scene) {
 						scene = &scenes3d.add();
-						auto parsed = parse_glb_from_file(scene_path);
-						if (!parsed) {
-							print(Print_error, "Failed to parse scene file '%'\n", scene_path);
-							return 0;
-						}
-						*scene = parsed.value;
+						auto parsed = parse_glb_from_memory(scene_data);
+						//if (!parsed) {
+						//	print(Print_error, "Failed to parse scene file '%'\n", scene_path);
+						//	return 0;
+						//}
+						//*scene = parsed.value;
+						*scene = parsed;
 						scenes3d_by_name.get_or_insert(scene_path) = scene;
 					}
 
 					assert(scene);
 
 					auto node = scene->get_node(submesh_name);
+					if (!node) {
+						print(Print_error, "Failed to get node '%' from scene '%'\n", submesh_name, scene_path);
+						return 0;
+					}
+
 					auto &mesh = meshes_by_node.get_or_insert(node);
 					if (mesh) {
 						return mesh;
@@ -93,28 +118,25 @@ struct {
 					mesh = create_mesh(*node->mesh);
 
 
-					mesh->name.reserve(scene->name.size + 1 + submesh_name.size);
-					mesh->name.add(scene->name);
+					mesh->name.reserve(scene_path.size + 1 + submesh_name.size);
+					mesh->name.add(scene_path);
 					mesh->name.add(':');
 					mesh->name.add(submesh_name);
 					meshes_by_name.get_or_insert(mesh->name) = mesh;
 					return mesh;
 				} else {
-					if (auto parse_result = parse_glb_from_file(path)) {
-						defer { free(parse_result.value); };
+					auto scene_data = get_asset_data(path);
+					auto parse_result = parse_glb_from_memory(scene_data);
+					defer { free(parse_result); };
 
-						if (parse_result.value.meshes.size == 0) {
-							print(Print_error, "Failed to load mesh '%' because there is no submeshes in the file\n", path);
-							return 0;
-						}
-
-						auto result = create_mesh(parse_result.value.meshes[0]);
-						meshes_by_name.get_or_insert(path) = result;
-						return result;
-					} else {
-						print(Print_error, "Failed to parse mesh '%'\n", path);
+					if (parse_result.meshes.size == 0) {
+						print(Print_error, "Failed to load mesh '%' because there is no submeshes in the file\n", path);
 						return 0;
 					}
+
+					auto result = create_mesh(parse_result.meshes[0]);
+					meshes_by_name.get_or_insert(path) = result;
+					return result;
 				}
 			}
 

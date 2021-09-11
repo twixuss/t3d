@@ -4,6 +4,12 @@
 #include "editor/current.h"
 #include "assets.h"
 
+tg::Viewport pad(tg::Viewport viewport) {
+	viewport.min += 2;
+	viewport.max -= 2;
+	return viewport;
+}
+
 struct ButtonTheme {
 	v4f color = foreground_color;
 	v4f hover_enter_color = foreground_color * highlight_color * 1.5f;
@@ -58,35 +64,16 @@ struct FieldState {
 	s32 text_offset;
 };
 
+struct ScrollBarState {
+	u32 total_size;
+	u32 scrolled_pixels;
+};
+
+
 HashMap<GuiKey, ButtonState>            button_states;
 HashMap<GuiKey, FieldState<f32>>        float_field_states;
 HashMap<GuiKey, FieldState<List<utf8>>> text_field_states;
-
-
-void blit(v4f color) {
-	tg::set_rasterizer({
-		.depth_test = false,
-		.depth_write = false,
-	});
-	tg::set_shader(blit_color_shader);
-	tg::set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
-	tg::set_topology(tg::Topology_triangle_list);
-	tg::set_shader_constants(blit_color_constants, 0);
-	tg::update_shader_constants(blit_color_constants, {.color = color});
-	tg::draw(3);
-}
-
-void blit(tg::Texture2D *texture) {
-	tg::set_rasterizer({
-		.depth_test = false,
-		.depth_write = false,
-	});
-	tg::set_shader(blit_texture_shader);
-	tg::set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
-	tg::set_topology(tg::Topology_triangle_list);
-	tg::set_texture(texture, 0);
-	tg::draw(3);
-}
+HashMap<GuiKey, ScrollBarState>         scroll_bar_states;
 
 
 u32 const font_size = 12;
@@ -124,8 +111,8 @@ void draw_text(Span<PlacedChar> placed_text, SizedFont *font, DrawTextParams par
 		tg::update_vertex_buffer(text_vertex_buffer, as_bytes(vertices));
 	} else {
 		text_vertex_buffer = tg::create_vertex_buffer(as_bytes(vertices), {
-			tg::Element_f32x2, // position	
-			tg::Element_f32x2, // uv	
+			tg::Element_f32x2, // position
+			tg::Element_f32x2, // uv
 		});
 	}
 	tg::set_rasterizer({.depth_test = false, .depth_write = false});
@@ -152,7 +139,7 @@ void draw_text(char const *string, DrawTextParams params = {}) { draw_text((Span
 
 bool button_base(umm id, ButtonTheme const &theme, std::source_location location) {
 	auto &state = button_states.get_or_insert({id, location});
-	
+
 	bool result = mouse_click(0);
 	if (result) {
 		state.click_t = 1;
@@ -191,9 +178,9 @@ bool button(Span<utf8> text, umm id = 0, ButtonTheme const &theme = default_butt
 
 bool button(tg::Texture2D *texture, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
 	auto result = button_base(id, theme, location);
-	
+
 	blit(texture);
-	
+
 	return result;
 }
 
@@ -208,69 +195,6 @@ bool button(tg::Viewport button_viewport, tg::Texture2D *texture, umm id = 0, Bu
 		return button(texture, id, theme, location);
 	}
 	return false;
-}
-
-Optional<f32> parse_f32(Span<utf8> string) {
-	if (!string.size)
-		return {};
-
-	u64 whole_part = 0;
-	auto c = string.data;
-	auto end = string.end();
-
-	bool negative = false;
-	if (*c == '-') {
-		negative = true;
-		++c;
-	}
-
-	bool do_fract_part = false;
-	while (1) {
-		if (c == end)
-			break;
-
-		if (*c == '.' || *c == ',') {
-			do_fract_part = true;
-			break;
-		}
-
-		u32 digit = *c - '0';
-		if (digit >= 10)
-			return {};
-
-		whole_part *= 10;
-		whole_part += digit;
-
-		++c;
-	}
-
-	u64 fract_part  = 0;
-	u64 fract_denom = 1;
-
-	if (do_fract_part) {
-		++c;
-		while (1) {
-			if (c == end) {
-				break;
-			}
-
-			u32 digit = *c - '0';
-			if (digit >= 10)
-				return {};
-
-			fract_denom *= 10;
-			fract_part *= 10;
-			fract_part += digit;
-
-			++c;
-		}
-	}
-
-	f64 result = (f64)whole_part + (f64)fract_part / (f64)fract_denom;
-	if (negative) {
-		result = -result;
-	}
-	return result;
 }
 
 template <class Init, class Edit, class Drag>
@@ -322,7 +246,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	}
 	if (mouse_click(0) || should_focus()) {
 		lock_input();
-		
+
 		apply_input = false;
 		stop_edit = false;
 
@@ -461,7 +385,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 						state.string.insert_at(c, state.caret_position);
 						state.caret_position += 1;
 						state.caret_blink_time = 0;
-						//if (!key_held(Key_shift)) 
+						//if (!key_held(Key_shift))
 						state.selection_start = state.caret_position;
 					} else {
 						u32 sel_min, sel_max;
@@ -521,7 +445,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	}
 
 	if (stop_edit && !apply_input) {
-		value = state.original_value;	
+		value = state.original_value;
 		value_changed = true;
 	}
 
@@ -531,7 +455,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	} else if (in_bounds(current_mouse_position, current_scissor)) {
 		color = theme.hovered_color;
 	}
-			
+
 	blit(color);
 
 	if (state.editing) {
@@ -565,7 +489,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 			}
 			if (caret_x == 0)
 				state.text_offset = 0;
-			
+
 			if (placed_chars.back().position.max.x > current_viewport.size().x) {
 				state.text_offset = max(state.text_offset, caret_x - (s32)(current_viewport.size().x * 3 / 4));
 				state.text_offset = min(state.text_offset, caret_x - (s32)(current_viewport.size().x * 1 / 4));
@@ -589,8 +513,8 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				print("%\n", state.text_offset);
 
 				//state.text_offset = clamp<s32>(
-				//	(s32)current_viewport.size().x / 4 - (s32)caret_x, 
-				//	0, 
+				//	(s32)current_viewport.size().x / 4 - (s32)caret_x,
+				//	0,
 				//	-placed_chars.back().position.max.x + current_viewport.size().x - 1
 				//);
 			}
@@ -611,10 +535,10 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 
 				push_current_viewport(selection_viewport) blit({0.25f,0.25f,0.5f,1});
 			}
-		
+
 			draw_text(placed_chars, font, {.position = {-state.text_offset, 0}});
 		}
-		
+
 
 
 
@@ -653,7 +577,7 @@ Optional<f64> parse_expression(FloatFieldToken *&t, FloatFieldToken *end) {
 	bool negative = false;
 	while (1) {
 		if (t->kind == '-') {
-			negative = !negative;	
+			negative = !negative;
 			++t;
 			if (t == end)
 				break;
@@ -716,23 +640,39 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 			List<FloatFieldToken> tokens;
 			tokens.allocator = temporary_allocator;
 
-			auto c = state.string.data;
+			auto current_char_p = state.string.data;
+			auto next_char_p = current_char_p;
 			auto end = state.string.end();
 
-			while (c != end) {
-				if (is_alpha(*c) || *c == '_') {
+			utf32 c = 0;
+			auto next_char = [&] {
+				current_char_p = next_char_p;
+				if (current_char_p >= end) {
+					return false;
+				}
+				auto got = get_char_and_advance_utf8(&next_char_p);
+				if (got.has_value) {
+					c = got.value;
+					return true;
+				}
+				return false;
+			};
+
+			next_char();
+
+			while (current_char_p < end) {
+				if (is_alpha(c) || c == '_') {
 					FloatFieldToken token;
 					token.kind = FloatFieldToken_number;
 					Span<utf8> token_string;
-					token_string.data = c;
+					token_string.data = current_char_p;
 
-					c += 1;
-					while (c != end && (is_alpha(*c) || *c == '_' || is_digit(*c))) {
-						c += 1;
+					while (next_char() && (is_alpha(c) || c == '_' || is_digit(c))) {
+						// Skip to end of identifier
 					}
 
-					token_string.size = c - token_string.data;
-			
+					token_string.size = current_char_p - token_string.data;
+
 					if (token_string == u8"pi"s) {
 						token.value = pi;
 					} else if (token_string == u8"tau"s) {
@@ -744,28 +684,26 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 					}
 
 					tokens.add(token);
-				} else if (is_digit(*c)) {
+				} else if (is_digit(c) || c == '.') {
 					FloatFieldToken token;
 					token.kind = FloatFieldToken_number;
 
 					Span<utf8> token_string;
-					token_string.data = c;
+					token_string.data = current_char_p;
 
-					c += 1;
-					while (c != end && (is_digit(*c))) {
-						c += 1;
+					while (next_char() && is_digit(c)) {
+						// Skip to end of whole part
 					}
 
-					if (c != end) {
-						if (*c == '.') {
-							c += 1;
-							while (c != end && (is_digit(*c))) {
-								c += 1;
+					if (current_char_p != end) {
+						if (c == '.') {
+							while (next_char() && is_digit(c)) {
+								// Skip to end of fractional part
 							}
 						}
 					}
 
-					token_string.size = c - token_string.data;
+					token_string.size = current_char_p - token_string.data;
 					auto parsed = parse_f32(token_string);
 					if (!parsed) {
 						return false;
@@ -773,15 +711,15 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 					token.value = parsed.value;
 					tokens.add(token);
 				} else {
-					switch (*c) {
+					switch (c) {
 						case '+':
 						case '-':
 						case '*':
 						case '/': {
 							FloatFieldToken token;
-							token.kind = *c;
+							token.kind = c;
 							tokens.add(token);
-							c += 1;
+							next_char();
 							break;
 						}
 						default: {
@@ -811,7 +749,7 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 
 bool text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
 	auto &state = text_field_states.get_or_insert({id, location});
-	
+
 	return input_field(InputFieldCallbacks{
 		.on_init = [&]() {
 			state.string = copy(value);
@@ -825,6 +763,15 @@ bool text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = def
 		},
 	}, state, value, theme);
 }
+
+
+void begin_scrollbar(umm id = 0, std::source_location location = std::source_location::current()) {
+	auto &state = scroll_bar_states.get_or_insert({id, location});
+}
+void end_scrollbar(umm id = 0, std::source_location location = std::source_location::current()) {
+	auto &state = scroll_bar_states.get_or_insert({id, location});
+}
+
 
 s32 current_property_y;
 s32 const line_height = 16;
@@ -871,7 +818,7 @@ void draw_property(Span<utf8> name, f32 &value, u64 id, std::source_location loc
 			float_field(value, get_id(id, location));
 		}
 	}
-	
+
 	current_property_y += line_height + 2;
 }
 
@@ -898,7 +845,7 @@ void draw_property(Span<utf8> name, v3f &value, u64 id, std::source_location loc
 	push_current_viewport(x_viewport) draw_text("X");
 	push_current_viewport(y_viewport) draw_text("Y");
 	push_current_viewport(z_viewport) draw_text("Z");
-	
+
 	x_viewport.min.x += font_size;
 	y_viewport.min.x += font_size;
 	z_viewport.min.x += font_size;
@@ -948,7 +895,7 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 		push_current_viewport(value_viewport) {
 			blit({.05, .05, .05, 1});
 			draw_text(path);
-	
+
 			bool result = (key_state[256 + 0].state & KeyState_up) && in_bounds(current_mouse_position, current_scissor);
 
 			if (result) {
@@ -970,7 +917,7 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 			}
 		}
 	}
-	
+
 	current_property_y += line_height + 2;
 }
 
@@ -981,7 +928,7 @@ void draw_property(Span<utf8> name, Texture2D *&value, u64 id, std::source_locat
 		u8".hdr"s,
 	};
 	draw_asset_property(name, value ? value->name : u8"null"s, id, location, extensions, [&] (Span<utf8> path) {
-		auto new_texture = assets.textures_2d.get(path);	
+		auto new_texture = assets.textures_2d.get(path);
 		if (new_texture) {
 			value = new_texture;
 		}
@@ -993,6 +940,6 @@ void draw_property(Span<utf8> name, Mesh *&value, u64 id, std::source_location l
 		u8"idk"s
 	};
 	draw_asset_property(name, value ? value->name : u8"null"s, id, location, extensions, [&] (Span<utf8> path) {
-		
+
 	});
 }

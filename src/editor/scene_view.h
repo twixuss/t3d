@@ -24,7 +24,7 @@ struct SceneView : EditorWindow {
 	MovementState movement_state;
 	ManipulateKind manipulator_kind;
 	f32 camera_velocity;
-	
+
 	v2u get_min_size() {
 		return {160, 160};
 	}
@@ -33,10 +33,7 @@ struct SceneView : EditorWindow {
 		for (auto &effect : camera->post_effects) {
 			effect.resize((v2u)viewport.size());
 		}
-		tg::resize_texture(camera->source_target->color, (v2u)viewport.size());
-		tg::resize_texture(camera->source_target->depth, (v2u)viewport.size());
-		tg::resize_texture(camera->destination_target->color, (v2u)viewport.size());
-		tg::resize_texture(camera->destination_target->depth, (v2u)viewport.size());
+		camera->resize_targets((v2u)viewport.size());
 	}
 	void render() {
 		begin_input_user();
@@ -52,7 +49,7 @@ struct SceneView : EditorWindow {
 		current_camera_entity = camera_entity;
 		current_camera = camera;
 		current_viewport = viewport;
-		
+
 		if (movement_state == Movement_none) {
 			if (mouse_down(1)) movement_state = Movement_flying;
 			if (mouse_down(2)) movement_state = key_held(Key_shift) ? Movement_panning : Movement_orbiting;
@@ -86,7 +83,7 @@ struct SceneView : EditorWindow {
 		if (key_down('1')) manipulator_kind = Manipulate_position;
 		if (key_down('2')) manipulator_kind = Manipulate_rotation;
 		if (key_down('3')) manipulator_kind = Manipulate_scale;
-		
+
 		if (key_held(Key_control)) {
 			camera->fov = clamp(camera->fov - window->mouse_wheel * radians(10), radians(30.0f), radians(120.0f));
 		}
@@ -95,7 +92,7 @@ struct SceneView : EditorWindow {
 		f32 target_camera_velocity = 0;
 
 		f32 const mouse_scale = -0.003f;
-		quaternion rotation_delta = 
+		quaternion rotation_delta =
 			quaternion_from_axis_angle({0,1,0}, window->mouse_delta.x * mouse_scale * camera->fov) *
 			quaternion_from_axis_angle(camera_entity->rotation * v3f{1,0,0}, window->mouse_delta.y * mouse_scale * camera->fov);
 
@@ -144,6 +141,7 @@ struct SceneView : EditorWindow {
 		}
 		camera_entity->position += camera_entity->rotation * camera_move_direction * frame_time * camera_velocity;
 
+		tg::disable_scissor();
 		render_scene(this);
 
 		u32 const button_size = 32;
@@ -185,7 +183,7 @@ struct SceneView : EditorWindow {
 	}
 	bool deserialize(Stream &stream) {
 
-#define read_bytes(value) if (!stream.b_read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
+#define read_bytes(value) if (!stream.read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
 
 		read_bytes(camera_entity->position);
 		read_bytes(camera_entity->rotation);

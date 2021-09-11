@@ -1,10 +1,10 @@
 entity "suzan\"ne" {
-	position 0 0 0
-	rotation -46.396 87.713 -28.062
+	position 1 0 0
+	rotation -54.693 44.996 -0
 	scale 1 1 1
 	MeshRenderer {
-		mesh "../data/scene.glb:Suzanne"
-		lightmap "../data/suzanne_lightmap.png"
+		mesh "../example/scene.glb:Suzanne"
+		lightmap "../example/suzanne_lightmap.png"
 	}
 	Rotator {
 		axis 1 1 1
@@ -16,8 +16,8 @@ entity "floor" {
 	rotation -0 0 0
 	scale 1 1 1
 	MeshRenderer {
-		mesh "../data/scene.glb:Room"
-		lightmap "../data/floor_lightmap.png"
+		mesh "../example/scene.glb:Room"
+		lightmap "../example/floor_lightmap.png"
 	}
 }
 entity "light1" {
@@ -27,24 +27,26 @@ entity "light1" {
 	Light {
 		intensity 100
 		fov 1.57
-		mask "../data/spotlight_mask.png"
+		mask "../example/spotlight_mask.png"
 	}
 }
 entity "light2" {
-	position 1.735 3.055 -0.976
-	rotation -89.999 0 0
+	position 6.078 1.641 -6.078
+	rotation -18 135 0
 	scale 1 1 1
 	Light {
-		intensity 10
+		intensity 100
 		fov 1.57
-		mask "../data/spotlight_mask.png"
+		mask "../example/sky_y-.hdr"
 	}
 }
 entity "main camera" {
-	position 0 0 0
-	rotation -0 0 0
+	position -2.811 1.98 4.051
+	rotation -18.832 -40.546 0
 	scale 1 1 1
 	Camera {
 		fov 1.57
+		near_plane 0.1
+		far_plane 100
 	}
 }

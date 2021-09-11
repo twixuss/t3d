@@ -1,6 +1,6 @@
 #pragma once
 #ifndef ENUMERATE_COMPONENTS
-#error You must define ENUMERATE_COMPONENTS before including "components_base.h".
+#error You must define ENUMERATE_COMPONENTS before including "component.h".
 /*
 The macro should enumerate every component in this form:
 
@@ -40,10 +40,11 @@ struct Component {
 	u32 entity_index = -1;
 	Entity &entity() const;
 
-	// 
+	//
 	// These functions are not called and only needed to check if derived component overrides them
 	//
 	void init() { invalid_code_path(); }
+	void start() { invalid_code_path(); }
 	void update() { invalid_code_path(); }
 	void free() { invalid_code_path(); }
 };
@@ -90,8 +91,12 @@ struct Token {
 };
 
 
-using ComponentSerialize = void(*)(StringBuilder &builder, void *component);
+using ComponentSerialize = void(*)(StringBuilder &builder, void *component, bool binary);
+#if T3D_EDITOR
 using ComponentDeserialize = bool(*)(Token *&from, Token *end, void *component);
+#else
+using ComponentDeserialize = bool(*)(u8 *&from, u8 *end, void *component);
+#endif
 using ComponentDrawProperties = void(*)(void *component);
 using ComponentConstruct = void(*)(void *component);
 using ComponentInit = void(*)(void *component);
@@ -108,13 +113,20 @@ struct ComponentInfo {
 };
 
 template <class Component>
-void adapt_component_serializer(StringBuilder &builder, void *component) {
-	return ((Component *)component)->serialize(builder);
+void adapt_component_serializer(StringBuilder &builder, void *component, bool binary) {
+	return ((Component *)component)->serialize(builder, binary);
 }
+#if T3D_EDITOR
 template <class Component>
 bool adapt_component_deserializer(Token *&from, Token *end, void *component) {
 	return ((Component *)component)->deserialize(from, end);
 }
+#else
+template <class Component>
+bool adapt_component_deserializer(u8 *&from, u8 *end, void *component) {
+	return ((Component *)component)->deserialize(from, end);
+}
+#endif
 template <class Component>
 void adapt_component_property_drawer(void *component) {
 	return ((Component *)component)->draw_properties();
@@ -138,11 +150,16 @@ void adapt_component_free(void *component) {
 	}
 }
 
+#if T3D_EDITOR
+#define PROPERTY_DRAWER_ADAPTOR(component) adapt_component_property_drawer<component>
+#else
+#define PROPERTY_DRAWER_ADAPTOR(component) 0
+#endif
 
 #define c(component) { \
 	.serialize       = adapt_component_serializer<component>, \
 	.deserialize     = adapt_component_deserializer<component>, \
-	.draw_properties = adapt_component_property_drawer<component>, \
+	.draw_properties = PROPERTY_DRAWER_ADAPTOR(component), \
 	.construct       = adapt_component_construct<component>, \
 	.init            = adapt_component_init<component>, \
 	.free            = adapt_component_free<component>, \
@@ -217,7 +234,7 @@ struct ComponentStorage {
 
 		umm memory_size = ceil(sizeof(Block) + sizeof(Mask) * masks_per_block + bytes_per_entry * values_per_block, memory_aligment);
 
-		auto memory = (u8 *)allocator.allocate(Allocate_uninitialized, memory_size, memory_aligment);
+		auto memory = (u8 *)allocator.allocate_uninitialized(memory_size, memory_aligment);
 
 		auto block_index = blocks.size;
 		auto block = blocks.add((Block *)memory);
@@ -294,6 +311,8 @@ template <class Component>
 struct ComponentStorageIterator {
 	template <class Fn>
 	ComponentStorageIterator(Fn &&fn) {
+		using FnRet = decltype(fn(*(Component*)0));
+
 		static constexpr u32 component_type = get_component_type_index<Component>();
 		auto &storage = component_storages[component_type];
 		for (auto block : storage.blocks) {
@@ -302,12 +321,22 @@ struct ComponentStorageIterator {
 
 			u32 mask_index = 0;
 			for (u32 mask_index = 0; mask_index < storage.masks_per_block; mask_index += 1) {
-				auto mask = block->masks[mask_index];
+				auto &mask = block->masks[mask_index];
 				if (mask == 0)
 					continue;
 				for (u32 bit_index = 0; bit_index != storage.bits_in_mask; bit_index += 1) {
 					if (mask & ((ComponentStorage::Mask)1 << bit_index)) {
-						fn(((Component *)block->values)[mask_index * storage.bits_in_mask + bit_index]);
+						auto &value = ((Component *)block->values)[mask_index * storage.bits_in_mask + bit_index];
+
+						if constexpr (is_same<FnRet, void>) {
+							fn(value);
+						} else if constexpr (is_same<FnRet, ForEachDirective>) {
+							if (fn(value) == ForEach_break) {
+								return;
+							}
+						} else {
+							static_assert(false, "iteration function must return either void or ForEachDirective (use for_each_continue/for_each_break macros for that)");
+						}
 					}
 				}
 				++mask_index;
@@ -339,17 +368,25 @@ void draw_property(Span<utf8> name, List<utf8> &value, umm id = 0, std::source_l
 void draw_property(Span<utf8> name, tg::Texture2D *&value, umm id = 0, std::source_location location = std::source_location::current());
 void draw_property(Span<utf8> name, Mesh *&value, umm id = 0, std::source_location location = std::source_location::current());
 
-void serialize(StringBuilder &builder, f32 value);
-void serialize(StringBuilder &builder, v3f value);
-void serialize(StringBuilder &builder, Mesh *value);
-void serialize(StringBuilder &builder, Material *value);
-void serialize(StringBuilder &builder, tg::Texture2D *value);
+void serialize(StringBuilder &builder, f32 value, bool binary);
+void serialize(StringBuilder &builder, v3f value, bool binary);
+void serialize(StringBuilder &builder, Mesh *value, bool binary);
+void serialize(StringBuilder &builder, Material *value, bool binary);
+void serialize(StringBuilder &builder, tg::Texture2D *value, bool binary);
 
+#if T3D_EDITOR
 bool deserialize(f32 &value, Token *&from, Token *end);
 bool deserialize(v3f &value, Token *&from, Token *end);
 bool deserialize(Mesh *&value, Token *&from, Token *end);
 bool deserialize(Material *&value, Token *&from, Token *end);
 bool deserialize(tg::Texture2D *&value, Token *&from, Token *end);
+#else
+bool deserialize(f32 &value, u8 *&from, u8 *end);
+bool deserialize(v3f &value, u8 *&from, u8 *end);
+bool deserialize(Mesh *&value, u8 *&from, u8 *end);
+bool deserialize(Material *&value, u8 *&from, u8 *end);
+bool deserialize(tg::Texture2D *&value, u8 *&from, u8 *end);
+#endif
 
 template <class Derived>
 struct ComponentBase : Component {};
@@ -357,9 +394,25 @@ struct ComponentBase : Component {};
 #define DECLARE_FIELD(type, name, default) type name = default;
 
 #define SERIALIZE_FIELD(type, name, default) \
-append(builder, "\t\t" #name " "); \
-::serialize(builder, name); \
-append(builder, "\n"); \
+if (binary) { \
+	::serialize(builder, name, true); \
+} else { \
+	append(builder, "\t\t" #name " "); \
+	::serialize(builder, name, false); \
+	append(builder, "\n"); \
+}
+
+
+#define DRAW_FIELD(type, name, default) \
+draw_property(u8#name##s, name, __COUNTER__); \
+
+
+#if T3D_EDITOR
+
+#define DRAW_PROPERTIES \
+	void draw_properties() { \
+		FIELDS(DRAW_FIELD) \
+	}
 
 #define DESERIALIZE_FIELD(type, name, default) \
 else if (from->string == u8#name##s) { \
@@ -371,17 +424,7 @@ else if (from->string == u8#name##s) { \
 	if (!::deserialize(name, from, end)) return false; \
 }
 
-#define DRAW_FIELD(type, name, default) \
-draw_property(u8#name##s, name, __COUNTER__); \
-
-#define DECLARE_COMPONENT(name) \
-template <> \
-struct ComponentBase<name> : Component { \
-	static u32 type_index; \
-	FIELDS(DECLARE_FIELD) \
-	void serialize(StringBuilder &builder) { \
-		FIELDS(SERIALIZE_FIELD) \
-	}  \
+#define DESERIALIZE(name) \
 	bool deserialize(Token *&from, Token *end) { \
 		while (from->kind != '}') { \
 			if (from->kind != Token_identifier) { \
@@ -393,9 +436,33 @@ struct ComponentBase<name> : Component { \
 		} \
 		from += 1; \
 		return true; \
-	}  \
-	void draw_properties() { \
-		FIELDS(DRAW_FIELD) \
-	}  \
+	}
+
+#else
+
+#define DRAW_PROPERTIES
+
+#define DESERIALIZE_FIELD(type, name, default) \
+	if (!::deserialize(name, from, end)) return false;
+
+#define DESERIALIZE(name) \
+	bool deserialize(u8 *&from, u8 *end) { \
+		FIELDS(DESERIALIZE_FIELD) \
+		return true; \
+	}
+
+#endif
+
+
+#define DECLARE_COMPONENT(name) \
+template <> \
+struct ComponentBase<name> : Component { \
+	static u32 type_index; \
+	FIELDS(DECLARE_FIELD) \
+	void serialize(StringBuilder &builder, bool binary) { \
+		FIELDS(SERIALIZE_FIELD) \
+	} \
+	DESERIALIZE(name) \
+	DRAW_PROPERTIES \
 };  \
 struct name : ComponentBase<name>

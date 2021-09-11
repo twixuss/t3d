@@ -1,5 +1,5 @@
 #pragma once
-#include "tl.h"
+#include "common.h"
 #include "component.h"
 #include "post_effect.h"
 #include "post_effects/exposure.h"
@@ -7,7 +7,9 @@
 #include "post_effects/dither.h"
 
 #define FIELDS(F) \
-F(f32, fov, pi * 0.5f) \
+F(f32, fov,        pi * 0.5f) \
+F(f32, near_plane, 0.01f) \
+F(f32, far_plane,  100.0f) \
 
 DECLARE_COMPONENT(Camera) {
 	m4 world_to_camera_matrix;
@@ -52,6 +54,12 @@ DECLARE_COMPONENT(Camera) {
 			effect.free();
 		}
 		tl::free(post_effects);
+	}
+	void resize_targets(v2u size) {
+		tg::resize_texture(source_target->color, size);
+		tg::resize_texture(source_target->depth, size);
+		tg::resize_texture(destination_target->color, size);
+		tg::resize_texture(destination_target->depth, size);
 	}
 };
 

@@ -5,6 +5,8 @@
 #include "../gui.h"
 #include "../selection.h"
 
+Span<utf8> project_directory = u8"../example"s;
+
 struct FileView : EditorWindow {
 
 	struct Entry {
@@ -94,8 +96,8 @@ struct FileView : EditorWindow {
 FileView *create_file_view() {
 	auto result = create_editor_window<FileView>(EditorWindow_file_view);
 	result->root.is_directory = true;
-	result->root.name = as_list(u8"../data"s);
-	result->root.path = as_list(u8"../data"s);
+	result->root.name = as_list(project_directory);
+	result->root.path = as_list(project_directory);
 	result->add_files(result->root);
 	result->name = u8"Files"s;
 	return result;

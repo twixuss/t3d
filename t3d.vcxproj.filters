@@ -1,14 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\tl.cpp" />
+    <ClCompile Include="src\main_editor.cpp" />
+    <ClCompile Include="src\common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\tl.h" />
+    <ClInclude Include="src\common.h" />
     <ClInclude Include="src\material.h" />
     <ClInclude Include="src\component.h" />
     <ClInclude Include="src\mesh.h" />
@@ -61,6 +61,8 @@
     <ClInclude Include="src\assets.h" />
     <ClInclude Include="src\editor\window_list.h" />
     <ClInclude Include="src\editor\tab_view.h" />
+    <ClInclude Include="src\runtime.h" />
+    <ClInclude Include="src\skybox.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">
@@ -72,5 +74,8 @@
     <Filter Include="editor">
       <UniqueIdentifier>{4612238a-4b0c-4e64-9aa6-3748c0616b5a}</UniqueIdentifier>
     </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\main_runtime.cpp" />
   </ItemGroup>
 </Project>

@@ -92,10 +92,14 @@ struct TabView : EditorWindow {
 
 					auto theme = default_button_theme;
 					theme.color = middle_color;
-					theme.hover_enter_color = default_button_theme.hover_enter_color / default_button_theme.color * theme.color;
-					theme.hover_stay_color  = default_button_theme.hover_stay_color  / default_button_theme.color * theme.color;
-					theme.press_color       = default_button_theme.press_color       / default_button_theme.color * theme.color;
-					if (button(tab.window->name, (umm)this, theme)) {
+					theme.press_color = default_button_theme.press_color / default_button_theme.color * theme.color;
+					if (tab_index != selected_tab) {
+						theme.color             = background_color / default_button_theme.color * default_button_theme.color;
+						theme.hover_enter_color = background_color / default_button_theme.color * default_button_theme.hover_enter_color;
+						theme.hover_stay_color  = background_color / default_button_theme.color * default_button_theme.hover_stay_color;
+						theme.press_color       = background_color / default_button_theme.color * default_button_theme.press_color;
+					}
+					if (button(tab.window->name, (umm)this + tab_index, theme)) {
 						selected_tab = tab_index;
 					}
 					//blit({.1,.1,.1,1});

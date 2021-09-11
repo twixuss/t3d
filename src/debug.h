@@ -16,7 +16,7 @@ tg::VertexBuffer *debug_lines_vertex_buffer;
 tg::Shader *debug_line_shader;
 
 void debug_line(v3f a, v3f b) {
-	debug_lines.add({.a = {.position = a}, .b = {.position = b}, .time = 0});
+	debug_lines.add({.a = {.position = a, .color = {1,1,1}}, .b = {.position = b, .color = {1,1,1}}, .time = 0});
 }
 
 void debug_line(v3f pa, v3f ca, v3f pb, v3f cb) {

@@ -1,11 +1,18 @@
 #pragma once
-#include "tl.h"
+#include "common.h"
 #include "entity.h"
 #include "material.h"
 #include "texture.h"
+#include "assets.h"
 
-inline void serialize_component(StringBuilder &builder, u32 component_type, void *data) {
-	component_info[component_type].serialize(builder, data);
+struct DataHeader {
+	u64 asset_offset;
+	u64 asset_size;
+	u64 scene_offset;
+	u64 scene_size;
+};
+
+inline void serialize_component(StringBuilder &builder, u32 component_type, void *data, bool binary) {
 }
 
 void escape_string(StringBuilder &builder, Span<utf8> string) {
@@ -18,89 +25,114 @@ void escape_string(StringBuilder &builder, Span<utf8> string) {
 	append(builder, '"');
 }
 
-void serialize(StringBuilder &builder, f32 value) {
-	append(builder, value);
-}
-
-void serialize(StringBuilder &builder, v3f value) {
-	append(builder, value.x);
-	append(builder, ' ');
-	append(builder, value.y);
-	append(builder, ' ');
-	append(builder, value.z);
-}
-
-void serialize(StringBuilder &builder, Texture2D *value) {
-	if (value) {
-		escape_string(builder, value->name);
+void serialize(StringBuilder &builder, f32 value, bool binary) {
+	if (binary) {
+		append_bytes(builder, value);
 	} else {
-		append(builder, "null");
+		append(builder, value);
 	}
 }
 
-void serialize(StringBuilder &builder, Mesh *value) {
-	if (value) {
-		escape_string(builder, value->name);
+void serialize(StringBuilder &builder, v3f value, bool binary) {
+	if (binary) {
+		append_bytes(builder, value);
 	} else {
-		append(builder, "null");
+		append(builder, value.x);
+		append(builder, ' ');
+		append(builder, value.y);
+		append(builder, ' ');
+		append(builder, value.z);
 	}
 }
 
-List<utf8> serialize_scene() {
+void serialize(StringBuilder &builder, Texture2D *value, bool binary) {
+	if (binary) {
+		if (value) {
+			append_bytes(builder, (u32)value->name.size);
+			append_bytes(builder, value->name);
+		} else {
+			append_bytes(builder, (u32)0);
+		}
+	} else {
+		if (value) {
+			escape_string(builder, value->name);
+		} else {
+			append(builder, "null");
+		}
+	}
+}
+
+void serialize(StringBuilder &builder, Mesh *value, bool binary) {
+	if (binary) {
+		if (value) {
+			append_bytes(builder, (u32)value->name.size);
+			append_bytes(builder, value->name);
+		} else {
+			append_bytes(builder, (u32)0);
+		}
+	} else {
+		if (value) {
+			escape_string(builder, value->name);
+		} else {
+			append(builder, "null");
+		}
+	}
+}
+
+List<u8> serialize_scene(bool binary) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 
-	//for_each(textures, [&] (Texture &texture) {
-	//	if (!texture.serializable) {
-	//		return;
-	//	}
-	//});
 
-	//for (auto &material : materials) {
-	//	
-	//}
+	if (binary) {
+		for_each(entities, [&](Entity &entity) {
+			if (is_editor_entity(entity)) {
+				return;
+			}
 
-	for_each(entities, [&](Entity &entity) {
-		if (is_editor_entity(entity)) {
-			return;
-		}
+			append_bytes(builder, (u32)entity.name.size);
+			append_bytes(builder, entity.name);
+			append_bytes(builder, entity.position);
+			append_bytes(builder, entity.rotation);
+			append_bytes(builder, entity.scale);
 
-		append(builder, "entity ");
-		escape_string(builder, entity.name);
-		
-		append(builder, " {\n\tposition ");
-		serialize(builder, entity.position);
-		append(builder, '\n');
-		
-		auto angles = degrees(to_euler_angles(entity.rotation));
-		append_format(builder, "\trotation % % %\n\tscale ", angles.x, angles.y, angles.z);
-		
-		serialize(builder, entity.scale);
-		append(builder, '\n');
+			append_bytes(builder, (u32)entity.components.size);
+			for (auto &component : entity.components) {
+				append_bytes(builder, (u32)component.type);
+				component_info[component.type].serialize(builder, component_storages[component.type].get(component.index), true);
+			}
+		});
+	} else {
+		for_each(entities, [&](Entity &entity) {
+			if (is_editor_entity(entity)) {
+				return;
+			}
 
-		for (auto &component : entity.components) {
-			append(builder, "\t");
-			append(builder, component_info[component.type].name);
-			append(builder, " {\n");
-			serialize_component(builder, component.type, component_storages[component.type].get(component.index));
-			append(builder, "\t}\n");
-		}
-		append(builder, "}\n");
-	});
+			append(builder, "entity ");
+			escape_string(builder, entity.name);
 
-	return (List<utf8>)to_string(builder, current_allocator);
-}
+			append(builder, " {\n\tposition ");
+			serialize(builder, entity.position, false);
+			append(builder, '\n');
 
-constexpr auto window_layout_path = tl_file_string("window_layout"s);
+			auto angles = degrees(to_euler_angles(entity.rotation));
+			append_format(builder, "\trotation % % %\n\tscale ", angles.x, angles.y, angles.z);
 
-void serialize_window_layout() {
-	scoped_allocator(temporary_allocator);
+			serialize(builder, entity.scale, false);
+			append(builder, '\n');
 
-	StringBuilder builder;
+			for (auto &component : entity.components) {
+				append(builder, "\t");
+				append(builder, component_info[component.type].name);
+				append(builder, " {\n");
+				component_info[component.type].serialize(builder, component_storages[component.type].get(component.index), false);
+				append(builder, "\t}\n");
+			}
+			append(builder, "}\n");
+		});
+	}
 
-	main_window->serialize(builder);
-	
-	write_entire_file(window_layout_path, as_bytes(to_string(builder)));
+	return (List<u8>)to_string(builder, current_allocator);
 }
 
 Optional<List<utf8>> unescape_string(Span<utf8> literal) {
@@ -115,6 +147,7 @@ Optional<List<utf8>> unescape_string(Span<utf8> literal) {
 	return unescaped_name;
 }
 
+#if T3D_EDITOR
 bool deserialize_scene(Span<utf8> path) {
 	auto source = (Span<utf8>)with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
 
@@ -126,33 +159,48 @@ bool deserialize_scene(Span<utf8> path) {
 	List<Token> tokens;
 	tokens.allocator = temporary_allocator;
 
-	utf8 *c = source.data;
-	utf8 *end = source.end();
-
 	HashMap<Span<utf8>, TokenKind> string_to_token_kind;
 	string_to_token_kind.allocator = temporary_allocator;
 	string_to_token_kind.get_or_insert(u8"null"s)   = Token_null;
 	string_to_token_kind.get_or_insert(u8"entity"s) = Token_entity;
 
-	while (c != end) {
-		while (c != end && is_whitespace(*c)) {
-			c += 1;
+	auto current_char_p = source.data;
+	auto next_char_p = current_char_p;
+	auto end = source.end();
+
+	utf32 c = 0;
+	auto next_char = [&] {
+		current_char_p = next_char_p;
+		if (current_char_p >= end) {
+			return false;
 		}
-		if (c == end) {
+		auto got = get_char_and_advance_utf8(&next_char_p);
+		if (got.has_value) {
+			c = got.value;
+			return true;
+		}
+		return false;
+	};
+
+	next_char();
+
+	while (current_char_p < end) {
+		while (current_char_p != end && is_whitespace(c)) {
+			next_char();
+		}
+		if (current_char_p == end) {
 			break;
 		}
 
-		if (is_alpha(*c) || *c == '_') {
+		if (is_alpha(c) || c == '_') {
 			Token token;
-			token.string.data = c;
+			token.string.data = current_char_p;
 
-			c += 1;
-			while (c != end && (is_alpha(*c) || *c == '_' || is_digit(*c))) {
-				c += 1;
+			while (next_char() && (is_alpha(c) || c == '_' || is_digit(c))) {
 			}
 
-			token.string.size = c - token.string.data;
-			
+			token.string.size = current_char_p - token.string.data;
+
 			auto found = string_to_token_kind.find(token.string);
 			if (found) {
 				token.kind = *found;
@@ -161,68 +209,62 @@ bool deserialize_scene(Span<utf8> path) {
 			}
 
 			tokens.add(token);
-		} else if (is_digit(*c) || *c == '-') {
+		} else if (is_digit(c) || c == '-') {
 			Token token;
 			token.kind = Token_number;
-			token.string.data = c;
+			token.string.data = current_char_p;
 
-			c += 1;
-			while (c != end && (is_digit(*c))) {
-				c += 1;
+			while (next_char() && is_digit(c)) {
 			}
 
-			if (c != end) {
-				if (*c == '.') {
-					c += 1;
-					while (c != end && (is_digit(*c))) {
-						c += 1;
+			if (current_char_p != end) {
+				if (c == '.') {
+					while (next_char() && is_digit(c)) {
 					}
 				}
 			}
 
-			token.string.size = c - token.string.data;
+			token.string.size = current_char_p - token.string.data;
 			tokens.add(token);
 		} else {
-			switch (*c) {
+			switch (c) {
 				case '"': {
 					Token token;
 					token.kind = '"';
-					token.string.data = c + 1;
+					token.string.data = current_char_p + 1;
 
 				continue_search:
-					c += 1;
-					while (c != end && (*c != '"')) {
-						c += 1;
+					while (next_char() && (c != '"')) {
 					}
 
-					if (c == end) {
+					if (current_char_p == end) {
 						print(Print_error, "Unclosed string literal\n");
 						return false;
 					}
 
-					if (c[-1] == '\\') {
+					if (current_char_p[-1] == '\\') {
 						goto continue_search;
 					}
 
-					token.string.size = c - token.string.data;
+					token.string.size = current_char_p - token.string.data;
 
-					c += 1;
-					
+					next_char();
+
 					tokens.add(token);
 					break;
 				}
 				case '{':
 				case '}': {
 					Token token;
-					token.kind = *c;
-					token.string.data = c;
+					token.kind = c;
+					token.string.data = current_char_p;
 					token.string.size = 1;
 					tokens.add(token);
-					c += 1;
+					next_char();
 					break;
 				}
 				default: {
-					print(Print_error, "Failed to deserialize scene: invalid character '%'\n", *c);
+					print(Print_error, "Failed to deserialize scene: invalid character '%'\n", c);
 					return false;
 				}
 			}
@@ -249,7 +291,7 @@ bool deserialize_scene(Span<utf8> path) {
 				print(Print_error, "Expected 'entity' keyword, but got '%'\n", t->string);
 				return false;
 			}
-			
+
 			t += 1;
 
 			if (t == end) {
@@ -269,7 +311,7 @@ bool deserialize_scene(Span<utf8> path) {
 			List<utf8> unescaped_name = successfully_unescaped_name.value;
 
 			++t;
-			
+
 			if (t == end) {
 				print(Print_error, "Expected '{' after entity name, but got end of file\n");
 				return false;
@@ -314,7 +356,7 @@ bool deserialize_scene(Span<utf8> path) {
 					result = parsed.value;
 					return true;
 				};
-					
+
 				if (t->string == u8"position"s) {
 					t += 1;
 					if (!parse_float(entity.position.x)) return false;
@@ -371,7 +413,7 @@ bool deserialize_scene(Span<utf8> path) {
 					}
 				}
 			}
-			
+
 			if (t == end) {
 				print(Print_error, "Unclosed entity block body\n");
 				return false;
@@ -438,20 +480,187 @@ bool deserialize(Mesh *&value, Token *&from, Token *end) {
 	if (!successful_path) {
 		return false;
 	}
-	
+
 	value = assets.meshes.get(successful_path.value);
 
 	from += 1;
 
 	return true;
 }
+#else
+bool deserialize_scene(Span<u8> data) {
+	auto cursor = data.data;
+	auto end = data.end();
 
+	while(cursor != end) {
+		auto &entity = create_entity();
+		auto entity_index = index_of(entities, &entity).value;
+
+		u32 name_size;
+		if (cursor + sizeof(name_size) > end) {
+			print(Print_error, "Failed to deserialize scene: reached data end too soon (name_size)\n");
+			return false;
+		}
+		name_size = *(u32 *)cursor;
+		cursor += sizeof(name_size);
+
+
+		if (cursor + name_size > end) {
+			print(Print_error, "Failed to deserialize scene: reached data end too soon (name)\n");
+			return false;
+		}
+		entity.name.set({(utf8 *)cursor, name_size});
+		cursor += name_size;
+
+
+		if (cursor + sizeof(entity.position) > end) {
+			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.position)\n");
+			return false;
+		}
+		entity.position = *(v3f *)cursor;
+		cursor += sizeof(entity.position);
+
+
+		if (cursor + sizeof(entity.rotation) > end) {
+			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.rotation)\n");
+			return false;
+		}
+		entity.rotation = *(quaternion *)cursor;
+		cursor += sizeof(entity.rotation);
+
+
+		if (cursor + sizeof(entity.scale) > end) {
+			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.scale)\n");
+			return false;
+		}
+		entity.scale = *(v3f *)cursor;
+		cursor += sizeof(entity.scale);
+
+
+		u32 component_count;
+		if (cursor + sizeof(component_count) > end) {
+			print(Print_error, "Failed to deserialize scene: reached data end too soon (component_count)\n");
+			return false;
+		}
+		component_count = *(u32 *)cursor;
+		cursor += sizeof(component_count);
+
+		for (u32 component_index = 0; component_index < component_count; component_index += 1) {
+			u32 component_type;
+			if (cursor + sizeof(component_type) > end) {
+				print(Print_error, "Failed to deserialize scene: reached data end too soon (component_type)\n");
+				return false;
+			}
+			component_type = *(u32 *)cursor;
+			cursor += sizeof(component_type);
+
+			if (component_type >= component_type_count) {
+				print(Print_error, "Failed to deserialize scene: component type is invalid (%)\n", component_type);
+				return false;
+			}
+
+			auto added = component_storages[component_type].add();
+
+			component_info[component_type].construct(added.pointer);
+			((Component *)added.pointer)->entity_index = entity_index;
+
+			entity.components.add(ComponentIndex{
+				.type = component_type,
+				.index = added.index,
+				.entity_index = entity_index,
+			});
+
+			if (!component_info[component_type].deserialize(cursor, end, added.pointer)) {
+				return false;
+			}
+			component_info[component_type].init(added.pointer);
+		}
+	}
+
+
+
+	return true;
+}
+bool deserialize(f32 &value, u8 *&from, u8 *end) {
+	if (from + sizeof(value) > end) {
+		print(Print_error, "Failed to deserialize `f32`: reached data end too soon\n");
+		return false;
+	}
+
+	value = *(f32 *)from;
+	from += sizeof(value);
+	return true;
+}
+
+bool deserialize(v3f &value, u8 *&from, u8 *end) {
+	if (from + sizeof(value) > end) {
+		print(Print_error, "Failed to deserialize `v3f`: reached data end too soon\n");
+		return false;
+	}
+
+	value = *(v3f *)from;
+	from += sizeof(value);
+	return true;
+}
+
+bool deserialize(Texture2D *&value, u8 *&from, u8 *end) {
+	u32 path_size;
+	if (from + sizeof(path_size) > end) {
+		print(Print_error, "Failed to deserialize `Texture2D *`: reached data end too soon (path_size)\n");
+		return false;
+	}
+	path_size = *(u32 *)from;
+	from += sizeof(path_size);
+
+	if (path_size == 0) {
+		value = 0;
+		return true;;
+	}
+
+	if (from + path_size > end) {
+		print(Print_error, "Failed to deserialize `Texture2D *`: reached data end too soon (path)\n");
+		return false;
+	}
+
+	value = assets.textures_2d.get(Span((utf8 *)from, path_size));
+	from += path_size;
+
+	return true;
+}
+
+bool deserialize(Mesh *&value, u8 *&from, u8 *end) {
+	u32 path_size;
+	if (from + sizeof(path_size) > end) {
+		print(Print_error, "Failed to deserialize `Mesh *`: reached data end too soon (path_size)\n");
+		return false;
+	}
+	path_size = *(u32 *)from;
+	from += sizeof(path_size);
+
+	if (path_size == 0) {
+		value = 0;
+		return true;;
+	}
+
+	if (from + path_size > end) {
+		print(Print_error, "Failed to deserialize `Mesh *`: reached data end too soon (path)\n");
+		return false;
+	}
+
+	value = assets.meshes.get(Span((utf8 *)from, path_size));
+	from += path_size;
+
+	return true;
+}
+#endif
+
+#if T3D_EDITOR
 EditorWindow *deserialize_editor_window(Stream &stream) {
-#define read_bytes(value) if (!stream.b_read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
+#define read_bytes(value) if (!stream.read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
 
 	EditorWindowKind kind;
 	read_bytes(kind);
-	
+
 	EditorWindowId window_id;
 	read_bytes(window_id);
 
@@ -469,7 +678,7 @@ EditorWindow *deserialize_editor_window(Stream &stream) {
 			return 0;
 		}
 	}
-		
+
 	EditorWindowId parent_id;
 	read_bytes(parent_id);
 
@@ -489,6 +698,17 @@ EditorWindow *deserialize_editor_window(Stream &stream) {
 
 	return window;
 }
+constexpr auto window_layout_path = tl_file_string("window_layout"s);
+
+void serialize_window_layout() {
+	scoped_allocator(temporary_allocator);
+
+	StringBuilder builder;
+
+	main_window->serialize(builder);
+
+	write_entire_file(window_layout_path, as_bytes(to_string(builder)));
+}
 
 bool deserialize_window_layout() {
 	auto buffer = with(temporary_allocator, read_entire_file(window_layout_path));
@@ -503,3 +723,4 @@ bool deserialize_window_layout() {
 
 	return stream->remaining_bytes() == 0 && main_window != 0;
 }
+#endif
