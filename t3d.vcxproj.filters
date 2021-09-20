@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\main_editor.cpp" />
-    <ClCompile Include="src\common.cpp" />
+    <ClCompile Include="data\common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
@@ -48,7 +48,7 @@
     <ClInclude Include="src\editor\current.h" />
     <ClInclude Include="src\debug.h" />
     <ClInclude Include="src\editor\input.h" />
-    <ClInclude Include="src\component_list.h" />
+    <ClInclude Include="src\component_list_.h" />
     <ClInclude Include="src\editor\file_view.h" />
     <ClInclude Include="src\editor\hierarchy_view.h" />
     <ClInclude Include="src\font.h" />
@@ -63,6 +63,7 @@
     <ClInclude Include="src\editor\tab_view.h" />
     <ClInclude Include="src\runtime.h" />
     <ClInclude Include="src\skybox.h" />
+    <ClInclude Include="data\scripts_init.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

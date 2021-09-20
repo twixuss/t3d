@@ -1,5 +1,5 @@
 #pragma once
-#include "entity.h"
+#include <t3d/entity.h>
 
 enum SelectionKind {
 	Selection_none,
@@ -13,7 +13,7 @@ struct {
 		Entity *entity;
 		Texture2D *texture;
 	};
-	
+
 	void unset() {
 		kind = Selection_none;
 	}

@@ -1,5 +1,5 @@
 #pragma once
-#include "common.h"
+#include <t3d/common.h>
 
 FontCollection *font_collection;
 tg::VertexBuffer *text_vertex_buffer;
@@ -19,11 +19,11 @@ void init_font() {
 		if (texture) {
 			tg::update_texture(texture, size, data);
 		} else {
-			texture = tg::create_texture_2d(size, data, tg::Format_rgb_u8n, tg::Filtering_nearest);
+			texture = tg::create_texture_2d(size, data, tg::Format_rgb_u8n);
 		}
 		return texture;
 	};
-	
+
 	text_shader_constants = tg::create_shader_constants<TextShaderConstants>();
 	text_shader = tg::create_shader(u8R"(
 #ifdef VERTEX_SHADER

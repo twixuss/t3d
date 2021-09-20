@@ -30,7 +30,7 @@ void load_assets() {
 		memcpy(asset_path.data, cursor, asset_path_size);
 		cursor += asset_path_size;
 		assert(cursor < end);
-			
+
 
 		auto asset_size = *(u32 *)cursor;
 		cursor += sizeof(asset_size);
@@ -41,7 +41,7 @@ void load_assets() {
 		asset.size = asset_size;
 
 		cursor += asset_size;
-			
+
 		asset_path_to_data.get_or_insert(asset_path) = asset;
 
 		print("Got asset '%'\n", asset_path);
@@ -49,7 +49,7 @@ void load_assets() {
 }
 
 s32 tl_main(Span<Span<utf8>> arguments) {
-	auto log_file = open_file(tl_file_string("runtime_log.txt"s), File_write);
+	auto log_file = open_file(tl_file_string("runtime_log.txt"s), {.write = true});
 	defer { close(log_file); };
 	auto log_printer = Printer {
 		[](PrintKind kind, Span<utf8> string, void *data) {
@@ -64,27 +64,27 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	Profiler::init();
 	defer { Profiler::deinit(); };
 
-	data_file = open_file(tl_file_string("data.bin"), File_read);
+	data_file = open_file(tl_file_string("data.bin"), {.read = true});
 	defer { close(data_file); };
-	
+
 	print("Opening 'data.bin' ...\n");
 
 	data_buffer = map_file(data_file);
 	data_header = (DataHeader *)data_buffer.data;
-	
+
 	print("Mapping 'data.bin' ...\n");
 
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
 		print("Initializing runtime ...\n");
 		runtime_init(window);
-		
+
 		print("Loading assets ...\n");
 		load_assets();
 
 		print("Loading scene ...\n");
 		assert_always(deserialize_scene(Span(data_buffer.data + data_header->scene_offset, data_header->scene_size)));
-		
+
 		print("Starting runtime ...\n");
 		runtime_start();
 
@@ -114,15 +114,15 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		update_time();
 	};
 
-	
+
 	auto window = create_window(info);
 	defer { free(window); };
 
 	assert_always(window);
-	
+
 	frame_timer = create_precise_timer();
-	
-	
+
+
 	while (update(window)) {
 	}
 

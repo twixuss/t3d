@@ -1,6 +1,6 @@
 #pragma once
+#include <t3d/debug.h>
 #include "current.h"
-#include "debug.h"
 #include "input.h"
 
 enum ManipulateKind {

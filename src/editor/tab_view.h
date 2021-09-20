@@ -1,6 +1,5 @@
 #pragma once
 #include "window.h"
-#include "../blit.h"
 
 struct TabView;
 
@@ -21,7 +20,7 @@ List<TabMove> tab_moves;
 
 struct TabView : EditorWindow {
 	static constexpr s32 tab_height = 16;
-	
+
 	struct Tab {
 		EditorWindow *window;
 		bool needs_resize;
@@ -51,11 +50,11 @@ struct TabView : EditorWindow {
 		tg::set_render_target(tg::back_buffer);
 
 		bool highlight_dnd = false;
-		
+
 		auto bar_viewport = viewport;
 		bar_viewport.min.y = bar_viewport.max.y - tab_height;
 		push_current_viewport(bar_viewport) {
-			blit(background_color);
+			gui_panel(background_color);
 
 			if (drag_and_drop_kind == DragAndDrop_tab) {
 				highlight_dnd = true;
@@ -102,7 +101,7 @@ struct TabView : EditorWindow {
 					if (button(tab.window->name, (umm)this + tab_index, theme)) {
 						selected_tab = tab_index;
 					}
-					//blit({.1,.1,.1,1});
+					//gui_panel({.1,.1,.1,1});
 					//draw_text(placed_chars, font, {.position = {2, 0}});
 
 					if (begin_drag_and_drop(DragAndDrop_tab)) {
@@ -116,9 +115,9 @@ struct TabView : EditorWindow {
 			if (highlight_dnd) {
 				assert(drag_and_drop_data.size == sizeof(DragDropTabInfo));
 				auto data = *(DragDropTabInfo *)drag_and_drop_data.data;
-				
+
 				if (data.tab_view != this) {
-					blit({.1,1,.1,.2});
+					gui_panel({.1,1,.1,.2});
 				}
 			}
 		}
@@ -128,7 +127,7 @@ struct TabView : EditorWindow {
 		}
 		tabs[selected_tab].window->render();
 
-		
+
 		if (highlight_dnd) {
 			s32 const area_radius = 16;
 
@@ -150,8 +149,8 @@ struct TabView : EditorWindow {
 				if (data.tab_view == this && tabs.size == 1) {
 				} else {
 					push_current_viewport(viewport) {
-						blit({.1,1,.1,.2});
-					
+						gui_panel({.1,1,.1,.2});
+
 						if (accept_drag_and_drop(DragAndDrop_tab)) {
 
 							tab_moves.add({

@@ -1,5 +1,5 @@
 #pragma once
-#include "../common.h"
+#include <t3d/common.h>
 #include "current.h"
 #include "window_list.h"
 #include <tl/memory_stream.h>

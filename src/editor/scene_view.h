@@ -1,6 +1,6 @@
 #pragma once
 #include "window.h"
-#include "../entity.h"
+#include <t3d/entity.h>
 #include "manipulator.h"
 #include "gui.h"
 #include "../selection.h"
@@ -169,12 +169,12 @@ struct SceneView : EditorWindow {
 		if (button(translate_viewport, u8"Camera"s, (umm)this)) selection.set(camera_entity);
 	}
 	void select_entity() {
-		for_each_component_of_type(MeshRenderer, renderer) {
-			renderer.mesh->positions;
-		};
+		//for_each_component_of_type(MeshRenderer, renderer) {
+		//	renderer.mesh->positions;
+		//};
 	}
 	void free() {
-		destroy(*camera_entity);
+		destroy_entity(*camera_entity);
 	}
 	void serialize(StringBuilder &builder) {
 		append_bytes(builder, camera_entity->position);

@@ -21,12 +21,13 @@
   <ItemGroup>
     <ClCompile Include="src\main_editor.cpp" />
     <None Include="src\main_runtime.cpp" />
-    <ClCompile Include="src\common.cpp" />
+    <ClCompile Include="data\common.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="data\scripts_init.h" />
     <ClInclude Include="src\assets.h" />
     <ClInclude Include="src\components\rotator.h" />
     <ClInclude Include="src\editor\tab_view.h" />
@@ -39,7 +40,7 @@
     <ClInclude Include="src\components\camera.h" />
     <ClInclude Include="src\components\light.h" />
     <ClInclude Include="src\components\mesh_renderer.h" />
-    <ClInclude Include="src\component_list.h" />
+    <ClInclude Include="src\component_list_.h" />
     <ClInclude Include="src\editor\current.h" />
     <ClInclude Include="src\debug.h" />
     <ClInclude Include="src\editor\file_view.h" />
@@ -156,6 +157,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
+      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -171,7 +173,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
@@ -190,6 +192,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <PreprocessToFile>false</PreprocessToFile>
+      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -205,7 +208,7 @@
       <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>

@@ -1,17 +1,15 @@
 #pragma once
-#include "common.h"
-#include "component_list.h"
-#include "component.h"
+#include <t3d/common.h>
+#include <t3d/component.h>
 
-#include "components/camera.h"
-#include "components/light.h"
-#include "components/mesh_renderer.h"
-#include "components/rotator.h"
+#include <t3d/components/camera.h>
+#include <t3d/components/light.h>
+#include <t3d/components/mesh_renderer.h>
 
-#include "debug.h"
-#include "serialize.h"
-#include "blit.h"
-#include "skybox.h"
+#include <t3d/debug.h>
+#include <t3d/serialize.h>
+#include <t3d/blit.h>
+#include <t3d/skybox.h>
 
 struct GlobalConstants {
 	m4 camera_rotation_projection_matrix;
@@ -23,7 +21,7 @@ struct GlobalConstants {
 	v3f camera_forward;
 };
 tg::TypedShaderConstants<GlobalConstants> global_constants;
-#define GLOBAL_CONSTANTS_SLOT 15
+#define GLOBAL_CONSTANTS_SLOT 5
 
 
 struct EntityConstants {
@@ -33,7 +31,7 @@ struct EntityConstants {
 	m4 object_rotation_matrix;
 };
 tg::TypedShaderConstants<EntityConstants> entity_constants;
-#define ENTITY_CONSTANTS_SLOT 14
+#define ENTITY_CONSTANTS_SLOT 6
 
 
 struct LightConstants {
@@ -45,7 +43,7 @@ struct LightConstants {
 	u32 light_index;
 };
 tg::TypedShaderConstants<LightConstants> light_constants;
-#define LIGHT_CONSTANTS_SLOT 13
+#define LIGHT_CONSTANTS_SLOT 7
 
 Material surface_material;
 struct SurfaceConstants {
@@ -60,7 +58,7 @@ struct HandleConstants {
 
 	v3f color;
 	f32 selected;
-	
+
 	v3f to_camera;
 	f32 is_rotation;
 };
@@ -201,25 +199,46 @@ float sample_shadow_map(sampler2DShadow shadow_map, float3 light_space, float bi
 
 tg::GraphicsApi graphics_api;
 
+#include <algorithm>
+
+void register_built_in_components() {
+}
+
 //
 // Called once on program start
 //
 void runtime_init(Window &window) {
 	construct(entities);
 	construct(assets);
-	
-	init_component_storages<
-#define c(name) name
-#define sep ,
-		ENUMERATE_COMPONENTS
-#undef sep
-#undef c
-	>();
+	construct(component_infos);
+	construct(assets);
+
+	register_built_in_components();
+
+	//std::sort(component_infos.begin(), component_infos.end(), [](ComponentInfo &a, ComponentInfo &b) {
+	//	if (a.execution_priority != b.execution_priority) {
+	//		return a.execution_priority < b.execution_priority;
+	//	} else {
+	//		if (a.name.size != b.name.size) {
+	//			return a.name.size < b.name.size;
+	//		} else {
+	//			auto res = memcmp(a.name.data, b.name.data, a.name.size);
+	//			assert(res != 0, "Components with same name???");
+	//			return res < 0;
+	//		}
+	//	}
+	//});
+
+	//for (u32 i = 0; i < component_infos.size; ++i) {
+	//	auto &info = component_infos[i];
+	//	*info.registry_index = i;
+	//}
 
 	graphics_api = tg::GraphicsApi_opengl;
 	assert_always(tg::init(graphics_api, {
 		.window = window.handle,
 		.debug = BUILD_DEBUG,
+		.dont_check_apis = BUILD_DEBUG,
 	}));
 
 	global_constants = tg::create_shader_constants<GlobalConstants>();
@@ -574,13 +593,38 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	}
 
 	u32 white_pixel = ~0;
-	white_texture = tg::create_texture_2d(1, 1, &white_pixel, tg::Format_rgba_u8n, tg::Filtering_nearest);
+	white_texture = tg::create_texture_2d(1, 1, &white_pixel, tg::Format_rgba_u8n);
 	white_texture->name = as_list(u8"white"s);
 
 	u32 black_pixel = 0xFF000000;
-	black_texture = tg::create_texture_2d(1, 1, &black_pixel, tg::Format_rgba_u8n, tg::Filtering_nearest);
+	black_texture = tg::create_texture_2d(1, 1, &black_pixel, tg::Format_rgba_u8n);
 	black_texture->name = as_list(u8"black"s);
-		
+
+	{
+		constexpr s32 size = 256;
+
+		// Why this is not constexpr you may ask?
+		// Because c++ compiler is so fast obviously
+		const auto pixels = [] {
+			Array<u32, size * size> pixels = {};
+
+			f32 const scale = 1.0f / (size/2-0.5f);
+
+			for (s32 y = 0; y < size; ++y)
+			for (s32 x = 0; x < size; ++x) {
+				f32 l = smoothstep(map_clamped<f32>(length((v2f)v2s{x,y} - size/2 + 0.5f) * scale, 1, 0.5f, 0, 1));
+
+				u32 b = (u32)(l * 255);
+
+				pixels[y*size + x] = b | (b << 8) | (b << 16);
+			}
+			return pixels;
+		}();
+
+		default_light_mask = tg::create_texture_2d(size, size, pixels.data, tg::Format_rgba_u8n);
+		default_light_mask->name = as_list(u8"default_light_mask"s);
+	}
+
 	sky_box_texture = tg::load_texture_cube({
 		.left   = tl_file_string("../example/sky_x+.hdr"s),
 		.right  = tl_file_string("../example/sky_x-.hdr"s),
@@ -588,7 +632,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		.bottom = tl_file_string("../example/sky_y-.hdr"s),
 		.front  = tl_file_string("../example/sky_z-.hdr"s),
 		.back   = tl_file_string("../example/sky_z+.hdr"s),
-	});
+	}, {.generate_mipmaps = true});
 }
 
 //
@@ -599,33 +643,24 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 // Called once after runtime_init()
 //
 void runtime_start() {
-
-#define c(name) \
-	if constexpr (is_statically_overridden(start, name, Component)) { \
-		for_each_component_of_type(name, comp) { \
-			comp.start(); \
-		}; \
-	}
-#define sep
-	ENUMERATE_COMPONENTS
-#undef sep
-#undef c
-
+	for_each(component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+		if (info.start) {
+			info.storage.for_each([&](void *data) {
+				info.start(data);
+			});
+		}
+	});
 }
 
 void runtime_update() {
-	
-#define c(name) \
-	if constexpr (is_statically_overridden(update, name, Component)) { \
-		for_each_component_of_type(name, comp) { \
-			comp.update(); \
-		}; \
-	}
-#define sep
-	ENUMERATE_COMPONENTS
-#undef sep
-#undef c
 
+	for_each(component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+		if (info.update) {
+			info.storage.for_each([&](void *data) {
+				info.update(data);
+			});
+		}
+	});
 }
 
 //
@@ -644,7 +679,7 @@ void runtime_render() {
 		tg::disable_blend();
 		tg::set_topology(tg::Topology_triangle_list);
 
-		for_each_component_of_type(Light, light) {
+		for_each_component<Light>([&] (Light &light) {
 			timed_block("Light"s);
 			auto &light_entity = entities[light.entity_index];
 
@@ -656,15 +691,15 @@ void runtime_render() {
 
 			light.world_to_light_matrix = m4::perspective_right_handed(1, light.fov, 0.1f, 100.0f) * (m4)-light_entity.rotation * m4::translation(-light_entity.position);
 
-			for_each_component_of_type(MeshRenderer, mesh_renderer) {
+			for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
 				auto &mesh_entity = entities[mesh_renderer.entity_index];
 
 				tg::update_shader_constants(entity_constants, {
 					.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
 				});
 				draw_mesh(mesh_renderer.mesh);
-			};
-		};
+			});
+		});
 	}
 }
 
@@ -672,7 +707,7 @@ void runtime_render() {
 // Render scene from `camera`'s perspective into backbuffer with current viewport
 //
 void render_camera(Camera &camera, Entity &camera_entity) {
-	
+
 	m4 camera_projection_matrix = m4::perspective_right_handed((f32)current_viewport.size().x / current_viewport.size().y, camera.fov, camera.near_plane, camera.far_plane);
 	m4 camera_translation_matrix = m4::translation(-camera_entity.position);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_entity.rotation);
@@ -682,7 +717,7 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 
 	tg::update_shader_constants(global_constants, {
 		.camera_rotation_projection_matrix = camera_projection_matrix * camera_rotation_matrix,
-		.world_to_camera_matrix = camera.world_to_camera_matrix, 
+		.world_to_camera_matrix = camera.world_to_camera_matrix,
 		.camera_position = camera_entity.position,
 		//.camera_forward = m3::rotation_r_zxy(camera_entity.rotation) * v3f{0,0,-1},
 		.camera_forward = camera_entity.rotation * v3f{0,0,-1},
@@ -691,7 +726,7 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 	tg::set_render_target(camera.destination_target);
 	tg::set_viewport(camera.destination_target->color->size);
 	tg::clear(camera.destination_target, tg::ClearFlags_color | tg::ClearFlags_depth, {.9,.1,.9,1}, 1);
-	
+
 	tg::set_topology(tg::Topology_triangle_list);
 
 	tg::set_rasterizer({
@@ -702,7 +737,7 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 	tg::disable_blend();
 
 	u32 light_index = 0;
-	for_each_component_of_type(Light, light) {
+	for_each_component<Light>([&] (Light &light) {
 		timed_block("Light"s);
 
 		defer {
@@ -720,8 +755,11 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 
 
 		tg::set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
-		tg::set_texture(light.mask, LIGHT_TEXTURE_SLOT);
-		for_each_component_of_type(MeshRenderer, mesh_renderer) {
+		tg::set_sampler(tg::Filtering_linear, tg::Comparison_less, SHADOW_MAP_TEXTURE_SLOT);
+
+		tg::set_texture(light.mask ? light.mask : default_light_mask, LIGHT_TEXTURE_SLOT);
+		tg::set_sampler(tg::Filtering_linear_mipmap, LIGHT_TEXTURE_SLOT);
+		for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
 			timed_block("MeshRenderer"s);
 			auto &mesh_entity = entities[mesh_renderer.entity_index];
 
@@ -741,16 +779,17 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 				.local_to_world_position_matrix = local_to_world,
 				.local_to_world_normal_matrix = (m4)mesh_entity.rotation * m4::scale(1 / mesh_entity.scale),
 			});
+			tg::set_sampler(tg::Filtering_linear_mipmap, LIGHTMAP_TEXTURE_SLOT);
 			tg::set_texture(mesh_renderer.lightmap, LIGHTMAP_TEXTURE_SLOT);
 			draw_mesh(mesh_renderer.mesh);
-		};
+		});
 		tg::set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
 		tg::set_rasterizer(tg::get_rasterizer()
 			.set_depth_test(true)
 			.set_depth_write(false)
 			.set_depth_func(tg::Comparison_equal)
 		);
-	};
+	});
 
 	tg::set_rasterizer(tg::get_rasterizer()
 		.set_depth_test(true)
@@ -759,9 +798,12 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 	);
 	tg::disable_blend();
 
+	tg::disable_depth_clip();
 	tg::set_shader(sky_box_shader);
+	tg::set_sampler(tg::Filtering_linear_mipmap, 0);
 	tg::set_texture(sky_box_texture, 0);
 	tg::draw(36);
+	tg::enable_depth_clip();
 
 	swap(camera.source_target, camera.destination_target);
 
@@ -776,5 +818,5 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 		tg::set_viewport(current_viewport);
 		blit(camera.source_target->color);
 	}
-	
+
 }

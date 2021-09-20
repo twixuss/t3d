@@ -1,15 +1,14 @@
-#include "common.h"
+#include <t3d/common.h>
 #include <source_location>
 #include <tl/common.h>
 #include <tl/bin2cpp.h>
 tl::umm get_hash(struct ManipulatorStateKey const &);
 
 #include "../dep/tl/include/tl/masked_block_list.h"
-#include "component.h"
-#include "components/light.h"
-#include "components/mesh_renderer.h"
-#include "components/camera.h"
-#include "components/rotator.h"
+#include <t3d/component.h>
+#include <t3d/components/light.h>
+#include <t3d/components/mesh_renderer.h>
+#include <t3d/components/camera.h>
 #include "editor/window.h"
 #include "editor/scene_view.h"
 #include "editor/hierarchy_view.h"
@@ -18,8 +17,8 @@ tl::umm get_hash(struct ManipulatorStateKey const &);
 #include "editor/file_view.h"
 #include "editor/tab_view.h"
 #include "editor/input.h"
-#include "serialize.h"
-#include "assets.h"
+#include <t3d/serialize.h>
+#include <t3d/assets.h>
 #include "runtime.h"
 
 #define c(name) { \
@@ -214,7 +213,7 @@ void render_scene(SceneView *view) {
 		manipulator_draw_requests.clear();
 	}
 
-	for_each_component_of_type(Camera, camera) {
+	for_each_component<Camera>([&](Camera &camera) {
 		auto &camera_entity = camera.entity();
 		if (!is_editor_entity(camera_entity)) {
 			m4 projection_matrix = m4::perspective_right_handed((f32)view->viewport.size().x / view->viewport.size().y, camera.fov, camera.near_plane, camera.far_plane);
@@ -256,7 +255,7 @@ void render_scene(SceneView *view) {
 			debug_line(points[2], points[6]);
 			debug_line(points[3], points[7]);
 		}
-	};
+	});
 
 	debug_draw_lines();
 }
@@ -279,11 +278,47 @@ void add_assets(StringBuilder &asset_builder, Span<pathchar> directory) {
 	}
 }
 
+void invoke_msvc(Span<utf8> arguments) {
+	constexpr auto cl_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30037\\bin\\Hostx64\\x64\\cl.exe"s;
+
+	StringBuilder bat_builder;
+	append(bat_builder, u8R"(
+@echo off
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
+cl )");
+
+	append(bat_builder, arguments);
+	append(bat_builder, " > \"temp\\cppbuild_log.txt\"");
+
+	auto bat_path = tl_file_string("temp\\cppbuild.bat"s);
+	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
+
+	auto process = execute(bat_path);
+	if (!process) {
+		print(Print_error, "Cannot execute file '%'\n", bat_path);
+		return;
+	}
+
+	defer { free(process); };
+
+	print("cl %\n", arguments);
+
+	wait(process);
+	auto exit_code = get_exit_code(process);
+	if (exit_code != 0) {
+		print(Print_error, "Build command failed\n");
+		print(as_utf8(read_entire_file(tl_file_string("temp\\cppbuild_log.txt"))));
+		return;
+	}
+
+	print("Build succeeded\n");
+}
+
 void build_executable() {
 	scoped_allocator(temporary_allocator);
 
 	StringBuilder asset_builder;
-	add_assets(asset_builder, tl_file_string("../example"s));
+	add_assets(asset_builder, to_pathchars(assets.directory));
 
 	auto data_file = open_file(tl_file_string("data.bin"), {.write = true});
 	defer { close(data_file); };
@@ -297,7 +332,7 @@ void build_executable() {
 	header.asset_size = asset_data.size;
 	write(data_file, asset_data);
 
-	auto scene_data = serialize_scene(true);
+	auto scene_data = serialize_scene_binary();
 	header.scene_offset = get_cursor(data_file);
 	header.scene_size = scene_data.size;
 	write(data_file, scene_data);
@@ -306,57 +341,176 @@ void build_executable() {
 	write(data_file, value_as_bytes(header));
 
 
-	constexpr auto cl_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30037\\bin\\Hostx64\\x64\\cl.exe"s;
+	invoke_msvc(u8R"(..\src\main_runtime.cpp ..\src\common.cpp /ZI /I"." /I"..\include" /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /LIBPATH:"../dep/freetype/win64")"s);
+}
 
-	StringBuilder bat_builder;
-	append(bat_builder, u8R"(
-@echo off
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-cl ..\src\main_runtime.cpp ..\src\common.cpp /ZI /I"." /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /LIBPATH:"../dep/freetype/win64" > compile_log.txt
+void insert_scripts_paths(ListList<utf8> &scripts, Span<utf8> directory) {
+	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(assets.directory)));
+	for (auto &item : items) {
+		auto item_path = with(temporary_allocator, concatenate(directory, '/', item.name));
+		if (item.kind == FileItem_directory) {
+			insert_scripts_paths(scripts, item_path);
+		} else {
+			if (ends_with(item.name, u8".cpp"s)) {
+				scripts.add(item_path);
+			}
+		}
+	}
+}
+
+ComponentUID component_uid_counter = 0;
+ComponentUID get_new_uid() {
+	return component_uid_counter++;
+}
+
+HashMap<ComponentUID, ComponentInfo> built_in_components;
+
+using T3dRegisterComponents = void (*)(HashMap<Span<utf8>, ComponentUID> &component_name_to_uid, HashMap<ComponentUID, ComponentInfo> &component_infos, ComponentUID (*get_new_uid)());
+
+void recompile_all_scripts() {
+	ListList<utf8> script_paths;
+	insert_scripts_paths(script_paths, assets.directory);
+	script_paths.make_absolute();
+
+	ListList<utf8> component_names;
+	for (auto &path : script_paths) {
+		auto file = open_file(to_pathchars(path, true).data, {.read = true});
+		if (!is_valid(file)) {
+			print(Print_error, "Couldn't open script file %\n", path);
+			continue;
+		}
+		defer { close(file); };
+
+		auto mapped = map_file(file);
+		defer { unmap_file(mapped); };
+
+		auto decls = find_all(mapped.data, "DECLARE_COMPONENT"b);
+		for (auto &decl : decls) {
+			if (decl.end() >= mapped.data.end()) {
+				print(Print_error, "DECLARE_COMPONENT was at the end of the file %\n", path);
+				continue;
+			}
+			if (*decl.end() != '(') {
+				print(Print_error, "'(' was expected after DECLARE_COMPONENT in file %\n", path);
+				continue;
+			}
+			u8 *closing_paren = decl.end() + 1;
+			while (1) {
+				if (closing_paren == mapped.data.end()) {
+					print(Print_error, "DECLARE_COMPONENT was unclosed in file %\n", path);
+					goto skip_decl;
+				}
+				if (*closing_paren == ')') {
+					break;
+				}
+				++closing_paren;
+			}
+
+			component_names.add((Span<utf8>)Span(decl.end() + 1, closing_paren));
+
+		skip_decl:;
+		}
+	}
+	component_names.make_absolute();
+
+	auto scripts_init_path = u8"scripts_init.cpp"s;
+
+	// Generate source
+	{
+		StringBuilder builder;
+		append(builder, u8R"(#pragma once
+#define TL_IMPL
+#define TGRAPHICS_IMPL
+#include <freetype/freetype.h> // TODO: Shold this be in user code?
+#include <t3d/component.h>
+#include <t3d/serialize.h>
+
+#pragma comment(lib, "freetype.lib")
+
+)"s);
+		for (auto component_name : component_names) {
+			append_format(builder, "extern \"C\" void register_component_%(HashMap<Span<utf8>, ComponentUID> &component_name_to_uid, HashMap<ComponentUID, ComponentInfo> &component_infos, ComponentUID (*get_new_uid)());\n", component_name);
+		}
+		append(builder, u8R"(extern "C" __declspec(dllexport) void t3d_register_components(HashMap<Span<utf8>, ComponentUID> &component_name_to_uid, HashMap<ComponentUID, ComponentInfo> &component_infos, ComponentUID (*get_new_uid)()) {
 )");
+		for (auto component_name : component_names) {
+			append_format(builder, u8R"(register_component_%(component_name_to_uid, component_infos, get_new_uid);
+)", component_name);
+		}
+		append(builder, u8"}"s);
 
-	auto bat_path = tl_file_string("build.bat"s);
-	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
 
-	auto process = execute(bat_path);
-	if (!process) {
-		print(Print_error, "Cannot execute file '%'\n", bat_path);
-		return;
+		write_entire_file(to_pathchars(scripts_init_path), as_bytes(to_string(builder)));
 	}
 
-	defer { free(process); };
 
-	wait(process);
-	auto exit_code = get_exit_code(process);
-	if (exit_code != 0) {
-		print(Print_error, "Build command failed\n");
-		print(as_utf8(read_entire_file(tl_file_string("compile_log.txt"))));
-		return;
+
+	// setup environment
+	Span<utf8> scripts_dll_path = u8"scripts.dll"s;
+
+	// compile dll
+	{
+		StringBuilder builder;
+		append_format(builder, "% ", scripts_init_path);
+		for (auto script_path : script_paths) {
+			append_format(builder, "% ", script_path);
+		}
+		append(builder, R"(../data/component.cpp /LD /out:scripts.dll /ZI /I"." /I"..\include" /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /LIBPATH:"../dep/freetype/win64")"s);
+		invoke_msvc(as_utf8(to_string(builder)));
 	}
 
-	print("Build succeeded\n");
+	// load dll
+	HMODULE scripts_dll = LoadLibraryW(with(temporary_allocator, (wchar *)to_pathchars(scripts_dll_path, true).data));
+
+	// register all components in dll
+	auto scripts_register_components = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_register_components");
+
+	StringBuilder builder;
+
+	for_each(entities, [&](Entity &entity) {
+		for (auto &component : entity.components) {
+			auto found_info = component_infos.find(component.type);
+			assert(found_info);
+			auto &info = *found_info;
+			info.serialize(builder, info.storage.get(component.index), false);
+		}
+	});
+
+	// Remove old components
+	set(component_infos, built_in_components);
+
+	// Add new components
+	scripts_register_components(component_name_to_uid, component_infos, get_new_uid);
 }
 
 void run() {
-	manipulator_draw_requests = {};
-	manipulator_states = {};
-	debug_lines = {};
+	construct(manipulator_draw_requests);
+	construct(manipulator_states);
+	construct(debug_lines);
 
-	button_states = {};
-	float_field_states = {};
-	text_field_states  = {};
-	scroll_bar_states  = {};
+	construct(button_states);
+	construct(float_field_states);
+	construct(text_field_states );
+	construct(scroll_bar_states );
 
-	input_string = {};
+	construct(input_string);
 
-	drag_and_drop_data = {};
-	tab_moves = {};
-	editor_windows = {};
+	construct(drag_and_drop_data);
+	construct(tab_moves);
+	construct(editor_windows);
+	construct(gui_draws);
 
+	construct(editor_assets);
+	editor_assets.directory = u8"../data"s;
 
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
 		runtime_init(window);
+		assets.directory = u8"../example"s;
+
+		built_in_components = copy(component_infos);
+
+		recompile_all_scripts();
 
 		tg::set_scissor(aabb_min_max({}, (v2s)window.client_size));
 
@@ -373,43 +527,39 @@ void run() {
 
 
 
-		handle_sphere_mesh  = assets.meshes.get(u8"../data/handle.glb:Sphere"s);
-		handle_circle_mesh  = assets.meshes.get(u8"../data/handle.glb:Circle"s);
-		handle_tangent_mesh = assets.meshes.get(u8"../data/handle.glb:Tangent"s);
-		handle_axis_x_mesh  = assets.meshes.get(u8"../data/handle.glb:AxisX"s );
-		handle_axis_y_mesh  = assets.meshes.get(u8"../data/handle.glb:AxisY"s );
-		handle_axis_z_mesh  = assets.meshes.get(u8"../data/handle.glb:AxisZ"s );
-		handle_arrow_x_mesh = assets.meshes.get(u8"../data/handle.glb:ArrowX"s );
-		handle_arrow_y_mesh = assets.meshes.get(u8"../data/handle.glb:ArrowY"s );
-		handle_arrow_z_mesh = assets.meshes.get(u8"../data/handle.glb:ArrowZ"s );
-		handle_plane_x_mesh = assets.meshes.get(u8"../data/handle.glb:PlaneX"s);
-		handle_plane_y_mesh = assets.meshes.get(u8"../data/handle.glb:PlaneY"s);
-		handle_plane_z_mesh = assets.meshes.get(u8"../data/handle.glb:PlaneZ"s);
+		handle_sphere_mesh  = editor_assets.get_mesh(u8"handle.glb:Sphere"s);
+		handle_circle_mesh  = editor_assets.get_mesh(u8"handle.glb:Circle"s);
+		handle_tangent_mesh = editor_assets.get_mesh(u8"handle.glb:Tangent"s);
+		handle_axis_x_mesh  = editor_assets.get_mesh(u8"handle.glb:AxisX"s );
+		handle_axis_y_mesh  = editor_assets.get_mesh(u8"handle.glb:AxisY"s );
+		handle_axis_z_mesh  = editor_assets.get_mesh(u8"handle.glb:AxisZ"s );
+		handle_arrow_x_mesh = editor_assets.get_mesh(u8"handle.glb:ArrowX"s );
+		handle_arrow_y_mesh = editor_assets.get_mesh(u8"handle.glb:ArrowY"s );
+		handle_arrow_z_mesh = editor_assets.get_mesh(u8"handle.glb:ArrowZ"s );
+		handle_plane_x_mesh = editor_assets.get_mesh(u8"handle.glb:PlaneX"s);
+		handle_plane_y_mesh = editor_assets.get_mesh(u8"handle.glb:PlaneY"s);
+		handle_plane_z_mesh = editor_assets.get_mesh(u8"handle.glb:PlaneZ"s);
 
 		auto create_default_scene = [&]() {
 			auto &suzanne = create_entity("suzan\"ne");
 			suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
 			{
 				auto &mr = add_component<MeshRenderer>(suzanne);
-				mr.mesh = assets.meshes.get(u8"../example/scene.glb:Suzanne"s);
+				mr.mesh = assets.get_mesh(u8"scene.glb:Suzanne"s);
 				mr.material = &surface_material;
-				mr.lightmap = assets.textures_2d.get(u8"../example/suzanne_lightmap.png"s);
-
-				auto &rotator = add_component<Rotator>(suzanne);
-				rotator.axis = {1, 1, 1};
-				rotator.degrees_per_second = 30;
+				mr.lightmap = assets.get_texture_2d(u8"suzanne_lightmap.png"s);
 			}
 			selection.set(&suzanne);
 
 			auto &floor = create_entity("floor");
 			{
 				auto &mr = add_component<MeshRenderer>(floor);
-				mr.mesh = assets.meshes.get(u8"../example/scene.glb:Room"s);
+				mr.mesh = assets.get_mesh(u8"scene.glb:Room"s);
 				mr.material = &surface_material;
-				mr.lightmap = assets.textures_2d.get(u8"../example/floor_lightmap.png"s);
+				mr.lightmap = assets.get_texture_2d(u8"floor_lightmap.png"s);
 			}
 
-			auto light_texture = assets.textures_2d.get(u8"../example/spotlight_mask.png"s);
+			auto light_texture = assets.get_texture_2d(u8"spotlight_mask.png"s);
 
 			{
 				auto &light = create_entity("light1");
@@ -460,7 +610,7 @@ void run() {
 				{ .split_t = 1 }
 			);
 
-		if (!deserialize_scene(u8"test.scene"s))
+		if (!deserialize_scene_text(u8"test.scene"s))
 			create_default_scene();
 
 		window.min_window_size = client_size_to_window_size(window, main_window->get_min_size());
@@ -499,9 +649,9 @@ void run() {
 
 		if (key_down(Key_f2, {.anywhere = true})) {
 			for_each(entities, [](Entity &e) {
-				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).value, e.flags, e.position, degrees(to_euler_angles(e.rotation)));
+				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, index_of(entities, &e).get(), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
 				for (auto &c : e.components) {
-					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, component_info[c.type].name, c.index);
+					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, get_component_info(c.type).name, c.index);
 				}
 			});
 		}
@@ -527,14 +677,14 @@ void run() {
 
 		switch (drag_and_drop_kind) {
 			case DragAndDrop_file: {
-				auto texture = assets.textures_2d.get(as_utf8(drag_and_drop_data));
+				auto texture = assets.get_texture_2d(as_utf8(drag_and_drop_data));
 				if (texture) {
 					aabb<v2s> thumbnail_viewport;
 					thumbnail_viewport.min = thumbnail_viewport.max = current_mouse_position;
 					thumbnail_viewport.max.x += 128;
 					thumbnail_viewport.min.y -= 128;
 					push_current_viewport(thumbnail_viewport) {
-						blit(texture);
+						gui_image(texture);
 					}
 				}
 				break;
@@ -554,8 +704,9 @@ void run() {
 				tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
 
 				push_current_viewport(tab_viewport) {
-					blit({.1,.1,.1,1});
-					draw_text(placed_chars, font, {.position = {2, 0}});
+					gui_panel({.1,.1,.1,1});
+
+					label(placed_chars, font, {.position = {2, 0}});
 				}
 				break;
 			}
@@ -711,6 +862,77 @@ void run() {
 
 		input_string.clear();
 
+		for (auto &draw : gui_draws) {
+			tg::set_viewport(draw.viewport);
+			tg::set_scissor(draw.scissor);
+			switch (draw.kind) {
+				case GuiDraw_rect_colored: {
+					auto &rect_colored = draw.rect_colored;
+					blit(rect_colored.color);
+					break;
+				}
+				case GuiDraw_rect_textured: {
+					auto &rect_textured = draw.rect_textured;
+					blit(rect_textured.texture);
+					break;
+				}
+				case GuiDraw_label: {
+					auto &label = draw.label;
+
+					auto font = label.font;
+					auto placed_text = label.placed_chars;
+
+					assert(placed_text.size);
+
+					struct Vertex {
+						v2f position;
+						v2f uv;
+					};
+
+					List<Vertex> vertices;
+					vertices.allocator = temporary_allocator;
+
+					for (auto &c : placed_text) {
+						Span<Vertex> quad = {
+							{{c.position.min.x, c.position.min.y}, {c.uv.min.x, c.uv.min.y}},
+							{{c.position.max.x, c.position.min.y}, {c.uv.max.x, c.uv.min.y}},
+							{{c.position.max.x, c.position.max.y}, {c.uv.max.x, c.uv.max.y}},
+							{{c.position.min.x, c.position.max.y}, {c.uv.min.x, c.uv.max.y}},
+						};
+						vertices += {
+							quad[1], quad[0], quad[2],
+							quad[2], quad[0], quad[3],
+						};
+					}
+
+					if (text_vertex_buffer) {
+						tg::update_vertex_buffer(text_vertex_buffer, as_bytes(vertices));
+					} else {
+						text_vertex_buffer = tg::create_vertex_buffer(as_bytes(vertices), {
+							tg::Element_f32x2, // position
+							tg::Element_f32x2, // uv
+						});
+					}
+					tg::set_rasterizer({.depth_test = false, .depth_write = false});
+					tg::set_topology(tg::Topology_triangle_list);
+					tg::set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
+					tg::set_shader(text_shader);
+					tg::set_shader_constants(text_shader_constants, 0);
+					tg::update_shader_constants(text_shader_constants, {
+						.inv_half_viewport_size = v2f{2,-2} / (v2f)draw.viewport.size(),
+						.offset = (v2f)label.position,
+					});
+					tg::set_vertex_buffer(text_vertex_buffer);
+					tg::set_sampler(tg::Filtering_nearest, 0);
+					tg::set_texture(font->texture, 0);
+					tg::draw(vertices.size);
+					break;
+				}
+				default: invalid_code_path("not implemented"); break;
+			}
+		}
+		gui_draws.clear();
+
 		clear_temporary_storage();
 
 		{
@@ -753,7 +975,7 @@ void run() {
 	info.on_char = [](u32 ch) {
 		input_string.add(encode_utf8(ch));
 	};
-
+	info.client_size = {1280, 720};
 	window = create_window(info);
 	defer { free(window); };
 
@@ -768,12 +990,12 @@ void run() {
 	while (update(window)) {
 	}
 
-	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene(false))));
+	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene_text())));
 
 	serialize_window_layout();
 
 	for_each(entities, [](Entity &e) {
-		destroy(e);
+		destroy_entity(e);
 	});
 
 	free_component_storages();

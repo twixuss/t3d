@@ -1,8 +1,8 @@
 #pragma once
 #include "font.h"
-#include "blit.h"
+#include <t3d/blit.h>
+#include <t3d/assets.h>
 #include "editor/current.h"
-#include "assets.h"
 
 tg::Viewport pad(tg::Viewport viewport) {
 	viewport.min += 2;
@@ -76,66 +76,66 @@ HashMap<GuiKey, FieldState<List<utf8>>> text_field_states;
 HashMap<GuiKey, ScrollBarState>         scroll_bar_states;
 
 
+enum GuiDrawKind : u8 {
+	GuiDraw_none,
+	GuiDraw_label,
+	GuiDraw_rect_colored,
+	GuiDraw_rect_textured,
+};
+
+struct GuiDraw {
+	GuiDrawKind kind;
+	aabb<v2s> viewport;
+	aabb<v2s> scissor;
+	union {
+		struct {
+			v4f color;
+		} rect_colored;
+		struct {
+			tg::Texture2D *texture;
+		} rect_textured;
+		struct {
+			v2s position;
+			List<PlacedChar> placed_chars;
+			SizedFont *font;
+		} label;
+	};
+};
+
+List<GuiDraw> gui_draws;
+
+void gui_panel(v4f color) {
+	gui_draws.add({.kind = GuiDraw_rect_colored, .viewport = current_viewport, .scissor = current_scissor, .rect_colored = {.color = color}});
+}
+
+void gui_image(tg::Texture2D *texture) {
+	gui_draws.add({.kind = GuiDraw_rect_textured, .viewport = current_viewport, .scissor = current_scissor, .rect_textured = {.texture = texture}});
+}
+
 u32 const font_size = 12;
 
 struct DrawTextParams {
 	v2s position = {};
 };
 
-void draw_text(Span<PlacedChar> placed_text, SizedFont *font, DrawTextParams params = {}) {
-	if (!placed_text.size)
+void label(Span<PlacedChar> placed_chars, SizedFont *font, DrawTextParams params = {}) {
+	if (placed_chars.size == 0)
 		return;
 
-	struct Vertex {
-		v2f position;
-		v2f uv;
-	};
-
-	List<Vertex> vertices;
-	vertices.allocator = temporary_allocator;
-
-	for (auto &c : placed_text) {
-		Span<Vertex> quad = {
-			{{c.position.min.x, c.position.min.y}, {c.uv.min.x, c.uv.min.y}},
-			{{c.position.max.x, c.position.min.y}, {c.uv.max.x, c.uv.min.y}},
-			{{c.position.max.x, c.position.max.y}, {c.uv.max.x, c.uv.max.y}},
-			{{c.position.min.x, c.position.max.y}, {c.uv.min.x, c.uv.max.y}},
-		};
-		vertices += {
-			quad[1], quad[0], quad[2],
-			quad[2], quad[0], quad[3],
-		};
-	}
-
-	if (text_vertex_buffer) {
-		tg::update_vertex_buffer(text_vertex_buffer, as_bytes(vertices));
-	} else {
-		text_vertex_buffer = tg::create_vertex_buffer(as_bytes(vertices), {
-			tg::Element_f32x2, // position
-			tg::Element_f32x2, // uv
-		});
-	}
-	tg::set_rasterizer({.depth_test = false, .depth_write = false});
-	tg::set_topology(tg::Topology_triangle_list);
-	tg::set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
-	tg::set_shader(text_shader);
-	tg::set_shader_constants(text_shader_constants, 0);
-	tg::update_shader_constants(text_shader_constants, {
-		.inv_half_viewport_size = v2f{2,-2} / (v2f)current_viewport.size(),
-		.offset = (v2f)params.position,
-	});
-	tg::set_vertex_buffer(text_vertex_buffer);
-	tg::set_texture(font->texture, 0);
-	tg::draw(vertices.size);
+	gui_draws.add({.kind = GuiDraw_label, .viewport = current_viewport, .scissor = current_scissor, .label = {.position = params.position, .placed_chars = with(temporary_allocator, as_list(placed_chars)), .font = font}});
 }
-void draw_text(Span<utf8> string, DrawTextParams params = {}) {
+void label(Span<utf8> string, DrawTextParams params = {}) {
+	if (string.size == 0)
+		return;
+
 	auto font = get_font_at_size(font_collection, font_size);
 	ensure_all_chars_present(string, font);
-	return draw_text(with(temporary_allocator, place_text(string, font)), font, params);
+
+	label(with(temporary_allocator, place_text(string, font)), font, params);
 }
-void draw_text(utf8 const *string, DrawTextParams params = {}) { draw_text(as_span(string), params); }
-void draw_text(Span<char>  string, DrawTextParams params = {}) { draw_text((Span<utf8>)string, params); }
-void draw_text(char const *string, DrawTextParams params = {}) { draw_text((Span<utf8>)as_span(string), params); }
+void label(utf8 const *string, DrawTextParams params = {}) { label(as_span(string), params); }
+void label(Span<char>  string, DrawTextParams params = {}) { label((Span<utf8>)string, params); }
+void label(char const *string, DrawTextParams params = {}) { label((Span<utf8>)as_span(string), params); }
 
 bool button_base(umm id, ButtonTheme const &theme, std::source_location location) {
 	auto &state = button_states.get_or_insert({id, location});
@@ -158,12 +158,14 @@ bool button_base(umm id, ButtonTheme const &theme, std::source_location location
 	color = lerp(color, theme.hover_enter_color, V4f(state.hover_enter_t));
 	color = lerp(color, theme.press_color,       V4f(state.press_t));
 	color = lerp(color, theme.click_color,       V4f(state.click_t));
-	blit(color);
+
+	gui_panel(color);
 
 	state.click_t       = lerp<f32>(state.click_t,       0, frame_time * theme.click_speed);
 	state.hover_enter_t = lerp<f32>(state.hover_enter_t, 0, frame_time * theme.hover_enter_speed);
 
 	state.previously_hovered = currently_hovered;
+
 
 	return result;
 }
@@ -171,7 +173,7 @@ bool button_base(umm id, ButtonTheme const &theme, std::source_location location
 bool button(Span<utf8> text, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
 	auto result = button_base(id, theme, location);
 
-	draw_text(text);
+	label(text);
 
 	return result;
 }
@@ -179,7 +181,7 @@ bool button(Span<utf8> text, umm id = 0, ButtonTheme const &theme = default_butt
 bool button(tg::Texture2D *texture, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
 	auto result = button_base(id, theme, location);
 
-	blit(texture);
+	gui_image(texture);
 
 	return result;
 }
@@ -456,7 +458,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 		color = theme.hovered_color;
 	}
 
-	blit(color);
+	gui_panel(color);
 
 	if (state.editing) {
 		tg::Viewport caret_viewport = current_viewport;
@@ -533,10 +535,10 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				selection_viewport.min.x = current_viewport.min.x + min_x;
 				selection_viewport.max.x = selection_viewport.min.x + max_x - min_x;
 
-				push_current_viewport(selection_viewport) blit({0.25f,0.25f,0.5f,1});
+				push_current_viewport(selection_viewport) gui_panel({0.25f,0.25f,0.5f,1});
 			}
 
-			draw_text(placed_chars, font, {.position = {-state.text_offset, 0}});
+			label(placed_chars, font, {.position = {-state.text_offset, 0}});
 		}
 
 
@@ -544,7 +546,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 
 		if (state.caret_blink_time <= 0.5f) {
 			push_current_viewport (caret_viewport) {
-				blit({1, 1, 1, 1});
+				gui_panel({1, 1, 1, 1});
 			}
 		}
 		state.caret_blink_time += frame_time;
@@ -552,7 +554,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 			state.caret_blink_time -= 1;
 		}
 	} else {
-		draw_text((List<utf8>)to_string(value));
+		label((List<utf8>)to_string(value));
 	}
 
 	return value_changed;
@@ -611,10 +613,10 @@ Optional<f64> parse_expression(FloatFieldToken *&t, FloatFieldToken *end) {
 
 			if (right) {
 				switch (op) {
-					case '+': result += right.value; break;
-					case '-': result -= right.value; break;
-					case '*': result *= right.value; break;
-					case '/': result /= right.value; break;
+					case '+': result += right.get(); break;
+					case '-': result -= right.get(); break;
+					case '*': result *= right.get(); break;
+					case '/': result /= right.get(); break;
 				}
 			}
 		}
@@ -651,8 +653,8 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 					return false;
 				}
 				auto got = get_char_and_advance_utf8(&next_char_p);
-				if (got.has_value) {
-					c = got.value;
+				if (got.valid()) {
+					c = got.get();
 					return true;
 				}
 				return false;
@@ -708,7 +710,7 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 					if (!parsed) {
 						return false;
 					}
-					token.value = parsed.value;
+					token.value = parsed.get();
 					tokens.add(token);
 				} else {
 					switch (c) {
@@ -735,7 +737,7 @@ bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_t
 
 				auto parsed = parse_expression(t, end);
 				if (parsed || state.string.size == 0) {
-					value = parsed ? parsed.value : 0;
+					value = parsed ? parsed.get() : 0;
 					return true;
 				}
 			}
@@ -780,7 +782,7 @@ void header(Span<utf8> text) {
 	tg::Viewport line_viewport = current_viewport;
 	line_viewport.min.y = current_viewport.max.y - line_height - current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
-	push_current_viewport(line_viewport) draw_text(text);
+	push_current_viewport(line_viewport) label(text);
 	current_property_y += line_height + 2;
 }
 
@@ -789,7 +791,7 @@ void property_separator() {
 	tg::Viewport line_viewport = current_viewport;
 	line_viewport.min.y = current_viewport.max.y - separator_height - current_property_y;
 	line_viewport.max.y = line_viewport.min.y + separator_height;
-	push_current_viewport(line_viewport) blit({.05, .05, .05, 1});
+	push_current_viewport(line_viewport) gui_panel({.05, .05, .05, 1});
 	current_property_y += separator_height + 2;
 }
 
@@ -809,7 +811,7 @@ void draw_property(Span<utf8> name, f32 &value, u64 id, std::source_location loc
 		ensure_all_chars_present(name, font);
 		auto placed_text = with(temporary_allocator, place_text(name, font));
 		text_width = placed_text.back().position.max.x;
-		draw_text(placed_text, font);
+		label(placed_text, font);
 
 		auto value_viewport = line_viewport;
 		value_viewport.min.x += text_width + 2;
@@ -842,9 +844,9 @@ void draw_property(Span<utf8> name, v3f &value, u64 id, std::source_location loc
 	z_viewport.min.x = y_viewport.max.x;
 	z_viewport.max.x = line_viewport.max.x;
 
-	push_current_viewport(x_viewport) draw_text("X");
-	push_current_viewport(y_viewport) draw_text("Y");
-	push_current_viewport(z_viewport) draw_text("Z");
+	push_current_viewport(x_viewport) label("X");
+	push_current_viewport(y_viewport) label("Y");
+	push_current_viewport(z_viewport) label("Z");
 
 	x_viewport.min.x += font_size;
 	y_viewport.min.x += font_size;
@@ -887,14 +889,14 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 		ensure_all_chars_present(name, font);
 		auto placed_text = with(temporary_allocator, place_text(name, font));
 		text_width = placed_text.back().position.max.x;
-		draw_text(placed_text, font);
+		label(placed_text, font);
 
 		auto value_viewport = current_viewport;
 		value_viewport.min.x += text_width + 2;
 
 		push_current_viewport(value_viewport) {
-			blit({.05, .05, .05, 1});
-			draw_text(path);
+			gui_panel({.05, .05, .05, 1});
+			label(path);
 
 			bool result = (key_state[256 + 0].state & KeyState_up) && in_bounds(current_mouse_position, current_scissor);
 
@@ -909,7 +911,7 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 				});
 
 				if (found) {
-					blit({0.1, 1.0, 0.1, 0.2});
+					gui_panel({0.1, 1.0, 0.1, 0.2});
 				}
 			}
 			if (accept_drag_and_drop(DragAndDrop_file)) {
@@ -928,7 +930,7 @@ void draw_property(Span<utf8> name, Texture2D *&value, u64 id, std::source_locat
 		u8".hdr"s,
 	};
 	draw_asset_property(name, value ? value->name : u8"null"s, id, location, extensions, [&] (Span<utf8> path) {
-		auto new_texture = assets.textures_2d.get(path);
+		auto new_texture = assets.get_texture_2d(path);
 		if (new_texture) {
 			value = new_texture;
 		}

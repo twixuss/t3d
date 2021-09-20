@@ -1,7 +1,6 @@
 #pragma once
+#include <t3d/entity.h>
 #include "window.h"
-#include "../blit.h"
-#include "../entity.h"
 #include "../gui.h"
 #include "../selection.h"
 
@@ -15,7 +14,7 @@ struct HierarchyView : EditorWindow {
 	void render() {
 		tg::set_render_target(tg::back_buffer);
 
-		blit(middle_color);
+		gui_panel(middle_color);
 
 		s32 const button_height = 16;
 		s32 const button_padding = 2;
@@ -29,7 +28,7 @@ struct HierarchyView : EditorWindow {
 			tg::Viewport button_viewport;
 			button_viewport.min = next_pos;
 			button_viewport.max = button_viewport.min + v2s{viewport.size().x - button_padding * 2, button_height};
-			
+
 
 			ButtonTheme theme = default_button_theme;
 			if (selection.kind == Selection_entity && &entity == selection.entity) {

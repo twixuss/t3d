@@ -1,6 +1,6 @@
 #pragma once
-#include "entity.h"
-#include "components/camera.h"
+#include <t3d/entity.h>
+#include <t3d/components/camera.h>
 
 Window *window;
 
@@ -18,7 +18,7 @@ struct ViewportPusher {
 	ViewportPusher(tg::Viewport new_viewport) {
 		old_viewport = current_viewport;
 		old_scissor  = current_scissor;
-		
+
 		current_viewport = new_viewport;
 		current_scissor = intersection(new_viewport, current_scissor);
 

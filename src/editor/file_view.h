@@ -1,11 +1,9 @@
 #pragma once
 #include "window.h"
-#include "../blit.h"
-#include "../entity.h"
+#include <t3d/entity.h>
+#include <t3d/assets.h>
 #include "../gui.h"
 #include "../selection.h"
-
-Span<utf8> project_directory = u8"../example"s;
 
 struct FileView : EditorWindow {
 
@@ -16,7 +14,7 @@ struct FileView : EditorWindow {
 		List<Entry> entries;
 	};
 	Entry root;
-	
+
 	s32 const button_height = 16;
 	s32 const button_padding = 2;
 	v2s next_pos;
@@ -46,7 +44,7 @@ struct FileView : EditorWindow {
 	}
 	void render() {
 		tg::set_render_target(tg::back_buffer);
-		blit(middle_color);
+		gui_panel(middle_color);
 
 		next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
 		tab = 0;
@@ -63,13 +61,13 @@ struct FileView : EditorWindow {
 
 			push_current_viewport(button_viewport) {
 				if (button(entry.name, (umm)&entry)) {
-					auto found = assets.textures_2d.by_path.find(entry.path);
+					auto found = assets.textures_2d_by_path.find(entry.path);
 
 					Texture2D *texture = 0;
 					if (found) {
 						texture = *found;
 					} else {
-						texture = assets.textures_2d.get(entry.path);
+						texture = assets.get_texture_2d(entry.path);
 					}
 
 					if (texture) {
@@ -96,8 +94,8 @@ struct FileView : EditorWindow {
 FileView *create_file_view() {
 	auto result = create_editor_window<FileView>(EditorWindow_file_view);
 	result->root.is_directory = true;
-	result->root.name = as_list(project_directory);
-	result->root.path = as_list(project_directory);
+	result->root.name = as_list(assets.directory);
+	result->root.path = as_list(assets.directory);
 	result->add_files(result->root);
 	result->name = u8"Files"s;
 	return result;
