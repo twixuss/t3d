@@ -14,4 +14,6 @@ DECLARE_COMPONENT(Rotator) {
 	}
 };
 
+REGISTER_COMPONENT(Rotator);
+
 #undef FIELDS

@@ -19,52 +19,50 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\main_editor.cpp" />
-    <None Include="src\main_runtime.cpp" />
-    <ClCompile Include="data\common.cpp" />
+    <ClCompile Include="src\t3d\common.cpp" />
+    <ClCompile Include="src\t3d\component.cpp" />
+    <ClCompile Include="src\t3d\entity.cpp" />
+    <ClCompile Include="src\t3d\main.cpp" />
+    <ClCompile Include="src\t3d\main_editor.cpp" />
+    <None Include="src\t3d\main_runtime.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="data\scripts_init.h" />
-    <ClInclude Include="src\assets.h" />
-    <ClInclude Include="src\components\rotator.h" />
-    <ClInclude Include="src\editor\tab_view.h" />
-    <ClInclude Include="src\editor\window_list.h" />
-    <ClInclude Include="src\runtime.h" />
-    <ClInclude Include="src\skybox.h" />
-    <ClInclude Include="src\texture.h" />
-    <ClInclude Include="src\blit.h" />
-    <ClInclude Include="src\component.h" />
-    <ClInclude Include="src\components\camera.h" />
-    <ClInclude Include="src\components\light.h" />
-    <ClInclude Include="src\components\mesh_renderer.h" />
-    <ClInclude Include="src\component_list_.h" />
-    <ClInclude Include="src\editor\current.h" />
-    <ClInclude Include="src\debug.h" />
-    <ClInclude Include="src\editor\file_view.h" />
-    <ClInclude Include="src\editor\hierarchy_view.h" />
-    <ClInclude Include="src\editor\property_view.h" />
-    <ClInclude Include="src\editor\scene_view.h" />
-    <ClInclude Include="src\editor\split_view.h" />
-    <ClInclude Include="src\editor\window.h" />
-    <ClInclude Include="src\entity.h" />
-    <ClInclude Include="src\font.h" />
-    <ClInclude Include="src\editor\input.h" />
-    <ClInclude Include="src\gui.h" />
-    <ClInclude Include="src\manipulator.h" />
-    <ClInclude Include="src\material.h" />
-    <ClInclude Include="src\mesh.h" />
-    <ClInclude Include="src\post_effect.h" />
-    <ClInclude Include="src\post_effects\bloom.h" />
-    <ClInclude Include="src\post_effects\dither.h" />
-    <ClInclude Include="src\post_effects\exposure.h" />
-    <ClInclude Include="src\selection.h" />
-    <ClInclude Include="src\serialize.h" />
-    <ClInclude Include="src\time.h" />
-    <ClInclude Include="src\common.h" />
-    <ClInclude Include="src\viewport.h" />
+    <ClInclude Include="src\t3d\assets.h" />
+    <ClInclude Include="src\t3d\blit.h" />
+    <ClInclude Include="src\t3d\common.h" />
+    <ClInclude Include="src\t3d\component.h" />
+    <ClInclude Include="src\t3d\components\camera.h" />
+    <ClInclude Include="src\t3d\components\light.h" />
+    <ClInclude Include="src\t3d\components\mesh_renderer.h" />
+    <ClInclude Include="src\t3d\component_list_.h" />
+    <ClInclude Include="src\t3d\debug.h" />
+    <ClInclude Include="src\t3d\editor\current.h" />
+    <ClInclude Include="src\t3d\editor\file_view.h" />
+    <ClInclude Include="src\t3d\editor\hierarchy_view.h" />
+    <ClInclude Include="src\t3d\editor\input.h" />
+    <ClInclude Include="src\t3d\editor\property_view.h" />
+    <ClInclude Include="src\t3d\editor\scene_view.h" />
+    <ClInclude Include="src\t3d\editor\split_view.h" />
+    <ClInclude Include="src\t3d\editor\tab_view.h" />
+    <ClInclude Include="src\t3d\editor\window.h" />
+    <ClInclude Include="src\t3d\editor\window_list.h" />
+    <ClInclude Include="src\t3d\entity.h" />
+    <ClInclude Include="src\t3d\font.h" />
+    <ClInclude Include="src\t3d\gui.h" />
+    <ClInclude Include="src\t3d\manipulator.h" />
+    <ClInclude Include="src\t3d\material.h" />
+    <ClInclude Include="src\t3d\mesh.h" />
+    <ClInclude Include="src\t3d\post_effect.h" />
+    <ClInclude Include="src\t3d\post_effects\bloom.h" />
+    <ClInclude Include="src\t3d\post_effects\dither.h" />
+    <ClInclude Include="src\t3d\post_effects\exposure.h" />
+    <ClInclude Include="src\t3d\runtime.h" />
+    <ClInclude Include="src\t3d\selection.h" />
+    <ClInclude Include="src\t3d\serialize.h" />
+    <ClInclude Include="src\t3d\shared_data.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
@@ -125,28 +123,28 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
     <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
     <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
     <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)bin\</OutDir>
     <IntDir>$(SolutionDir)temp\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)include/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
     <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

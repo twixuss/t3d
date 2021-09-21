@@ -61,36 +61,42 @@ L3 unified: 1 x 6 MiB
  - xop: false
  - xsave: true
 RAM: 16 GiB
-cl scripts_init.cpp ../example/rotator.cpp ../data/component.cpp /LD /out:scripts.dll /ZI /I"." /I"..\include" /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /LIBPATH:"../dep/freetype/win64"
+Registered component 'Camera' with uid '1'
+info.serialize          = 7FF6B944692F
+info.deserialize_text   = 7FF6B9444EEF
+info.deserialize_binary = 7FF6B94420F0
+info.draw_properties    = 7FF6B9446506
+info.construct          = 7FF6B9444AF3
+Registered component 'Light' with uid '2'
+info.serialize          = 7FF6B9445D1D
+info.deserialize_text   = 7FF6B94451A1
+info.deserialize_binary = 7FF6B94430F4
+info.draw_properties    = 7FF6B9442866
+info.construct          = 7FF6B9445A25
+Registered component 'MeshRenderer' with uid '3'
+info.serialize          = 7FF6B9445D45
+info.deserialize_text   = 7FF6B94457C3
+info.deserialize_binary = 7FF6B9445796
+info.draw_properties    = 7FF6B9445FED
+info.construct          = 7FF6B944685D
+cl scripts_init.cpp ../example/rotator.cpp ../data/common.cpp /LD /ZI /I"." /I"..\include" /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /out:scripts.dll /LIBPATH:"../dep/freetype/win64"
 Build command failed
 scripts_init.cpp
 rotator.cpp
-component.cpp
+common.cpp
 Создание кода...
 Microsoft (R) Incremental Linker Version 14.29.30038.1
 Copyright (C) Microsoft Corporation.  All rights reserved.
 
 /out:scripts_init.dll 
 /dll 
-/implib:ut:scripts.lib 
-/out:ut:scripts.dll 
+/implib:scripts_init.lib 
 /debug 
+/out:scripts.dll 
 /LIBPATH:../dep/freetype/win64 
 scripts_init.obj 
 rotator.obj 
-component.obj 
-rotator.obj : error LNK2005: "void * __cdecl add_component(struct Entity &,unsigned int)" (?add_component@@YAPEAXAEAUEntity@@I@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "void * __cdecl add_component(struct Entity &,unsigned int,unsigned int)" (?add_component@@YAPEAXAEAUEntity@@II@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "void * __cdecl add_component(unsigned int,unsigned int)" (?add_component@@YAPEAXII@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "struct Entity & __cdecl create_entity(char const *)" (?create_entity@@YAAEAUEntity@@PEBD@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "struct Entity & __cdecl create_entity(struct tl::List<char8_t,struct tl::Allocator>,enum OwnershipFlags)" (?create_entity@@YAAEAUEntity@@U?$List@_QUAllocator@tl@@@tl@@W4OwnershipFlags@@@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "struct Entity & __cdecl create_entity(struct tl::Span<char8_t>)" (?create_entity@@YAAEAUEntity@@U?$Span@_Q@tl@@@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "void __cdecl destroy_entity(struct Entity &)" (?destroy_entity@@YAXAEAUEntity@@@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "public: struct Entity & __cdecl Component::entity(void)const " (?entity@Component@@QEBAAEAUEntity@@XZ) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "bool __cdecl is_editor_entity(struct Entity &)" (?is_editor_entity@@YA_NAEAUEntity@@@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "void __cdecl remove_component(struct Entity &,struct ComponentIndex *)" (?remove_component@@YAXAEAUEntity@@PEAUComponentIndex@@@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "void __cdecl remove_component(struct Entity &,struct ComponentIndex)" (?remove_component@@YAXAEAUEntity@@UComponentIndex@@@Z) уже определен в scripts_init.obj
-rotator.obj : error LNK2005: "struct tl::MaskedBlockList<struct Entity,256> entities" (?entities@@3U?$MaskedBlockList@UEntity@@$0BAA@@tl@@A) уже определен в scripts_init.obj
+common.obj 
 freetype.lib(ftinit.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "freetype.lib(ftinit.obj)" или на "F:\t3d\bin\freetype.pdb"; компоновка объекта выполняется как при отсутствии отладочных данных
 freetype.lib(ftbase.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "freetype.lib(ftbase.obj)" или на "F:\t3d\bin\freetype.pdb"; компоновка объекта выполняется как при отсутствии отладочных данных
 freetype.lib(autofit.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "freetype.lib(autofit.obj)" или на "F:\t3d\bin\freetype.pdb"; компоновка объекта выполняется как при отсутствии отладочных данных
@@ -114,5 +120,7 @@ freetype.lib(ftgzip.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "free
 freetype.lib(ftlzw.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "freetype.lib(ftlzw.obj)" или на "F:\t3d\bin\freetype.pdb"; компоновка объекта выполняется как при отсутствии отладочных данных
 freetype.lib(ftbitmap.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "freetype.lib(ftbitmap.obj)" или на "F:\t3d\bin\freetype.pdb"; компоновка объекта выполняется как при отсутствии отладочных данных
 freetype.lib(ftdebug.obj) : warning LNK4099: "freetype.pdb" PDB не найден с "freetype.lib(ftdebug.obj)" или на "F:\t3d\bin\freetype.pdb"; компоновка объекта выполняется как при отсутствии отладочных данных
-   Создается библиотека ut:scripts.lib и объект ut:scripts.exp
-ut:scripts.dll : fatal error LNK1169: обнаружен многократно определенный символ - один или более
+   Создается библиотека scripts_init.lib и объект scripts_init.exp
+rotator.obj : error LNK2019: ссылка на неразрешенный внешний символ "void __cdecl draw_property(struct tl::Span<char8_t>,float &,unsigned __int64,struct std::source_location)" (?draw_property@@YAXU?$Span@_Q@tl@@AEAM_KUsource_location@std@@@Z) в функции "public: void __cdecl ComponentBase<struct Rotator>::draw_properties(void)" (?draw_properties@?$ComponentBase@URotator@@@@QEAAXXZ).
+rotator.obj : error LNK2019: ссылка на неразрешенный внешний символ "void __cdecl draw_property(struct tl::Span<char8_t>,union tl::v3<float> &,unsigned __int64,struct std::source_location)" (?draw_property@@YAXU?$Span@_Q@tl@@AEAT?$v3@M@2@_KUsource_location@std@@@Z) в функции "public: void __cdecl ComponentBase<struct Rotator>::draw_properties(void)" (?draw_properties@?$ComponentBase@URotator@@@@QEAAXXZ).
+scripts.dll : fatal error LNK1120: неразрешенных внешних элементов: 2
