@@ -1,0 +1,16 @@
+components\camera
+components\light
+components\mesh_renderer
+editor\current
+editor\input
+editor\window
+assets
+blit
+common
+component
+draw_property
+entity
+font
+gui
+mesh
+serialize

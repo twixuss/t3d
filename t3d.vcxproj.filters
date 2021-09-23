@@ -6,6 +6,19 @@
     <ClCompile Include="src\t3d\main_editor.cpp" />
     <ClCompile Include="src\t3d\component.cpp" />
     <ClCompile Include="src\t3d\entity.cpp" />
+    <ClCompile Include="src\t3d\editor\current.cpp" />
+    <ClCompile Include="src\t3d\editor\window.cpp" />
+    <ClCompile Include="src\t3d\editor\input.cpp" />
+    <ClCompile Include="src\t3d\font.cpp" />
+    <ClCompile Include="src\t3d\components\camera.cpp" />
+    <ClCompile Include="src\t3d\components\light.cpp" />
+    <ClCompile Include="src\t3d\components\mesh_renderer.cpp" />
+    <ClCompile Include="src\t3d\draw_property.cpp" />
+    <ClCompile Include="src\t3d\mesh.cpp" />
+    <ClCompile Include="src\t3d\assets.cpp" />
+    <ClCompile Include="src\t3d\blit.cpp" />
+    <ClCompile Include="src\t3d\gui.cpp" />
+    <ClCompile Include="src\t3d\serialize.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
@@ -43,7 +56,8 @@
     <ClInclude Include="src\t3d\runtime.h" />
     <ClInclude Include="src\t3d\selection.h" />
     <ClInclude Include="src\t3d\serialize.h" />
-    <ClInclude Include="src\t3d\shared_data.h" />
+    <ClInclude Include="src\t3d\shared.h" />
+    <ClInclude Include="src\t3d\draw_property.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

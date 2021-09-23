@@ -39,20 +39,20 @@ inline void debug_draw_lines() {
 	}
 
 	if (vertices.size) {
-		tg::set_topology(tg::Topology_line_list);
-		tg::set_rasterizer({.depth_test = false});
-		tg::disable_blend();
-		tg::set_vertex_buffer(debug_lines_vertex_buffer);
-		tg::update_vertex_buffer(debug_lines_vertex_buffer, as_bytes(vertices));
-		tg::set_shader(debug_line_shader);
-		tg::draw(vertices.size * 2);
+		shared->tg->set_topology(tg::Topology_line_list);
+		shared->tg->set_rasterizer({.depth_test = false});
+		shared->tg->disable_blend();
+		shared->tg->set_vertex_buffer(debug_lines_vertex_buffer);
+		shared->tg->update_vertex_buffer(debug_lines_vertex_buffer, as_bytes(vertices));
+		shared->tg->set_shader(debug_line_shader);
+		shared->tg->draw(vertices.size * 2);
 	}
 }
 
 inline void debug_frame() {
 	for (u32 line_index = 0; line_index < debug_lines.size; ++line_index) {
 		auto &line = debug_lines[line_index];
-		line.time -= shared_data->frame_time;
+		line.time -= shared->frame_time;
 		if (line.time <= 0) {
 			erase_unordered_at(debug_lines, line_index);
 			--line_index;

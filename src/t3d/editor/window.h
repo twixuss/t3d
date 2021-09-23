@@ -4,11 +4,11 @@
 #include "window_list.h"
 #include <tl/memory_stream.h>
 
-v4f background_color = {.08, .08, .08, 1};
-v4f     middle_color = {.12, .12, .12, 1};
-v4f foreground_color = {.18, .18, .18, 1};
-v4f  highlight_color = {1.2, 1.2, 1.5, 1};
-v4f  selection_color = {1.5, 1.5, 2.0, 1};
+inline constexpr v4f background_color = {.08, .08, .08, 1};
+inline constexpr v4f     middle_color = {.12, .12, .12, 1};
+inline constexpr v4f foreground_color = {.18, .18, .18, 1};
+inline constexpr v4f  highlight_color = {1.2, 1.2, 1.5, 1};
+inline constexpr v4f  selection_color = {1.5, 1.5, 2.0, 1};
 
 enum EditorWindowKind : u16 {
 	EditorWindow_none,
@@ -24,11 +24,10 @@ struct EditorWindow;
 
 using EditorWindowId = u32;
 
-HashMap<EditorWindowId, EditorWindow *> editor_windows;
-EditorWindowId editor_window_id_counter;
+EditorWindowId get_new_editor_window_id();
 
 template <class T>
-T *create_editor_window(EditorWindowKind kind, EditorWindowId id = (editor_window_id_counter += 1));
+T *create_editor_window(EditorWindowKind kind, EditorWindowId id = get_new_editor_window_id());
 
 struct EditorWindow {
 	EditorWindowId id;
@@ -110,22 +109,20 @@ template <class T> v2u editor_window_get_min_size(void *data) {
 	return ((T *)data)->get_min_size();
 }
 
-s32 debug_print_editor_window_hierarchy_tab;
-inline void debug_print_editor_window_tabs() {
-	for (u32 i = 0; i < debug_print_editor_window_hierarchy_tab; ++i)
-		print("  "s);
-}
-template <class T> void editor_window_debug_print(void *data) {
+void debug_print_editor_window_tabs();
+void push_debug_print_editor_window_tab();
+void pop_debug_print_editor_window_tab();
+
+template <class T>
+void editor_window_debug_print(void *data) {
 	debug_print_editor_window_tabs();
 	print("% %, parent=%\n", ((T *)data)->name, data, ((EditorWindow *)data)->parent);
 	if constexpr (&T::debug_print != &EditorWindow::debug_print) {
-		++debug_print_editor_window_hierarchy_tab;
+		push_debug_print_editor_window_tab();
 		((T *)data)->debug_print();
-		--debug_print_editor_window_hierarchy_tab;
+		pop_debug_print_editor_window_tab();
 	}
 }
-
-EditorWindow *main_window;
 
 #define c(name) struct name;
 #define sep
@@ -152,7 +149,7 @@ inline static constexpr u32 editor_window_type_count = type_count<
 #undef sep
 #undef c
 
-
+/*
 #define c(name) u8#name##s
 #define sep ,
 
@@ -162,6 +159,7 @@ Span<utf8> editor_window_names[] {
 
 #undef sep
 #undef c
+*/
 
 using EditorWindowInit        = void(*)(void *);
 using EditorWindowGetMinSize  = v2u(*)(void *);
@@ -197,7 +195,9 @@ template <class Window> void adapt_editor_window_debug_print(void *_this) { retu
 template <class Window> void adapt_editor_window_serialize(void *_this, StringBuilder &builder) { return ((Window *)_this)->serialize(builder); }
 template <class Window> bool adapt_editor_window_deserialize(void *_this, Stream &stream) { return ((Window *)_this)->deserialize(stream); }
 
-extern EditorWindowMetadata editor_window_metadata[editor_window_type_count];
+//extern EditorWindowMetadata editor_window_metadata[editor_window_type_count];
+
+void insert_editor_window(EditorWindowId id, EditorWindow *result);
 
 template <class T>
 T *create_editor_window(EditorWindowKind kind, EditorWindowId id) {
@@ -211,11 +211,12 @@ T *create_editor_window(EditorWindowKind kind, EditorWindowId id) {
 	result->_deserialize  = editor_window_deserialize<T>;
 	result->kind          = kind;
 	result->id            = id;
-	editor_windows.get_or_insert(id) = result;
+	insert_editor_window(id, result);
 	editor_window_init<T>(*result);
 	return result;
 }
 
+/*
 inline EditorWindow *create_editor_window(EditorWindowKind kind, EditorWindowId id) {
 	auto &metadata = editor_window_metadata[kind];
 	auto result = (EditorWindow *)default_allocator.allocate(metadata.size, metadata.alignment);
@@ -232,3 +233,4 @@ inline EditorWindow *create_editor_window(EditorWindowKind kind, EditorWindowId 
 	metadata.init(result);
 	return result;
 }
+*/

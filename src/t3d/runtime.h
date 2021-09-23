@@ -139,26 +139,30 @@ float sample_shadow_map(sampler2DShadow shadow_map, float3 light_space, float bi
 #endif
 
 )"s;
-	return tg::create_shader(with(temporary_allocator, concatenate(shader_header, source)));
+	return shared->tg->create_shader(with(temporary_allocator, concatenate(shader_header, source)));
 }
 
 #include <algorithm>
 
 void register_built_in_components() {
-	register_component_Camera();
-	register_component_Light();
-	register_component_MeshRenderer();
+	update_component_info(get_component_desc_Camera());
+	update_component_info(get_component_desc_Light());
+	update_component_info(get_component_desc_MeshRenderer());
+
 }
 
 //
 // Called once on program start
 //
 void runtime_init(Window &window) {
-	construct(assets);
-
-	allocate_shared_data();
+	allocate_shared();
 
 	register_built_in_components();
+
+#ifndef RUNTIME_REGISTER_COMPONENTS
+#define RUNTIME_REGISTER_COMPONENTS
+#endif
+	RUNTIME_REGISTER_COMPONENTS;
 
 	//std::sort(component_infos.begin(), component_infos.end(), [](ComponentInfo &a, ComponentInfo &b) {
 	//	if (a.execution_priority != b.execution_priority) {
@@ -179,27 +183,26 @@ void runtime_init(Window &window) {
 	//	*info.registry_index = i;
 	//}
 
-	shared_data->graphics_api = tg::GraphicsApi_opengl;
-	assert_always(tg::init(shared_data->graphics_api, {
+	shared->tg = tg::init(tg::GraphicsApi_opengl, {
 		.window = window.handle,
 		.debug = BUILD_DEBUG,
-		.dont_check_apis = BUILD_DEBUG,
-	}));
+	});
+	assert_always(shared->tg);
 
-	shared_data->global_constants = tg::create_shader_constants<GlobalConstants>();
-	tg::set_shader_constants(shared_data->global_constants, GLOBAL_CONSTANTS_SLOT);
+	shared->global_constants = shared->tg->create_shader_constants<GlobalConstants>();
+	shared->tg->set_shader_constants(shared->global_constants, GLOBAL_CONSTANTS_SLOT);
 
-	shared_data->entity_constants = tg::create_shader_constants<EntityConstants>();
-	tg::set_shader_constants(shared_data->entity_constants, ENTITY_CONSTANTS_SLOT);
+	shared->entity_constants = shared->tg->create_shader_constants<EntityConstants>();
+	shared->tg->set_shader_constants(shared->entity_constants, ENTITY_CONSTANTS_SLOT);
 
-	shared_data->light_constants = tg::create_shader_constants<LightConstants>();
-	tg::set_shader_constants(shared_data->light_constants, LIGHT_CONSTANTS_SLOT);
+	shared->light_constants = shared->tg->create_shader_constants<LightConstants>();
+	shared->tg->set_shader_constants(shared->light_constants, LIGHT_CONSTANTS_SLOT);
 
-	switch (shared_data->graphics_api) {
+	switch (shared->tg->api) {
 		case tg::GraphicsApi_opengl: {
-			shared_data->surface_material.constants = tg::create_shader_constants(sizeof(SurfaceConstants));
-			tg::update_shader_constants(shared_data->surface_material.constants, SurfaceConstants{.color = {1,1,1,1}});
-			shared_data->surface_material.shader = create_shader(u8R"(
+			shared->surface_material.constants = shared->tg->create_shader_constants(sizeof(SurfaceConstants));
+			shared->tg->update_shader_constants(shared->surface_material.constants, SurfaceConstants{.color = {1,1,1,1}});
+			shared->surface_material.shader = create_shader(u8R"(
 layout (std140, binding=0) uniform _ {
 	vec4 u_color;
 };
@@ -250,8 +253,8 @@ void main() {
 }
 #endif
 )"s);
-			shared_data->handle_constants = tg::create_shader_constants<HandleConstants>();
-			shared_data->handle_shader = create_shader(u8R"(
+			shared->handle_constants = shared->tg->create_shader_constants<HandleConstants>();
+			shared->handle_shader = create_shader(u8R"(
 layout (std140, binding=0) uniform _ {
 	mat4 object_matrix;
 	vec3 u_color;
@@ -295,7 +298,7 @@ void main() {
 }
 #endif
 )"s);
-			shared_data->blit_texture_shader = tg::create_shader(u8R"(
+			shared->blit_texture_shader = shared->tg->create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -326,8 +329,8 @@ void main() {
 }
 #endif
 )"s);
-			shared_data->blit_color_constants = tg::create_shader_constants<BlitColorConstants>();
-			shared_data->blit_color_shader = tg::create_shader(u8R"(
+			shared->blit_color_constants = shared->tg->create_shader_constants<BlitColorConstants>();
+			shared->blit_color_shader = shared->tg->create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -356,8 +359,8 @@ void main() {
 }
 #endif
 )"s);
-			shared_data->blit_texture_color_constants = tg::create_shader_constants<BlitTextureColorConstants>();
-			shared_data->blit_texture_color_shader = tg::create_shader(u8R"(
+			shared->blit_texture_color_constants = shared->tg->create_shader_constants<BlitTextureColorConstants>();
+			shared->blit_texture_color_shader = shared->tg->create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -392,7 +395,7 @@ void main() {
 }
 #endif
 )"s);
-			shared_data->shadow_map_shader = create_shader(u8R"(
+			shared->shadow_map_shader = create_shader(u8R"(
 #ifdef VERTEX_SHADER
 
 layout(location=0) in vec3 position;
@@ -407,7 +410,7 @@ void main() {
 }
 #endif
 )"s);
-			shared_data->sky_box_shader = create_shader(u8R"(
+			shared->sky_box_shader = create_shader(u8R"(
 layout(binding=0) uniform samplerCube sky_box;
 
 V2F vec3 vertex_uv;
@@ -538,12 +541,12 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 	}
 
 	u32 white_pixel = ~0;
-	shared_data->white_texture = tg::create_texture_2d(1, 1, &white_pixel, tg::Format_rgba_u8n);
-	shared_data->white_texture->name = as_list(u8"white"s);
+	shared->white_texture = shared->tg->create_texture_2d(1, 1, &white_pixel, tg::Format_rgba_u8n);
+	shared->white_texture->name = as_list(u8"white"s);
 
 	u32 black_pixel = 0xFF000000;
-	shared_data->black_texture = tg::create_texture_2d(1, 1, &black_pixel, tg::Format_rgba_u8n);
-	shared_data->black_texture->name = as_list(u8"black"s);
+	shared->black_texture = shared->tg->create_texture_2d(1, 1, &black_pixel, tg::Format_rgba_u8n);
+	shared->black_texture->name = as_list(u8"black"s);
 
 	{
 		constexpr s32 size = 256;
@@ -566,11 +569,11 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 			return pixels;
 		}();
 
-		shared_data->default_light_mask = tg::create_texture_2d(size, size, pixels.data, tg::Format_rgba_u8n);
-		shared_data->default_light_mask->name = as_list(u8"default_light_mask"s);
+		shared->default_light_mask = shared->tg->create_texture_2d(size, size, pixels.data, tg::Format_rgba_u8n);
+		shared->default_light_mask->name = as_list(u8"default_light_mask"s);
 	}
 
-	shared_data->sky_box_texture = tg::load_texture_cube({
+	shared->sky_box_texture = shared->tg->load_texture_cube({
 		.left   = tl_file_string("../example/sky_x+.hdr"s),
 		.right  = tl_file_string("../example/sky_x-.hdr"s),
 		.top    = tl_file_string("../example/sky_y+.hdr"s),
@@ -588,7 +591,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 // Called once after runtime_init()
 //
 void runtime_start() {
-	for_each(shared_data->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+	for_each(shared->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
 		if (info.start) {
 			info.storage.for_each([&](void *data) {
 				info.start(data);
@@ -599,7 +602,7 @@ void runtime_start() {
 
 void runtime_update() {
 
-	for_each(shared_data->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+	for_each(shared->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
 		if (info.update) {
 			info.storage.for_each([&](void *data) {
 				info.update(data);
@@ -614,32 +617,32 @@ void runtime_update() {
 void runtime_render() {
 	{
 		timed_block("Shadows"s);
-		tg::disable_scissor();
-		tg::set_rasterizer(
-			tg::get_rasterizer()
+		shared->tg->disable_scissor();
+		shared->tg->set_rasterizer(
+			shared->tg->get_rasterizer()
 				.set_depth_test(true)
 				.set_depth_write(true)
 				.set_depth_func(tg::Comparison_less)
 		);
-		tg::disable_blend();
-		tg::set_topology(tg::Topology_triangle_list);
+		shared->tg->disable_blend();
+		shared->tg->set_topology(tg::Topology_triangle_list);
 
 		for_each_component<Light>([&] (Light &light) {
 			timed_block("Light"s);
-			auto &light_entity = shared_data->entities.at(light.entity_index);
+			auto &light_entity = shared->entities.at(light.entity_index);
 
-			tg::set_render_target(light.shadow_map);
-			tg::set_viewport(shadow_map_resolution, shadow_map_resolution);
-			tg::clear(light.shadow_map, tg::ClearFlags_depth, {}, 1);
+			shared->tg->set_render_target(light.shadow_map);
+			shared->tg->set_viewport(shadow_map_resolution, shadow_map_resolution);
+			shared->tg->clear(light.shadow_map, tg::ClearFlags_depth, {}, 1);
 
-			tg::set_shader(shared_data->shadow_map_shader);
+			shared->tg->set_shader(shared->shadow_map_shader);
 
 			light.world_to_light_matrix = m4::perspective_right_handed(1, light.fov, 0.1f, 100.0f) * (m4)-light_entity.rotation * m4::translation(-light_entity.position);
 
 			for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
-				auto &mesh_entity = shared_data->entities.at(mesh_renderer.entity_index);
+				auto &mesh_entity = shared->entities.at(mesh_renderer.entity_index);
 
-				tg::update_shader_constants(shared_data->entity_constants, {
+				shared->tg->update_shader_constants(shared->entity_constants, {
 					.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
 				});
 				draw_mesh(mesh_renderer.mesh);
@@ -653,14 +656,14 @@ void runtime_render() {
 //
 void render_camera(Camera &camera, Entity &camera_entity) {
 
-	m4 camera_projection_matrix = m4::perspective_right_handed((f32)current_viewport.size().x / current_viewport.size().y, camera.fov, camera.near_plane, camera.far_plane);
+	m4 camera_projection_matrix = m4::perspective_right_handed((f32)shared->current_viewport.size().x / shared->current_viewport.size().y, camera.fov, camera.near_plane, camera.far_plane);
 	m4 camera_translation_matrix = m4::translation(-camera_entity.position);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_entity.rotation);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-to_euler_angles(camera_entity.rotation));
 	m4 camera_rotation_matrix = transpose((m4)camera_entity.rotation);
 	camera.world_to_camera_matrix = camera_projection_matrix * camera_rotation_matrix * camera_translation_matrix;
 
-	tg::update_shader_constants(shared_data->global_constants, {
+	shared->tg->update_shader_constants(shared->global_constants, {
 		.camera_rotation_projection_matrix = camera_projection_matrix * camera_rotation_matrix,
 		.world_to_camera_matrix = camera.world_to_camera_matrix,
 		.camera_position = camera_entity.position,
@@ -668,18 +671,18 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 		.camera_forward = camera_entity.rotation * v3f{0,0,-1},
 	});
 
-	tg::set_render_target(camera.destination_target);
-	tg::set_viewport(camera.destination_target->color->size);
-	tg::clear(camera.destination_target, tg::ClearFlags_color | tg::ClearFlags_depth, {.9,.1,.9,1}, 1);
+	shared->tg->set_render_target(camera.destination_target);
+	shared->tg->set_viewport(camera.destination_target->color->size);
+	shared->tg->clear(camera.destination_target, tg::ClearFlags_color | tg::ClearFlags_depth, {.9,.1,.9,1}, 1);
 
-	tg::set_topology(tg::Topology_triangle_list);
+	shared->tg->set_topology(tg::Topology_triangle_list);
 
-	tg::set_rasterizer({
+	shared->tg->set_rasterizer({
 		.depth_test = true,
 		.depth_write = true,
 		.depth_func = tg::Comparison_less,
 	});
-	tg::disable_blend();
+	shared->tg->disable_blend();
 
 	u32 light_index = 0;
 	for_each_component<Light>([&] (Light &light) {
@@ -689,9 +692,9 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 			++light_index;
 		};
 
-		auto &light_entity = shared_data->entities.at(light.entity_index);
+		auto &light_entity = shared->entities.at(light.entity_index);
 
-		tg::update_shader_constants(shared_data->light_constants, {
+		shared->tg->update_shader_constants(shared->light_constants, {
 			.world_to_light_matrix = light.world_to_light_matrix,
 			.light_position = light_entity.position,
 			.light_intensity = light.intensity,
@@ -699,56 +702,58 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 		});
 
 
-		tg::set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
-		tg::set_sampler(tg::Filtering_linear, tg::Comparison_less, SHADOW_MAP_TEXTURE_SLOT);
+		shared->tg->set_texture(light.shadow_map->depth, SHADOW_MAP_TEXTURE_SLOT);
+		shared->tg->set_sampler(tg::Filtering_linear, tg::Comparison_less, SHADOW_MAP_TEXTURE_SLOT);
 
-		tg::set_texture(light.mask ? light.mask : shared_data->default_light_mask, LIGHT_TEXTURE_SLOT);
-		tg::set_sampler(tg::Filtering_linear_mipmap, LIGHT_TEXTURE_SLOT);
+		shared->tg->set_texture(light.mask ? light.mask : shared->default_light_mask, LIGHT_TEXTURE_SLOT);
+		shared->tg->set_sampler(tg::Filtering_linear_mipmap, LIGHT_TEXTURE_SLOT);
 		for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
 			timed_block("MeshRenderer"s);
-			auto &mesh_entity = shared_data->entities.at(mesh_renderer.entity_index);
+			auto &mesh_entity = shared->entities.at(mesh_renderer.entity_index);
 
 			auto material = mesh_renderer.material;
 			if (!material) {
-				material = &shared_data->surface_material;
+				material = &shared->surface_material;
 			}
 
-			tg::set_shader(material->shader);
-			tg::set_shader_constants(material->constants, 0);
+			shared->tg->set_shader(material->shader);
+			shared->tg->set_shader_constants(material->constants, 0);
 
 
 			//entity_data.local_to_camera_matrix = camera.world_to_camera_matrix * m4::translation(mesh_entity.position) * m4::rotation_r_zxy(mesh_entity.rotation);
 			m4 local_to_world = m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale);
-			tg::update_shader_constants(shared_data->entity_constants, {
+			shared->tg->update_shader_constants(shared->entity_constants, {
 				.local_to_camera_matrix = camera.world_to_camera_matrix * local_to_world,
 				.local_to_world_position_matrix = local_to_world,
 				.local_to_world_normal_matrix = (m4)mesh_entity.rotation * m4::scale(1 / mesh_entity.scale),
 			});
-			tg::set_sampler(tg::Filtering_linear_mipmap, LIGHTMAP_TEXTURE_SLOT);
-			tg::set_texture(mesh_renderer.lightmap ? mesh_renderer.lightmap : shared_data->black_texture, LIGHTMAP_TEXTURE_SLOT);
+			shared->tg->set_sampler(tg::Filtering_linear_mipmap, LIGHTMAP_TEXTURE_SLOT);
+			shared->tg->set_texture(mesh_renderer.lightmap ? mesh_renderer.lightmap : shared->black_texture, LIGHTMAP_TEXTURE_SLOT);
 			draw_mesh(mesh_renderer.mesh);
 		});
-		tg::set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
-		tg::set_rasterizer(tg::get_rasterizer()
-			.set_depth_test(true)
-			.set_depth_write(false)
-			.set_depth_func(tg::Comparison_equal)
-		);
+		shared->tg->set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
+		shared->tg->set_rasterizer({
+			.depth_test = true,
+			.depth_write = false,
+			.depth_func = tg::Comparison_equal,
+		});
 	});
 
-	tg::set_rasterizer(tg::get_rasterizer()
-		.set_depth_test(true)
-		.set_depth_write(false)
-		.set_depth_func(tg::Comparison_equal)
-	);
-	tg::disable_blend();
+	shared->tg->set_rasterizer({
+		.depth_test = true,
+		.depth_write = false,
+		.depth_func = tg::Comparison_equal,
+	});
+	shared->tg->disable_blend();
 
-	tg::disable_depth_clip();
-	tg::set_shader(shared_data->sky_box_shader);
-	tg::set_sampler(tg::Filtering_linear_mipmap, 0);
-	tg::set_texture(shared_data->sky_box_texture, 0);
-	tg::draw(36);
-	tg::enable_depth_clip();
+	if (shared->sky_box_texture) {
+		shared->tg->disable_depth_clip();
+		shared->tg->set_shader(shared->sky_box_shader);
+		shared->tg->set_sampler(tg::Filtering_linear_mipmap, 0);
+		shared->tg->set_texture(shared->sky_box_texture, 0);
+		shared->tg->draw(36);
+		shared->tg->enable_depth_clip();
+	}
 
 	swap(camera.source_target, camera.destination_target);
 
@@ -759,8 +764,8 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 			swap(camera.source_target, camera.destination_target);
 		}
 
-		tg::set_render_target(tg::back_buffer);
-		tg::set_viewport(current_viewport);
+		shared->tg->set_render_target(shared->tg->back_buffer);
+		shared->tg->set_viewport(shared->current_viewport);
 		blit(camera.source_target->color);
 	}
 

@@ -43,7 +43,7 @@ struct FileView : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		tg::set_render_target(tg::back_buffer);
+		shared->tg->set_render_target(shared->tg->back_buffer);
 		gui_panel(middle_color);
 
 		next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
@@ -61,13 +61,13 @@ struct FileView : EditorWindow {
 
 			push_current_viewport(button_viewport) {
 				if (button(entry.name, (umm)&entry)) {
-					auto found = assets.textures_2d_by_path.find(entry.path);
+					auto found = shared->assets.textures_2d_by_path.find(entry.path);
 
 					Texture2D *texture = 0;
 					if (found) {
 						texture = *found;
 					} else {
-						texture = assets.get_texture_2d(entry.path);
+						texture = shared->assets.get_texture_2d(entry.path);
 					}
 
 					if (texture) {
@@ -76,7 +76,7 @@ struct FileView : EditorWindow {
 				}
 
 				if (begin_drag_and_drop(DragAndDrop_file)) {
-					drag_and_drop_data.set(as_bytes(entry.path));
+					shared->drag_and_drop_data.set(as_bytes(entry.path));
 				}
 			}
 
@@ -94,8 +94,8 @@ struct FileView : EditorWindow {
 FileView *create_file_view() {
 	auto result = create_editor_window<FileView>(EditorWindow_file_view);
 	result->root.is_directory = true;
-	result->root.name = as_list(assets.directory);
-	result->root.path = as_list(assets.directory);
+	result->root.name = as_list(shared->assets.directory);
+	result->root.path = as_list(shared->assets.directory);
 	result->add_files(result->root);
 	result->name = u8"Files"s;
 	return result;

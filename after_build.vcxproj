@@ -19,75 +19,13 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\t3d\assets.cpp" />
-    <ClCompile Include="src\t3d\blit.cpp" />
-    <ClCompile Include="src\t3d\common.cpp" />
-    <ClCompile Include="src\t3d\component.cpp" />
-    <ClCompile Include="src\t3d\components\camera.cpp" />
-    <ClCompile Include="src\t3d\components\light.cpp" />
-    <ClCompile Include="src\t3d\components\mesh_renderer.cpp" />
-    <ClCompile Include="src\t3d\draw_property.cpp" />
-    <ClCompile Include="src\t3d\editor\current.cpp" />
-    <ClCompile Include="src\t3d\editor\input.cpp" />
-    <ClCompile Include="src\t3d\editor\window.cpp" />
-    <ClCompile Include="src\t3d\entity.cpp" />
-    <ClCompile Include="src\t3d\font.cpp" />
-    <ClCompile Include="src\t3d\gui.cpp" />
-    <ClCompile Include="src\t3d\main.cpp" />
-    <ClCompile Include="src\t3d\main_editor.cpp" />
-    <ClCompile Include="src\t3d\mesh.cpp" />
-    <ClCompile Include="src\t3d\serialize.cpp" />
-    <None Include="src\t3d\main_runtime.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <Natvis Include="dep\tl\tl.natvis" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="src\t3d\assets.h" />
-    <ClInclude Include="src\t3d\blit.h" />
-    <ClInclude Include="src\t3d\common.h" />
-    <ClInclude Include="src\t3d\component.h" />
-    <ClInclude Include="src\t3d\components\camera.h" />
-    <ClInclude Include="src\t3d\components\light.h" />
-    <ClInclude Include="src\t3d\components\mesh_renderer.h" />
-    <ClInclude Include="src\t3d\component_list_.h" />
-    <ClInclude Include="src\t3d\debug.h" />
-    <ClInclude Include="src\t3d\draw_property.h" />
-    <ClInclude Include="src\t3d\editor\current.h" />
-    <ClInclude Include="src\t3d\editor\file_view.h" />
-    <ClInclude Include="src\t3d\editor\hierarchy_view.h" />
-    <ClInclude Include="src\t3d\editor\input.h" />
-    <ClInclude Include="src\t3d\editor\property_view.h" />
-    <ClInclude Include="src\t3d\editor\scene_view.h" />
-    <ClInclude Include="src\t3d\editor\split_view.h" />
-    <ClInclude Include="src\t3d\editor\tab_view.h" />
-    <ClInclude Include="src\t3d\editor\window.h" />
-    <ClInclude Include="src\t3d\editor\window_list.h" />
-    <ClInclude Include="src\t3d\entity.h" />
-    <ClInclude Include="src\t3d\font.h" />
-    <ClInclude Include="src\t3d\gui.h" />
-    <ClInclude Include="src\t3d\manipulator.h" />
-    <ClInclude Include="src\t3d\material.h" />
-    <ClInclude Include="src\t3d\mesh.h" />
-    <ClInclude Include="src\t3d\post_effect.h" />
-    <ClInclude Include="src\t3d\post_effects\bloom.h" />
-    <ClInclude Include="src\t3d\post_effects\dither.h" />
-    <ClInclude Include="src\t3d\post_effects\exposure.h" />
-    <ClInclude Include="src\t3d\runtime.h" />
-    <ClInclude Include="src\t3d\selection.h" />
-    <ClInclude Include="src\t3d\serialize.h" />
-    <ClInclude Include="src\t3d\shared.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="after_build.vcxproj">
-      <Project>{97460a52-6e24-465b-adf9-3a99c016db15}</Project>
-    </ProjectReference>
+    <ClCompile Include="src\after_build\main.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{dbba3fe7-9532-4484-af35-bc3474d341d2}</ProjectGuid>
-    <RootNamespace>t3d</RootNamespace>
+    <ProjectGuid>{97460a52-6e24-465b-adf9-3a99c016db15}</ProjectGuid>
+    <RootNamespace>after_build</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -122,7 +60,8 @@
     <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
   <ImportGroup Label="Shared">
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -140,54 +79,43 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)bin\</OutDir>
+    <OutDir>$(SolutionDir)temp\bin\</OutDir>
     <IntDir>$(SolutionDir)temp\$(ProjectName)\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <IncludePath>$(SolutionDir)dep/tl/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)bin\</OutDir>
+    <OutDir>$(SolutionDir)temp\bin\</OutDir>
     <IntDir>$(SolutionDir)temp\$(ProjectName)\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <IncludePath>$(SolutionDir)dep/tl/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>$(SolutionDir)bin\</OutDir>
+    <OutDir>$(SolutionDir)temp\bin\</OutDir>
     <IntDir>$(SolutionDir)temp\$(ProjectName)\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <IncludePath>$(SolutionDir)dep/tl/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>$(SolutionDir)bin\</OutDir>
+    <OutDir>$(SolutionDir)temp\bin\</OutDir>
     <IntDir>$(SolutionDir)temp\$(ProjectName)\</IntDir>
-    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);$(SolutionDir)dep/tl/include/;$(SolutionDir)dep/stb/;$(SolutionDir)dep/freetype/include/;$(SolutionDir)src/;$(SolutionDir)dep/tgraphics/include/</IncludePath>
-    <LibraryPath>$(SolutionDir)dep/freetype/win64/;$(LibraryPath)</LibraryPath>
-    <PostBuildEventUseInBuild>true</PostBuildEventUseInBuild>
+    <IncludePath>$(SolutionDir)dep/tl/include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=1;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <PreprocessToFile>false</PreprocessToFile>
-      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>call 
-$(SolutionDir)temp/bin/after_build.exe</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -196,12 +124,10 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
-      <PreprocessToFile>false</PreprocessToFile>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -211,28 +137,25 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>call 
-$(SolutionDir)temp/bin/after_build.exe</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=1;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <PreprocessToFile>false</PreprocessToFile>
-      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PostBuildEvent>
-      <Command>call 
-$(SolutionDir)temp/bin/after_build.exe</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -241,12 +164,10 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions);BUILD_DEBUG=0;;TL_DEBUG=BUILD_DEBUG;T3D_EDITOR=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpplatest</LanguageStandard>
-      <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
-      <PreprocessToFile>false</PreprocessToFile>
-      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -256,10 +177,11 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <AdditionalOptions>/Ob3 %(AdditionalOptions)</AdditionalOptions>
     </Link>
     <PostBuildEvent>
-      <Command>call 
-$(SolutionDir)temp/bin/after_build.exe</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
 </Project>

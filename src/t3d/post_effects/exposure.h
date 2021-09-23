@@ -1,6 +1,6 @@
 #pragma once
 #include <t3d/post_effect.h>
-#include <t3d/shared_data.h>
+#include <t3d/shared.h>
 #include <t3d/blit.h>
 
 struct Exposure {
@@ -34,8 +34,8 @@ struct Exposure {
 	bool auto_adjustment;
 
 	void init() {
-		constants = tg::create_shader_constants<Exposure::Constants>();
-		shader = tg::create_shader(u8R"(
+		constants = shared->tg->create_shader_constants<Exposure::Constants>();
+		shader = shared->tg->create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -82,8 +82,8 @@ void main() {
 	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
 		timed_block("Exposure::render"s);
 
-		tg::set_rasterizer(
-			tg::get_rasterizer()
+		shared->tg->set_rasterizer(
+			shared->tg->get_rasterizer()
 				.set_depth_test(false)
 				.set_depth_write(false)
 		);
@@ -92,18 +92,18 @@ void main() {
 			{
 				timed_block("Downsample"s);
 
-				tg::disable_blend();
+				shared->tg->disable_blend();
 
-				tg::set_shader(shared_data->blit_texture_shader);
-				tg::set_sampler(tg::Filtering_linear, 0);
+				shared->tg->set_shader(shared->blit_texture_shader);
+				shared->tg->set_sampler(tg::Filtering_linear, 0);
 
 				auto sample_from = source;
 				for (auto &target : downsampled_targets) {
 					timed_block("blit"s);
-					tg::set_render_target(target);
-					tg::set_viewport(target->color->size);
-					tg::set_texture(sample_from->color, 0);
-					tg::draw(3);
+					shared->tg->set_render_target(target);
+					shared->tg->set_viewport(target->color->size);
+					shared->tg->set_texture(sample_from->color, 0);
+					shared->tg->draw(3);
 					sample_from = target;
 				}
 			}
@@ -112,7 +112,7 @@ void main() {
 
 			{
 				timed_block("tg::read_texture"s);
-				tg::read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
+				shared->tg->read_texture(downsampled_targets.back()->color, as_bytes(array_as_span(texels)));
 			}
 			{
 				timed_block("average"s);
@@ -156,21 +156,21 @@ void main() {
 						invalid_code_path("mask_kind is invalid");
 						break;
 				}
-				adapted_exposure = pow(2, lerp(log2(adapted_exposure), log2(target_exposure), shared_data->frame_time));
+				adapted_exposure = pow(2, lerp(log2(adapted_exposure), log2(target_exposure), shared->frame_time));
 			}
 		}
 
-		tg::update_shader_constants(constants, {
+		shared->tg->update_shader_constants(constants, {
 			.exposure_offset = adapted_exposure * exposure,
 		});
 
-		tg::set_shader(shader);
-		tg::set_shader_constants(constants, 0);
-		tg::set_render_target(destination);
-		tg::set_viewport(destination->color->size);
-		tg::set_sampler(tg::Filtering_nearest, 0);
-		tg::set_texture(source->color, 0);
-		tg::draw(3);
+		shared->tg->set_shader(shader);
+		shared->tg->set_shader_constants(constants, 0);
+		shared->tg->set_render_target(destination);
+		shared->tg->set_viewport(destination->color->size);
+		shared->tg->set_sampler(tg::Filtering_nearest, 0);
+		shared->tg->set_texture(source->color, 0);
+		shared->tg->draw(3);
 	}
 
 	void resize(v2u size) {
@@ -180,10 +180,10 @@ void main() {
 		u32 target_index = 0;
 		while (1) {
 			if (target_index < downsampled_targets.size) {
-				tg::resize_texture(downsampled_targets[target_index]->color, next_size);
+				shared->tg->resize_texture(downsampled_targets[target_index]->color, next_size);
 			} else {
-				downsampled_targets.add(tg::create_render_target(
-					tg::create_texture_2d(next_size.x, next_size.y, 0, tg::Format_rgb_f16),
+				downsampled_targets.add(shared->tg->create_render_target(
+					shared->tg->create_texture_2d(next_size.x, next_size.y, 0, tg::Format_rgb_f16),
 					0
 				));
 			}

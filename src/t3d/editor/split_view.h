@@ -34,7 +34,7 @@ struct SplitView : EditorWindow {
 		// add 1 to account for half of the split bar
 		auto size1 = part1->get_min_size() + 1;
 		auto size2 = part2->get_min_size() + 1;
-		
+
 		if(horizontal) {
 			clamped_split_t = clamp(split_t, (f32)size1.y / viewport.size().y, 1 - (f32)size2.y / viewport.size().y);
 		} else {
@@ -74,26 +74,26 @@ struct SplitView : EditorWindow {
 		}
 		f32 const grab_distance = 4;
 		Cursor cursor = horizontal ? Cursor_vertical : Cursor_horizontal;
-		if (distance((v2f)current_mouse_position, bar_line) <= grab_distance) {
+		if (distance((v2f)shared->current_mouse_position, bar_line) <= grab_distance) {
 			if (mouse_down(0, {.anywhere = true})) {
 				is_sizing = true;
 				lock_input();
 				if (horizontal) {
-					grab_offset = bar_position - current_mouse_position.y;
+					grab_offset = bar_position - shared->current_mouse_position.y;
 				} else {
-					grab_offset = bar_position - current_mouse_position.x;
+					grab_offset = bar_position - shared->current_mouse_position.x;
 				}
 			}
 		} else if (!is_sizing) {
-			if (current_cursor != Cursor_none) {
+			if (shared->current_cursor != Cursor_none) {
 				cursor = Cursor_default;
 			}
 		}
-		//if ((cursor == Cursor_vertical && current_cursor == Cursor_horizontal) || (cursor == Cursor_horizontal && current_cursor == Cursor_vertical)) {
-		//	current_cursor = Cursor_horizontal_and_vertical;
-		//} else 
-		if (current_cursor == Cursor_default) {
-			current_cursor = cursor;
+		//if ((cursor == Cursor_vertical && shared->current_cursor == Cursor_horizontal) || (cursor == Cursor_horizontal && shared->current_cursor == Cursor_vertical)) {
+		//	shared->current_cursor = Cursor_horizontal_and_vertical;
+		//} else
+		if (shared->current_cursor == Cursor_default) {
+			shared->current_cursor = cursor;
 		}
 
 		if (is_sizing) {
@@ -104,7 +104,7 @@ struct SplitView : EditorWindow {
 		}
 
 		if (is_sizing) {
-			v2s mouse_position = {::window->mouse_position.x, (s32)::window->client_size.y - ::window->mouse_position.y};
+			v2s mouse_position = {shared->window->mouse_position.x, (s32)shared->window->client_size.y - shared->window->mouse_position.y};
 			if (horizontal) {
 				split_t = map<f32>(mouse_position.y + grab_offset, viewport.min.y, viewport.min.y + viewport.size().y, 0, 1);
 			} else {
@@ -120,17 +120,17 @@ struct SplitView : EditorWindow {
 	void debug_print() {
 		debug_print_editor_window_tabs();
 		print("part1:\n");
-		++debug_print_editor_window_hierarchy_tab;
+		push_debug_print_editor_window_tab();
 		part1->debug_print();
-		--debug_print_editor_window_hierarchy_tab;
+		pop_debug_print_editor_window_tab();
 
 		debug_print_editor_window_tabs();
 		print("part2:\n");
-		++debug_print_editor_window_hierarchy_tab;
+		push_debug_print_editor_window_tab();
 		part2->debug_print();
-		--debug_print_editor_window_hierarchy_tab;
+		pop_debug_print_editor_window_tab();
 	}
-	
+
 	EditorWindow *&get_part(EditorWindow *window) {
 		if (window == part1) {
 			return part1;

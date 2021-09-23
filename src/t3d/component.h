@@ -1,6 +1,7 @@
 #pragma once
 
 #include <t3d/common.h>
+#include <t3d/draw_property.h>
 #include <tl/common.h>
 #include <tl/quaternion.h>
 #include <tl/hash_map.h>
@@ -200,6 +201,22 @@ using ComponentStart             = void(*)(void *component);
 using ComponentUpdate            = void(*)(void *component);
 using ComponentFree              = void(*)(void *component);
 
+struct ComponentDesc {
+	ComponentSerialize serialize;
+	ComponentDeserializeText deserialize_text;
+	ComponentDeserializeBinary deserialize_binary;
+	ComponentDrawProperties draw_properties;
+	ComponentConstruct construct;
+	ComponentInit init;
+	ComponentStart start;
+	ComponentUpdate update;
+	ComponentFree free;
+	Span<utf8> name;
+	u32 size;
+	u32 alignment;
+	ComponentUID *uid;
+};
+
 struct ComponentInfo {
 	ComponentSerialize serialize;
 	ComponentDeserializeText deserialize_text;
@@ -217,7 +234,6 @@ struct ComponentInfo {
 ComponentInfo &get_component_info(ComponentUID uid);
 void free_component_storages();
 ComponentInfo &component_infos_get_or_insert(ComponentUID uid);
-ComponentUID *component_name_to_uid_find(Span<utf8> name);
 ComponentUID get_new_component_uid();
 
 template <class Component, class Fn>
@@ -253,14 +269,6 @@ void adapt_component_construct(void *component) {
 
 struct Mesh;
 struct Material;
-
-// TODO: this should not be here... fucking c++
-void draw_property(Span<utf8> name, f32 &value, umm id = 0, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, v3f &value, umm id = 0, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, quaternion &value, umm id = 0, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, List<utf8> &value, umm id = 0, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, tg::Texture2D *&value, umm id = 0, std::source_location location = std::source_location::current());
-void draw_property(Span<utf8> name, Mesh *&value, umm id = 0, std::source_location location = std::source_location::current());
 
 void serialize_binary(StringBuilder &builder, f32 value);
 void serialize_binary(StringBuilder &builder, v3f value);
@@ -358,45 +366,37 @@ struct ComponentBase<ComponentT> : Component { \
 	} \
 	DRAW_PROPERTIES \
 };  \
+ComponentDesc get_component_desc_##ComponentT(); \
 struct ComponentT : ComponentBase<ComponentT>
 
 #define REGISTER_COMPONENT(ComponentT) \
-extern "C" inline void register_component_##ComponentT() { \
-	auto name = u8#ComponentT##s;\
-	auto found_uid = component_name_to_uid_find(name); \
+ComponentDesc get_component_desc_##ComponentT() { \
+	ComponentDesc desc = {}; \
  \
-	ComponentUID uid = found_uid ? *found_uid : get_new_component_uid(); \
-	print("Registered component '%' with uid '%'\n", u8#ComponentT##s, uid);\
-	ComponentT::uid = uid; \
+	desc.name = u8#ComponentT##s; \
  \
-	auto &info = component_infos_get_or_insert(uid); \
+	desc.size      = sizeof(ComponentT); \
+	desc.alignment = alignof(ComponentT); \
  \
-	info.name = name; \
+	desc.uid = &ComponentT::uid;\
  \
-	info.storage.bytes_per_entry = sizeof(ComponentT); \
-	info.storage.entry_alignment = alignof(ComponentT); \
- \
-	info.serialize          = adapt_component_serializer<ComponentT>; \
-	info.deserialize_text   = adapt_component_deserializer_text<ComponentT>; \
-	info.deserialize_binary = adapt_component_deserializer_binary<ComponentT>; \
-	info.draw_properties    = adapt_component_property_drawer<ComponentT>; \
-	info.construct          = adapt_component_construct<ComponentT>; \
-	print("info.serialize          = %\n", info.serialize         ); \
-	print("info.deserialize_text   = %\n", info.deserialize_text  ); \
-	print("info.deserialize_binary = %\n", info.deserialize_binary); \
-	print("info.draw_properties    = %\n", info.draw_properties   ); \
-	print("info.construct          = %\n", info.construct         ); \
+	desc.serialize          = adapt_component_serializer<ComponentT>; \
+	desc.deserialize_text   = adapt_component_deserializer_text<ComponentT>; \
+	desc.deserialize_binary = adapt_component_deserializer_binary<ComponentT>; \
+	desc.draw_properties    = adapt_component_property_drawer<ComponentT>; \
+	desc.construct          = adapt_component_construct<ComponentT>; \
  \
 	if constexpr (is_statically_overridden(init, ComponentT, ::Component)) { \
-		info.init = [](void *component) { ((ComponentT *)component)->init(); }; \
+		desc.init = [](void *component) { ((ComponentT *)component)->init(); }; \
 	} \
 	if constexpr (is_statically_overridden(start, ComponentT, ::Component)) { \
-		info.start = [](void *component) { ((ComponentT *)component)->start(); }; \
+		desc.start = [](void *component) { ((ComponentT *)component)->start(); }; \
 	} \
 	if constexpr (is_statically_overridden(update, ComponentT, ::Component)) { \
-		info.update = [](void *component) { ((ComponentT *)component)->update(); }; \
+		desc.update = [](void *component) { ((ComponentT *)component)->update(); }; \
 	} \
 	if constexpr (is_statically_overridden(free, ComponentT, ::Component)) { \
-		info.free = [](void *component) { ((ComponentT *)component)->free(); }; \
+		desc.free = [](void *component) { ((ComponentT *)component)->free(); }; \
 	} \
+	return desc; \
 }

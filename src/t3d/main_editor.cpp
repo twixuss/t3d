@@ -4,22 +4,25 @@
 #include <tl/bin2cpp.h>
 tl::umm get_hash(struct ManipulatorStateKey const &);
 
-#include "../dep/tl/include/tl/masked_block_list.h"
+#include <tl/masked_block_list.h>
 #include <t3d/component.h>
 #include <t3d/components/light.h>
 #include <t3d/components/mesh_renderer.h>
 #include <t3d/components/camera.h>
-#include "editor/window.h"
-#include "editor/scene_view.h"
-#include "editor/hierarchy_view.h"
-#include "editor/split_view.h"
-#include "editor/property_view.h"
-#include "editor/file_view.h"
-#include "editor/tab_view.h"
-#include "editor/input.h"
+#include <t3d/editor/window.h>
+#include <t3d/editor/scene_view.h>
+#include <t3d/editor/hierarchy_view.h>
+#include <t3d/editor/split_view.h>
+#include <t3d/editor/property_view.h>
+#include <t3d/editor/file_view.h>
+#include <t3d/editor/tab_view.h>
+#include <t3d/editor/input.h>
 #include <t3d/serialize.h>
 #include <t3d/assets.h>
-#include "runtime.h"
+#include <t3d/runtime.h>
+#include <t3d/post_effects/bloom.h>
+#include <t3d/post_effects/dither.h>
+#include <t3d/post_effects/exposure.h>
 
 #define c(name) { \
 .init         = adapt_editor_window_init<name>, \
@@ -62,6 +65,7 @@ Mesh *handle_plane_x_mesh;
 Mesh *handle_plane_y_mesh;
 Mesh *handle_plane_z_mesh;
 
+Span<utf8> editor_bin_directory;
 
 m4 local_to_world_position(v3f position, quaternion rotation, v3f scale) {
 	return m4::translation(position) * (m4)rotation * m4::scale(scale);
@@ -82,16 +86,16 @@ void render_scene(SceneView *view) {
 
 	render_camera(camera, camera_entity);
 
-	tg::disable_blend();
+	shared->tg->disable_blend();
 
-	//tg::clear(tg::back_buffer, tg::ClearFlags_depth, {}, 1);
+	//shared->tg->clear(shared->tg->back_buffer, tg::ClearFlags_depth, {}, 1);
 
-	tg::set_rasterizer({
+	shared->tg->set_rasterizer({
 		.depth_test = true,
 		.depth_write = true,
 		.depth_func = tg::Comparison_less,
 	});
-	tg::set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
+	shared->tg->set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
 
 	if (selection.kind == Selection_entity) {
 		auto new_transform = manipulate_transform(selection.entity->position, selection.entity->rotation, selection.entity->scale, view->manipulator_kind);
@@ -101,7 +105,7 @@ void render_scene(SceneView *view) {
 
 		for (auto &request : manipulator_draw_requests) {
 			v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
-			tg::update_shader_constants(shared_data->entity_constants, {
+			shared->tg->update_shader_constants(shared->entity_constants, {
 				.local_to_camera_matrix =
 					camera.world_to_camera_matrix
 					* m4::translation(camera_entity.position + camera_to_handle_direction)
@@ -110,59 +114,59 @@ void render_scene(SceneView *view) {
 				.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
 				.object_rotation_matrix = (m4)request.rotation,
 			});
-			tg::set_shader(shared_data->handle_shader);
-			tg::set_shader_constants(shared_data->handle_constants, 0);
+			shared->tg->set_shader(shared->handle_shader);
+			shared->tg->set_shader_constants(shared->handle_constants, 0);
 
 			u32 selected_element = request.highlighted_part_index;
 
 			v3f to_camera = normalize(camera_entity.position - selection.entity->position);
 			switch (request.kind) {
 				case Manipulate_position: {
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_axis_x_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_axis_y_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_axis_z_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_arrow_x_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_arrow_y_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_arrow_z_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
 					draw_mesh(handle_plane_x_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
 					draw_mesh(handle_plane_y_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
 					draw_mesh(handle_plane_z_mesh);
 					break;
 				}
 				case Manipulate_rotation: {
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
 					if (request.dragging) {
 						quaternion rotation = quaternion_look(request.tangent.direction);
 						v3f position = request.tangent.origin;
-						tg::update_shader_constants(shared_data->entity_constants, {
+						shared->tg->update_shader_constants(shared->entity_constants, {
 							.local_to_camera_matrix =
 								camera.world_to_camera_matrix
 								* m4::translation(camera_entity.position + camera_to_handle_direction)
@@ -170,41 +174,41 @@ void render_scene(SceneView *view) {
 							.local_to_world_normal_matrix = local_to_world_normal(rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
 							.object_rotation_matrix = (m4)rotation,
 						});
-						tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
+						shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
 						draw_mesh(handle_tangent_mesh);
 					}
 
 					break;
 				}
 				case Manipulate_scale: {
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_axis_x_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_axis_y_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_axis_z_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
 					draw_mesh(handle_plane_x_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
 					draw_mesh(handle_plane_y_mesh);
 
-					tg::update_shader_constants(shared_data->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
 					draw_mesh(handle_plane_z_mesh);
 					break;
 				}
@@ -260,23 +264,23 @@ void render_scene(SceneView *view) {
 	debug_draw_lines();
 }
 
-void add_assets(StringBuilder &asset_builder, Span<pathchar> directory) {
+void add_files_recursive(ListList<utf8> &result, Span<pathchar> directory) {
 	auto items = get_items_in_directory(directory);
 	for (auto &item : items) {
-		auto path16 = concatenate(directory, '/', item.name, '\0');
+		auto path16 = concatenate(directory, '/', item.name);
 		if (item.kind == FileItem_directory) {
-			add_assets(asset_builder, path16);
+			add_files_recursive(result, path16);
 		} else {
-			auto path8 = concatenate(to_utf8(directory), '/', item.name);
-			append_bytes(asset_builder, (u32)path8.size);
-			append_bytes(asset_builder, path8);
-
-			auto data = read_entire_file(path16);
-			append_bytes(asset_builder, (u32)data.size);
-			append_bytes(asset_builder, as_span(data));
+			result.add(to_utf8(path16));
 		}
 	}
 }
+
+#define scoped_directory(dir) \
+	auto previous_directory = get_current_directory(); \
+	create_directory(format(tl_file_string("%\\%"s), previous_directory, dir)); \
+	set_current_directory(format(tl_file_string("%\\%"s), previous_directory, dir)); \
+	defer { set_current_directory(previous_directory); };
 
 bool invoke_msvc(Span<utf8> arguments) {
 	constexpr auto cl_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30037\\bin\\Hostx64\\x64\\cl.exe"s;
@@ -285,15 +289,16 @@ bool invoke_msvc(Span<utf8> arguments) {
 	append(bat_builder, u8R"(
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-cl )");
+cmd /C cl )");
 
 	append(bat_builder, arguments);
-	append(bat_builder, " > \"temp\\cppbuild_log.txt\"");
+	append_format(bat_builder, " | \"%\\stdin_duplicator\" \"stdout\" \"build_log.txt\"", editor_bin_directory);
 
-	auto bat_path = tl_file_string("temp\\cppbuild.bat"s);
+	auto bat_path = tl_file_string("build.bat"s);
 	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
 
 	auto process = execute(bat_path);
+
 	if (!process) {
 		print(Print_error, "Cannot execute file '%'\n", bat_path);
 		return false;
@@ -307,7 +312,7 @@ cl )");
 	auto exit_code = get_exit_code(process);
 	if (exit_code != 0) {
 		print(Print_error, "Build command failed\n");
-		print(as_utf8(read_entire_file(tl_file_string("temp\\cppbuild_log.txt"))));
+		print(as_utf8(read_entire_file(tl_file_string("build_log.txt"))));
 		return false;
 	}
 
@@ -315,60 +320,29 @@ cl )");
 	return true;
 }
 
-void build_executable() {
-	scoped_allocator(temporary_allocator);
-
-	StringBuilder asset_builder;
-	add_assets(asset_builder, to_pathchars(assets.directory));
-
-	auto data_file = open_file(tl_file_string("data.bin"), {.write = true});
-	defer { close(data_file); };
-
-	DataHeader header;
-
-	set_cursor(data_file, sizeof(header), File_begin);
-
-	auto asset_data = as_bytes(to_string(asset_builder));
-	header.asset_offset = get_cursor(data_file);
-	header.asset_size = asset_data.size;
-	write(data_file, asset_data);
-
-	auto scene_data = serialize_scene_binary();
-	header.scene_offset = get_cursor(data_file);
-	header.scene_size = scene_data.size;
-	write(data_file, scene_data);
-
-	set_cursor(data_file, 0, File_begin);
-	write(data_file, value_as_bytes(header));
-
-
-	invoke_msvc(u8R"(..\src\main_runtime.cpp ..\src\common.cpp /ZI /I"." /I"..\src" /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /LIBPATH:"../dep/freetype/win64")"s);
-}
-
 void insert_scripts_paths(ListList<utf8> &scripts, Span<utf8> directory) {
-	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(assets.directory)));
+	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(shared->assets.directory)));
 	for (auto &item : items) {
 		auto item_path = with(temporary_allocator, concatenate(directory, '/', item.name));
 		if (item.kind == FileItem_directory) {
 			insert_scripts_paths(scripts, item_path);
 		} else {
-			if (ends_with(item.name, u8".cpp"s)) {
+			if (ends_with(item.name, u8".h"s)) {
 				scripts.add(item_path);
 			}
 		}
 	}
 }
 
-
-HashMap<ComponentUID, ComponentInfo> built_in_components;
-
-using T3dRegisterComponents = void (*)();
-
-void recompile_all_scripts() {
+ListList<utf8> get_scripts_paths() {
 	ListList<utf8> script_paths;
-	insert_scripts_paths(script_paths, assets.directory);
+	insert_scripts_paths(script_paths, shared->assets.directory);
 	script_paths.make_absolute();
+	return script_paths;
+}
 
+
+ListList<utf8> get_component_names(ListList<utf8> script_paths) {
 	ListList<utf8> component_names;
 	for (auto &path : script_paths) {
 		auto file = open_file(to_pathchars(path, true).data, {.read = true});
@@ -409,8 +383,109 @@ void recompile_all_scripts() {
 		}
 	}
 	component_names.make_absolute();
+	return component_names;
+}
 
-	auto scripts_init_path = u8"scripts_init.cpp"s;
+auto const scripts_init_path = u8"scripts_init.cpp"s;
+
+Span<ascii> include_dirs[] = {
+	"src"s,
+	"dep/tl/include"s,
+	"dep/freetype/include"s,
+	"dep/stb"s,
+	"dep/tgraphics/include"s,
+};
+
+Span<ascii> lib_dirs[] = {
+	"dep/freetype/win64"s,
+};
+
+void build_executable() {
+	scoped_allocator(temporary_allocator);
+	scoped_directory("build");
+
+	StringBuilder asset_builder;
+
+	ListList<utf8> asset_paths;
+	add_files_recursive(asset_paths, to_pathchars(shared->assets.directory));
+	asset_paths.make_absolute();
+
+	for (auto full_path : asset_paths) {
+		auto path = full_path.subspan(shared->assets.directory.size + 1, full_path.size - shared->assets.directory.size - 1);
+		print("asset %\n", path);
+		append_bytes(asset_builder, (u32)path.size);
+		append_bytes(asset_builder, path);
+
+		auto data = read_entire_file(to_pathchars(full_path));
+		append_bytes(asset_builder, (u32)data.size);
+		append_bytes(asset_builder, as_span(data));
+	}
+
+	auto data_file = open_file(tl_file_string("data.bin"), {.write = true});
+	defer { close(data_file); };
+
+	DataHeader header;
+
+	set_cursor(data_file, sizeof(header), File_begin);
+
+	auto asset_data = as_bytes(to_string(asset_builder));
+	header.asset_offset = get_cursor(data_file);
+	header.asset_size = asset_data.size;
+	write(data_file, asset_data);
+
+	auto scene_data = serialize_scene_binary();
+	header.scene_offset = get_cursor(data_file);
+	header.scene_size = scene_data.size;
+	write(data_file, scene_data);
+
+	set_cursor(data_file, 0, File_begin);
+	write(data_file, value_as_bytes(header));
+
+
+	ListList<utf8> script_paths = get_scripts_paths();
+
+
+	StringBuilder builder;
+
+	auto cpp_files_file = read_entire_file(format("%/../data/cpp_files.txt", editor_bin_directory));
+
+	auto cpp_paths = split(as_utf8(cpp_files_file), u8"\n"s);
+
+	for (auto cpp_path : cpp_paths) {
+		if (!cpp_path.size) continue;
+		append_format(builder, "%/obj/%.obj ", editor_bin_directory, parse_path(cpp_path).name);
+	}
+
+	append_format(builder, "% ", scripts_init_path);
+	for (auto script_path : script_paths) {
+		append_format(builder, "% ", format("%.cpp", script_path.subspan(0, script_path.size - 2)));
+	}
+
+	append_format(builder, u8"%\\..\\src\\t3d\\main_runtime.cpp "s, editor_bin_directory);
+
+	for (auto inc : include_dirs) {
+		append_format(builder, "/I\"%\\..\\%\" ", editor_bin_directory, inc);
+	}
+
+	append(builder, u8"/ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:project.exe "s);
+
+	for (auto lib : lib_dirs) {
+		append_format(builder, "/LIBPATH:\"%\\..\\%\" ", editor_bin_directory, lib);
+	}
+
+	invoke_msvc((List<utf8>)to_string(builder));
+}
+
+
+HashMap<ComponentUID, ComponentInfo> built_in_components;
+
+using T3dRegisterComponents = void (*)(List<ComponentDesc> &descs);
+
+void recompile_all_scripts() {
+	scoped_directory("build");
+
+	ListList<utf8> script_paths = get_scripts_paths();
+	ListList<utf8> component_names = get_component_names(script_paths);
 
 	// Generate source
 	{
@@ -423,12 +498,12 @@ void recompile_all_scripts() {
 
 )"s);
 		for (auto component_name : component_names) {
-			append_format(builder, "extern \"C\" void register_component_%();\n", component_name);
+			append_format(builder, "ComponentDesc get_component_desc_%();\n", component_name);
 		}
-		append(builder, u8R"(extern "C" __declspec(dllexport) void t3d_register_components() {
+		append(builder, u8R"(extern "C" __declspec(dllexport) void t3d_get_component_descs(List<ComponentDesc> &descs) {
 )");
 		for (auto component_name : component_names) {
-			append_format(builder, u8R"(register_component_%();
+			append_format(builder, u8R"(	descs.add(get_component_desc_%());
 )", component_name);
 		}
 		append(builder, u8"}"s);
@@ -445,11 +520,31 @@ void recompile_all_scripts() {
 	// compile dll
 	{
 		StringBuilder builder;
+
+		auto cpp_files_file = read_entire_file(format("%/../data/cpp_files.txt", editor_bin_directory));
+
+		auto cpp_paths = split(as_utf8(cpp_files_file), u8"\n"s);
+
+		for (auto cpp_path : cpp_paths) {
+			if (!cpp_path.size) continue;
+			append_format(builder, "%/obj/%.obj ", editor_bin_directory, parse_path(cpp_path).name);
+		}
+
 		append_format(builder, "% ", scripts_init_path);
 		for (auto script_path : script_paths) {
-			append_format(builder, "% ", script_path);
+			append_format(builder, "% ", format("%.cpp", script_path.subspan(0, script_path.size - 2)));
 		}
-		append(builder, R"(../data/common.cpp /LD /ZI /I"." /I"..\src" /I"..\dep\tl\include" /I"..\dep\freetype\include" /I"..\dep\stb" /I"..\dep\tgraphics\include" /std:c++latest /D"BUILD_DEBUG=0" /link /out:scripts.dll /LIBPATH:"../dep/freetype/win64")"s);
+
+		for (auto inc : include_dirs) {
+			append_format(builder, "/I\"%\\..\\%\" ", editor_bin_directory, inc);
+		}
+
+		append(builder, "/LD /ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:scripts.dll ");
+
+
+		for (auto lib : lib_dirs) {
+			append_format(builder, "/LIBPATH:\"%\\..\\%\" ", editor_bin_directory, lib);
+		}
 		assert(invoke_msvc(as_utf8(to_string(builder))));
 	}
 
@@ -457,16 +552,16 @@ void recompile_all_scripts() {
 	HMODULE scripts_dll = LoadLibraryW(with(temporary_allocator, (wchar *)to_pathchars(scripts_dll_path, true).data));
 
 	((void (*)())GetProcAddress(scripts_dll, "initialize_module"))();
-	set_module_shared_data(scripts_dll);
+	set_module_shared(scripts_dll);
 
 	// register all components in dll
-	auto scripts_register_components = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_register_components");
+	auto t3d_get_component_descs = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_get_component_descs");
 
 	StringBuilder builder;
 
-	for_each(shared_data->entities, [&](Entity &entity) {
+	for_each(shared->entities, [&](Entity &entity) {
 		for (auto &component : entity.components) {
-			auto found_info = shared_data->component_infos.find(component.type);
+			auto found_info = shared->component_infos.find(component.type);
 			assert(found_info);
 			auto &info = *found_info;
 			info.serialize(builder, info.storage.get(component.index), false);
@@ -474,89 +569,81 @@ void recompile_all_scripts() {
 	});
 
 	// Remove old components
-	set(shared_data->component_infos, built_in_components);
+	//set(shared->component_infos, built_in_components);
 
-	// Add new components
-	scripts_register_components();
+	List<ComponentDesc> descs;
+	descs.allocator = shared->allocator;
+	t3d_get_component_descs(descs);
+
+	for (auto &desc : descs) {
+		update_component_info(desc);
+	}
 }
 
 void run() {
 	construct(manipulator_draw_requests);
 	construct(manipulator_states);
 	construct(debug_lines);
-
-	construct(button_states);
-	construct(float_field_states);
-	construct(text_field_states );
-	construct(scroll_bar_states );
-
-	construct(input_string);
-
-	construct(drag_and_drop_data);
 	construct(tab_moves);
-	construct(editor_windows);
-	construct(gui_draws);
-
-	construct(editor_assets);
-	editor_assets.directory = u8"../data"s;
 
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
 		runtime_init(window);
-		assets.directory = u8"../example"s;
+		shared->is_editor = true;
+		shared->assets.directory = format(u8"%/../example"s, editor_bin_directory);
+		shared->editor_assets.directory = format(u8"%/../data"s, editor_bin_directory);
 
-		built_in_components = copy(shared_data->component_infos);
+		built_in_components = copy(shared->component_infos);
 
 		recompile_all_scripts();
 
-		tg::set_scissor(aabb_min_max({}, (v2s)window.client_size));
+		shared->tg->set_scissor(aabb_min_max({}, (v2s)window.client_size));
 
 		init_font();
 
-		debug_lines_vertex_buffer = tg::create_vertex_buffer(
+		debug_lines_vertex_buffer = shared->tg->create_vertex_buffer(
 			{},
 			{
 				tg::Element_f32x3, // position
 				tg::Element_f32x3, // color
 			}
 		);
-		//tg::set_vsync(false);
 
+		shared->tg->set_vsync(true);
 
-
-		handle_sphere_mesh  = editor_assets.get_mesh(u8"handle.glb:Sphere"s);
-		handle_circle_mesh  = editor_assets.get_mesh(u8"handle.glb:Circle"s);
-		handle_tangent_mesh = editor_assets.get_mesh(u8"handle.glb:Tangent"s);
-		handle_axis_x_mesh  = editor_assets.get_mesh(u8"handle.glb:AxisX"s );
-		handle_axis_y_mesh  = editor_assets.get_mesh(u8"handle.glb:AxisY"s );
-		handle_axis_z_mesh  = editor_assets.get_mesh(u8"handle.glb:AxisZ"s );
-		handle_arrow_x_mesh = editor_assets.get_mesh(u8"handle.glb:ArrowX"s );
-		handle_arrow_y_mesh = editor_assets.get_mesh(u8"handle.glb:ArrowY"s );
-		handle_arrow_z_mesh = editor_assets.get_mesh(u8"handle.glb:ArrowZ"s );
-		handle_plane_x_mesh = editor_assets.get_mesh(u8"handle.glb:PlaneX"s);
-		handle_plane_y_mesh = editor_assets.get_mesh(u8"handle.glb:PlaneY"s);
-		handle_plane_z_mesh = editor_assets.get_mesh(u8"handle.glb:PlaneZ"s);
+		handle_sphere_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:Sphere"s);
+		handle_circle_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:Circle"s);
+		handle_tangent_mesh = shared->editor_assets.get_mesh(u8"handle.glb:Tangent"s);
+		handle_axis_x_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:AxisX"s );
+		handle_axis_y_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:AxisY"s );
+		handle_axis_z_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:AxisZ"s );
+		handle_arrow_x_mesh = shared->editor_assets.get_mesh(u8"handle.glb:ArrowX"s );
+		handle_arrow_y_mesh = shared->editor_assets.get_mesh(u8"handle.glb:ArrowY"s );
+		handle_arrow_z_mesh = shared->editor_assets.get_mesh(u8"handle.glb:ArrowZ"s );
+		handle_plane_x_mesh = shared->editor_assets.get_mesh(u8"handle.glb:PlaneX"s);
+		handle_plane_y_mesh = shared->editor_assets.get_mesh(u8"handle.glb:PlaneY"s);
+		handle_plane_z_mesh = shared->editor_assets.get_mesh(u8"handle.glb:PlaneZ"s);
 
 		auto create_default_scene = [&]() {
 			auto &suzanne = create_entity("suzan\"ne");
 			suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
 			{
 				auto &mr = add_component<MeshRenderer>(suzanne);
-				mr.mesh = assets.get_mesh(u8"scene.glb:Suzanne"s);
-				mr.material = &shared_data->surface_material;
-				mr.lightmap = assets.get_texture_2d(u8"suzanne_lightmap.png"s);
+				mr.mesh = shared->assets.get_mesh(u8"scene.glb:Suzanne"s);
+				mr.material = &shared->surface_material;
+				mr.lightmap = shared->assets.get_texture_2d(u8"suzanne_lightmap.png"s);
 			}
 			selection.set(&suzanne);
 
 			auto &floor = create_entity("floor");
 			{
 				auto &mr = add_component<MeshRenderer>(floor);
-				mr.mesh = assets.get_mesh(u8"scene.glb:Room"s);
-				mr.material = &shared_data->surface_material;
-				mr.lightmap = assets.get_texture_2d(u8"floor_lightmap.png"s);
+				mr.mesh = shared->assets.get_mesh(u8"scene.glb:Room"s);
+				mr.material = &shared->surface_material;
+				mr.lightmap = shared->assets.get_texture_2d(u8"floor_lightmap.png"s);
 			}
 
-			auto light_texture = assets.get_texture_2d(u8"spotlight_mask.png"s);
+			auto light_texture = shared->assets.get_texture_2d(u8"spotlight_mask.png"s);
 
 			{
 				auto &light = create_entity("light1");
@@ -593,7 +680,7 @@ void run() {
 		};
 
 		//if (!deserialize_window_layout())
-			main_window = create_split_view(
+			shared->main_window = create_split_view(
 				create_split_view(
 					create_tab_view(create_file_view()),
 					create_tab_view(create_scene_view()),
@@ -610,28 +697,28 @@ void run() {
 		if (!deserialize_scene_text(u8"test.scene"s))
 			create_default_scene();
 
-		window.min_window_size = client_size_to_window_size(window, main_window->get_min_size());
+		window.min_window_size = client_size_to_window_size(window, shared->main_window->get_min_size());
 	};
 	info.on_draw = [](Window &window) {
-		current_cursor = Cursor_default;
+		shared->current_cursor = Cursor_default;
 
 		static v2u old_window_size;
 		if (any_true(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
 
-			main_window->resize({.min = {}, .max = (v2s)window.client_size});
+			shared->main_window->resize({.min = {}, .max = (v2s)window.client_size});
 
-			tg::resize_render_targets(window.client_size);
+			shared->tg->resize_render_targets(window.client_size);
 		}
 
-		current_viewport = current_scissor = {
+		shared->current_viewport = shared->current_scissor = {
 			.min = {},
 			.max = (v2s)window.client_size,
 		};
-		tg::set_viewport(current_viewport);
-		tg::set_scissor(current_scissor);
+		shared->tg->set_viewport(shared->current_viewport);
+		shared->tg->set_scissor(shared->current_scissor);
 
-		current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
+		shared->current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
 
 		if (key_down(Key_f1, {.anywhere = true})) {
 			Profiler::enabled = true;
@@ -645,7 +732,7 @@ void run() {
 		};
 
 		if (key_down(Key_f2, {.anywhere = true})) {
-			for_each(shared_data->entities, [](Entity &e) {
+			for_each(shared->entities, [](Entity &e) {
 				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, get_entity_index(e), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
 				for (auto &c : e.components) {
 					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, get_component_info(c.type).name, c.index);
@@ -656,28 +743,28 @@ void run() {
 		if (key_down(Key_f6, {.anywhere = true})) {
 			build_executable();
 		}
-		window.min_window_size = client_size_to_window_size(window, main_window->get_min_size());
+		window.min_window_size = client_size_to_window_size(window, shared->main_window->get_min_size());
 
-		input_user_index = 0;
-		focusable_input_user_index = 0;
+		shared->input_user_index = 0;
+		shared->focusable_input_user_index = 0;
 
 		timed_block("frame"s);
 
 		runtime_render();
 
-		tg::clear(tg::back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
+		shared->tg->clear(shared->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
 
 		{
-			timed_block("main_window->render()"s);
-			main_window->render();
+			timed_block("shared->main_window->render()"s);
+			shared->main_window->render();
 		}
 
-		switch (drag_and_drop_kind) {
+		switch (shared->drag_and_drop_kind) {
 			case DragAndDrop_file: {
-				auto texture = assets.get_texture_2d(as_utf8(drag_and_drop_data));
+				auto texture = shared->assets.get_texture_2d(as_utf8(shared->drag_and_drop_data));
 				if (texture) {
 					aabb<v2s> thumbnail_viewport;
-					thumbnail_viewport.min = thumbnail_viewport.max = current_mouse_position;
+					thumbnail_viewport.min = thumbnail_viewport.max = shared->current_mouse_position;
 					thumbnail_viewport.max.x += 128;
 					thumbnail_viewport.min.y -= 128;
 					push_current_viewport(thumbnail_viewport) {
@@ -687,15 +774,15 @@ void run() {
 				break;
 			}
 			case DragAndDrop_tab: {
-				auto tab_info = *(DragDropTabInfo *)drag_and_drop_data.data;
+				auto tab_info = *(DragDropTabInfo *)shared->drag_and_drop_data.data;
 				auto tab = tab_info.tab_view->tabs[tab_info.tab_index];
 
-				auto font = get_font_at_size(font_collection, font_size);
+				auto font = get_font_at_size(shared->font_collection, font_size);
 				ensure_all_chars_present(tab.window->name, font);
 				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
 
 				tg::Viewport tab_viewport;
-				tab_viewport.min = tab_viewport.max = current_mouse_position;
+				tab_viewport.min = tab_viewport.max = shared->current_mouse_position;
 
 				tab_viewport.min.y -= TabView::tab_height;
 				tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
@@ -710,15 +797,15 @@ void run() {
 		}
 
 		if (drag_and_dropping()) {
-			if (key_state[256].state & KeyState_up) {
-				drag_and_drop_kind = DragAndDrop_none;
+			if (shared->key_state[256].state & KeyState_up) {
+				shared->drag_and_drop_kind = DragAndDrop_none;
 				unlock_input_nocheck();
 			}
 		}
 
 		debug_frame();
 
-		bool debug_print_editor_window_hierarchy = shared_data->frame_index == 0;
+		bool debug_print_editor_window_hierarchy = shared->frame_index == 0;
 		for (auto &move : tab_moves) {
 			auto from = move.from;
 			auto tab_index = move.tab_index;
@@ -750,9 +837,9 @@ void run() {
 						}
 					}
 				} else {
-					auto main_window_viewport = main_window->viewport;
-					main_window = what_is_left;
-					main_window->resize(main_window_viewport);
+					auto main_window_viewport = shared->main_window->viewport;
+					shared->main_window = what_is_left;
+					shared->main_window->resize(main_window_viewport);
 				}
 			};
 
@@ -810,13 +897,13 @@ void run() {
 
 					to_parent->replace_child(to, create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal}));
 				} else {
-					assert(to == main_window);
-					main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
+					assert(to == shared->main_window);
+					shared->main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
 				}
 
 				tg::Viewport window_viewport = {};
-				window_viewport.max = (v2s)max(main_window->get_min_size(), window.client_size);
-				main_window->resize(window_viewport);
+				window_viewport.max = (v2s)max(shared->main_window->get_min_size(), window.client_size);
+				shared->main_window->resize(window_viewport);
 				resize(window, (v2u)window_viewport.max);
 
 				//to_parent->resize(to_parent->viewport);
@@ -829,20 +916,19 @@ void run() {
 		tab_moves.clear();
 
 
-		if (should_unlock_input) {
-			should_unlock_input = false;
-			input_is_locked = false;
-			input_locker = 0;
+		if (shared->should_unlock_input) {
+			shared->should_unlock_input = false;
+			shared->input_is_locked = false;
+			shared->input_locker = 0;
 		}
 
-		if (debug_print_editor_window_hierarchy || (key_state[Key_f4].state & KeyState_down)) {
+		if (debug_print_editor_window_hierarchy || (shared->key_state[Key_f4].state & KeyState_down)) {
 			debug_print_editor_window_hierarchy = false;
-			debug_print_editor_window_hierarchy_tab = 0;
 
-			main_window->debug_print();
+			shared->main_window->debug_print();
 		}
 
-		for (auto &state : key_state) {
+		for (auto &state : shared->key_state) {
 			if (state.state & KeyState_down) {
 				state.state &= ~KeyState_down;
 			} else if (state.state & KeyState_up) {
@@ -852,16 +938,16 @@ void run() {
 				state.state &= ~KeyState_repeated;
 			}
 			state.state &= ~KeyState_begin_drag;
-			if ((state.state & KeyState_held) && !(state.state & KeyState_drag) && (distance_squared(state.start_position, current_mouse_position) >= pow2(8))) {
+			if ((state.state & KeyState_held) && !(state.state & KeyState_drag) && (distance_squared(state.start_position, shared->current_mouse_position) >= pow2(8))) {
 				state.state |= KeyState_drag | KeyState_begin_drag;
 			}
 		}
 
-		input_string.clear();
+		shared->input_string.clear();
 
-		for (auto &draw : gui_draws) {
-			tg::set_viewport(draw.viewport);
-			tg::set_scissor(draw.scissor);
+		for (auto &draw : shared->gui_draws) {
+			shared->tg->set_viewport(draw.viewport);
+			shared->tg->set_scissor(draw.scissor);
 			switch (draw.kind) {
 				case GuiDraw_rect_colored: {
 					auto &rect_colored = draw.rect_colored;
@@ -902,49 +988,49 @@ void run() {
 						};
 					}
 
-					if (text_vertex_buffer) {
-						tg::update_vertex_buffer(text_vertex_buffer, as_bytes(vertices));
+					if (shared->text_vertex_buffer) {
+						shared->tg->update_vertex_buffer(shared->text_vertex_buffer, as_bytes(vertices));
 					} else {
-						text_vertex_buffer = tg::create_vertex_buffer(as_bytes(vertices), {
+						shared->text_vertex_buffer = shared->tg->create_vertex_buffer(as_bytes(vertices), {
 							tg::Element_f32x2, // position
 							tg::Element_f32x2, // uv
 						});
 					}
-					tg::set_rasterizer({.depth_test = false, .depth_write = false});
-					tg::set_topology(tg::Topology_triangle_list);
-					tg::set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
-					tg::set_shader(text_shader);
-					tg::set_shader_constants(text_shader_constants, 0);
-					tg::update_shader_constants(text_shader_constants, {
+					shared->tg->set_rasterizer({.depth_test = false, .depth_write = false});
+					shared->tg->set_topology(tg::Topology_triangle_list);
+					shared->tg->set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
+					shared->tg->set_shader(shared->text_shader);
+					shared->tg->set_shader_constants(shared->text_shader_constants, 0);
+					shared->tg->update_shader_constants(shared->text_shader_constants, {
 						.inv_half_viewport_size = v2f{2,-2} / (v2f)draw.viewport.size(),
 						.offset = (v2f)label.position,
 					});
-					tg::set_vertex_buffer(text_vertex_buffer);
-					tg::set_sampler(tg::Filtering_nearest, 0);
-					tg::set_texture(font->texture, 0);
-					tg::draw(vertices.size);
+					shared->tg->set_vertex_buffer(shared->text_vertex_buffer);
+					shared->tg->set_sampler(tg::Filtering_nearest, 0);
+					shared->tg->set_texture(font->texture, 0);
+					shared->tg->draw(vertices.size);
 					break;
 				}
 				default: invalid_code_path("not implemented"); break;
 			}
 		}
-		gui_draws.clear();
+		shared->gui_draws.clear();
 
 		clear_temporary_storage();
 
 		{
 			timed_block("present"s);
-			tg::present();
+			shared->tg->present();
 		}
 
 		update_time();
 
 		++fps_counter;
-		set_title(&window, tformat(u8"frame_time: % ms, fps: %", shared_data->frame_time * 1000, fps_counter_result));
+		set_title(&window, tformat(u8"frame_time: % ms, fps: %", shared->frame_time * 1000, fps_counter_result));
 
-		set_cursor(window, current_cursor);
+		set_cursor(window, shared->current_cursor);
 
-		fps_timer += shared_data->frame_time;
+		fps_timer += shared->frame_time;
 		if (fps_timer >= 1) {
 			fps_counter_result = fps_counter;
 			fps_timer -= 1;
@@ -952,46 +1038,46 @@ void run() {
 		}
 	};
 	info.on_key_down = [](u8 key) {
-		key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
-		key_state[key].start_position = input_is_locked ? input_lock_mouse_position : current_mouse_position;
+		shared->key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
+		shared->key_state[key].start_position = shared->input_is_locked ? shared->input_lock_mouse_position : shared->current_mouse_position;
 	};
 	info.on_key_up = [](u8 key) {
-		key_state[key].state = KeyState_up;
+		shared->key_state[key].state = KeyState_up;
 	};
 	info.on_key_repeat = [](u8 key) {
-		key_state[key].state |= KeyState_repeated;
+		shared->key_state[key].state |= KeyState_repeated;
 	};
 	info.on_mouse_down = [](u8 button){
-		key_state[256 + button].state = KeyState_down | KeyState_held;
-		key_state[256 + button].start_position = input_is_locked ? input_lock_mouse_position : current_mouse_position;
+		shared->key_state[256 + button].state = KeyState_down | KeyState_held;
+		shared->key_state[256 + button].start_position = shared->input_is_locked ? shared->input_lock_mouse_position : shared->current_mouse_position;
 	};
 	info.on_mouse_up = [](u8 button){
-		auto &state = key_state[256 + button];
+		auto &state = shared->key_state[256 + button];
 		state.state = KeyState_up | ((state.state & KeyState_drag) ? KeyState_end_drag : 0);
 	};
 	info.on_char = [](u32 ch) {
-		input_string.add(encode_utf8(ch));
+		shared->input_string.add(encode_utf8(ch));
 	};
 	info.client_size = {1280, 720};
-	window = create_window(info);
-	defer { free(window); };
+	shared->window = create_window(info);
+	defer { free(shared->window); };
 
-	assert_always(window);
+	assert_always(shared->window);
 
 
-	shared_data->frame_timer = create_precise_timer();
+	shared->frame_timer = create_precise_timer();
 
 	Profiler::enabled = false;
 	Profiler::reset();
 
-	while (update(window)) {
+	while (update(shared->window)) {
 	}
 
 	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene_text())));
 
 	//serialize_window_layout();
 
-	for_each(shared_data->entities, [](Entity &e) {
+	for_each(shared->entities, [](Entity &e) {
 		destroy_entity(e);
 	});
 
@@ -1008,6 +1094,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	defer { debug_deinit(); };
 	current_allocator = tracking_allocator;
 #endif
+
+	editor_bin_directory = replace(parse_path(arguments[0]).directory, u8'\\', u8'/');
 
 	auto log_file = open_file(tl_file_string("editor_log.txt"s), {.write = true});
 	defer { close(log_file); };

@@ -1,5 +1,5 @@
 #pragma once
-#include <t3d/shared_data.h>
+#include <t3d/shared.h>
 #include <t3d/material.h>
 #include <t3d/mesh.h>
 
@@ -13,5 +13,3 @@ DECLARE_COMPONENT(MeshRenderer) {
 };
 
 #undef FIELDS
-
-REGISTER_COMPONENT(MeshRenderer)

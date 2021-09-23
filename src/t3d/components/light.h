@@ -1,5 +1,5 @@
 #pragma once
-#include <t3d/shared_data.h>
+#include <t3d/shared.h>
 
 u32 const shadow_map_resolution = 256;
 
@@ -14,8 +14,8 @@ DECLARE_COMPONENT(Light) {
 	m4 world_to_light_matrix;
 
 	void init() {
-		auto depth = tg::create_texture_2d(shadow_map_resolution, shadow_map_resolution, 0, tg::Format_depth);
-		shadow_map = tg::create_render_target(0, depth);
+		auto depth = shared->tg->create_texture_2d(shadow_map_resolution, shadow_map_resolution, 0, tg::Format_depth);
+		shadow_map = shared->tg->create_render_target(0, depth);
 	}
 	void component_free() {
 		//tg::free(shadow_map);
@@ -23,5 +23,3 @@ DECLARE_COMPONENT(Light) {
 };
 
 #undef FIELDS
-
-REGISTER_COMPONENT(Light)

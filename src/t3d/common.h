@@ -119,11 +119,12 @@ inline Optional<f32> parse_f32(Span<utf8> string) {
 	return result;
 }
 
-extern "C" TL_DLL_EXPORT struct SharedData *shared_data;
+extern "C" TL_DLL_EXPORT struct SharedData *shared;
 
-void allocate_shared_data();
+void allocate_shared();
 
 extern "C" TL_DLL_EXPORT void initialize_module();
 
-void set_module_shared_data(HMODULE module);
+void set_module_shared(HMODULE module);
 
+void update_component_info(struct ComponentDesc const &desc);

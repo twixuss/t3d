@@ -11,11 +11,4 @@ struct Mesh {
 	List<u32> indices;
 };
 
-inline void draw_mesh(Mesh *mesh) {
-	if (!mesh) {
-		return;
-	}
-	tg::set_vertex_buffer(mesh->vertex_buffer);
-	tg::set_index_buffer(mesh->index_buffer);
-	tg::draw_indexed(mesh->index_count);
-}
+void draw_mesh(Mesh *mesh);

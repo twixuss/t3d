@@ -11,9 +11,9 @@ struct Dither {
 	tg::TypedShaderConstants<Constants> constants;
 
 	void init() {
-		constants = tg::create_shader_constants<Dither::Constants>();
+		constants = shared->tg->create_shader_constants<Dither::Constants>();
 
-		shader = tg::create_shader(u8R"(
+		shader = shared->tg->create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else
@@ -58,22 +58,22 @@ void main() {
 
 	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
 		timed_block("Dither::render"s);
-		tg::set_rasterizer(
-			tg::get_rasterizer()
+		shared->tg->set_rasterizer(
+			shared->tg->get_rasterizer()
 				.set_depth_test(false)
 				.set_depth_write(false)
 		);
-		tg::disable_blend();
+		shared->tg->disable_blend();
 
-		tg::set_shader(shader);
-		tg::set_shader_constants(constants, 0);
+		shared->tg->set_shader(shader);
+		shared->tg->set_shader_constants(constants, 0);
 
-		tg::update_shader_constants(constants, {.time = shared_data->time, .frame_index = shared_data->frame_index});
+		shared->tg->update_shader_constants(constants, {.time = shared->time, .frame_index = shared->frame_index});
 
-		tg::set_render_target(destination);
-		tg::set_sampler(tg::Filtering_nearest, 0);
-		tg::set_texture(source->color, 0);
-		tg::draw(3);
+		shared->tg->set_render_target(destination);
+		shared->tg->set_sampler(tg::Filtering_nearest, 0);
+		shared->tg->set_texture(source->color, 0);
+		shared->tg->draw(3);
 	}
 
 	void resize(v2u size) {}

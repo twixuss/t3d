@@ -1,7 +1,7 @@
 #pragma once
 #include <t3d/debug.h>
-#include "current.h"
-#include "input.h"
+#include <t3d/editor/current.h>
+#include <t3d/editor/input.h>
 
 enum ManipulateKind {
 	Manipulate_position,
@@ -71,14 +71,14 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 	ManipulatorDrawRequest draw_request = {};
 	draw_request.scale = {1,1,1};
 
-	auto &state = manipulator_states.get_or_insert({.id = id, .camera = current_camera, .location = source_location});
+	auto &state = manipulator_states.get_or_insert({.id = id, .camera = shared->current_camera, .location = source_location});
 
 	f32 const handle_size_scale = 0.25f;
 	f32 const handle_grab_thickness = 0.05f;
-	f32 handle_size = handle_size_scale * current_camera->fov / (pi * 0.5f);
+	f32 handle_size = handle_size_scale * shared->current_camera->fov / (pi * 0.5f);
 
-	auto camera_forward = current_camera_entity->rotation * v3f{0,0,-1};
-	auto camera_forward_dot_handle_direction = dot(position - current_camera_entity->position, camera_forward);
+	auto camera_forward = shared->current_camera_entity->rotation * v3f{0,0,-1};
+	auto camera_forward_dot_handle_direction = dot(position - shared->current_camera_entity->position, camera_forward);
 	f32 handle_size_scaled_by_distance = handle_size * camera_forward_dot_handle_direction;
 
 	auto mouse_position = get_mouse_position_in_current_viewport();
@@ -91,12 +91,12 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 		state.original_transform.rotation = rotation;
 	};
 
-	m4 camera_to_world_matrix = inverse(current_camera->world_to_camera_matrix);
+	m4 camera_to_world_matrix = inverse(shared->current_camera->world_to_camera_matrix);
 
 	switch (kind) {
 		case Manipulate_position:
 		case Manipulate_scale: {
-			//m4 handle_matrix = m4::translation(position) * m4::rotation_r_zxy(rotation) * m4::scale(handle_size * dot(position - current_camera_entity.position, m4::rotation_r_zxy(current_camera_entity.rotation) * v3f{0,0,-1}));
+			//m4 handle_matrix = m4::translation(position) * m4::rotation_r_zxy(rotation) * m4::scale(handle_size * dot(position - shared->current_camera_entity.position, m4::rotation_r_zxy(shared->current_camera_entity.rotation) * v3f{0,0,-1}));
 			m4 handle_matrix = m4::translation(position) * (m4)rotation * m4::scale(handle_size_scaled_by_distance);
 
 			v3f handle_viewport_position = world_to_viewport(handle_matrix * v4f{0,0,0,1});
@@ -150,7 +150,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 					closest_element = axis_index + 3;
 				}
 			}
-			if (closest_dist > window->client_size.y * handle_grab_thickness) {
+			if (closest_dist > shared->window->client_size.y * handle_grab_thickness) {
 				closest_element = null_manipulator_part;
 			}
 
@@ -170,16 +170,16 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 				if (state.dragging_part_index < 3) {
 					v2f closest_in_viewport = closest_point(line_begin_end(handle_viewport_position.xy, handle_viewport_axis_tips[state.dragging_part_index]), (v2f)mouse_position);
 
-					v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, {}, (v2f)current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
-					ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
+					v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, {}, (v2f)shared->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+					ray<v3f> cursor_ray = ray_origin_end(shared->current_camera_entity->position, end.xyz / end.w);
 
 					cursor_ray.direction = normalize(cursor_ray.direction);
 					new_position = closest_point(line_begin_end(position, handle_world_axis_tips[state.dragging_part_index]), as_line(cursor_ray));
 				} else {
 					v3f plane_normal = normalize(handle_world_axis_tips[state.dragging_part_index - 3] - position);
 
-					v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
-					ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
+					v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)shared->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+					ray<v3f> cursor_ray = ray_origin_end(shared->current_camera_entity->position, end.xyz / end.w);
 
 					new_position = intersect(cursor_ray, plane_point_normal(position, plane_normal));
 				}
@@ -188,7 +188,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 					state.drag_offset = manipulated_transform.position - new_position;
 				} else {
 					if (kind == Manipulate_position) {
-						manipulated_transform.position = new_position + state.drag_offset * (dot(new_position - current_camera_entity->position, camera_forward) / dot(state.original_click_position - current_camera_entity->position, camera_forward));
+						manipulated_transform.position = new_position + state.drag_offset * (dot(new_position - shared->current_camera_entity->position, camera_forward) / dot(state.original_click_position - shared->current_camera_entity->position, camera_forward));
 					} else {
 						m4 cancel_rotation = inverse((m4)rotation);
 						v3f old_offset = (cancel_rotation * V4f(state.original_click_position - position, 1)).xyz;
@@ -219,8 +219,8 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 			v3f closest_intersect_position = {};
 
 			for (u32 part_index = 0; part_index < 3; ++part_index) {
-				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
-				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
+				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)shared->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+				ray<v3f> cursor_ray = ray_origin_end(shared->current_camera_entity->position, end.xyz / end.w);
 				cursor_ray.direction = normalize(cursor_ray.direction);
 
 				// TODO: this could be better
@@ -229,7 +229,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 					v3f point = position + rotation * quaternion_from_axis_angle(global_normals[part_index], point_index * (2 * pi / point_count)) * global_normals[part_index].zxy() * handle_size_scaled_by_distance;
 
 					// Ignore the back of the circle
-					if (dot(normalize(point - position), normalize(current_camera_entity->position - position)) < -0.1)
+					if (dot(normalize(point - position), normalize(shared->current_camera_entity->position - position)) < -0.1)
 						continue;
 
 					//debug_line(position, point);
@@ -243,7 +243,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 				}
 			}
 
-			if (closest_dist > handle_grab_thickness * current_viewport.size().y) {
+			if (closest_dist > handle_grab_thickness * shared->current_viewport.size().y) {
 				closest_element = null_manipulator_part;
 			}
 
@@ -258,8 +258,8 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 
 			}
 			if (state.dragging_part_index != null_manipulator_part) {
-				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
-				ray<v3f> cursor_ray = ray_origin_end(current_camera_entity->position, end.xyz / end.w);
+				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)shared->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+				ray<v3f> cursor_ray = ray_origin_end(shared->current_camera_entity->position, end.xyz / end.w);
 
 				if (begin_drag) {
 					state.rotation_axis = rotation * global_normals[state.dragging_part_index];
@@ -270,7 +270,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 				v3f intersect_position = closest_intersect_position;
 
 				if (begin_drag) {
-					v2f intersect_position_viewport = (v2f)(current_mouse_position - current_viewport.min);
+					v2f intersect_position_viewport = (v2f)(shared->current_mouse_position - shared->current_viewport.min);
 					v3f tip = intersect_position + normalize(cross(intersect_position - position, state.rotation_axis)) * handle_size_scaled_by_distance;
 					//debug_line(10.0f, intersect_position, tip, {0, 1, 0});
 					state.tangent3 = normalize(ray_origin_end(
@@ -289,12 +289,12 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 					//print("%\n", state.tangent.direction);
 				}
 
-				state.accumulated_mouse_delta += window->mouse_delta * v2f{1, -1};
+				state.accumulated_mouse_delta += shared->window->mouse_delta * v2f{1, -1};
 
 				f32 dist = pi * -2 * dot(
 					state.start_mouse_position + state.accumulated_mouse_delta - state.tangent.origin,
 					state.tangent.direction
-				) / current_viewport.size().y;
+				) / shared->current_viewport.size().y;
 
 				manipulated_transform.rotation = quaternion_from_axis_angle(state.rotation_axis, dist) * state.original_transform.rotation;
 			}
@@ -317,7 +317,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 	draw_request.tangent = state.tangent3;
 	draw_request.kind = kind;
 	draw_request.dragging = state.dragging_part_index != null_manipulator_part;
-	draw_request.highlighted_part_index = in_bounds(current_mouse_position, current_viewport) ? ((state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element) : -1;
+	draw_request.highlighted_part_index = in_bounds(shared->current_mouse_position, shared->current_viewport) ? ((state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element) : -1;
 	draw_request.position = position;
 	draw_request.rotation = rotation;
 	draw_request.size = handle_size;

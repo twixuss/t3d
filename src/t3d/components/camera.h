@@ -1,9 +1,6 @@
 #pragma once
-#include <t3d/shared_data.h>
+#include <t3d/component.h>
 #include <t3d/post_effect.h>
-#include <t3d/post_effects/exposure.h>
-#include <t3d/post_effects/bloom.h>
-#include <t3d/post_effects/dither.h>
 
 #define FIELDS(F) \
 F(f32, fov,        pi * 0.5f) \
@@ -30,38 +27,11 @@ DECLARE_COMPONENT(Camera) {
 		post_effects.add(effect);
 		return *(Effect *)effect.data;
 	}
-	v3f world_to_camera(v4f point) {
-		auto p = world_to_camera_matrix * point;
-		return {p.xyz / p.w};
-	}
-	v3f world_to_camera(v3f point) {
-		return world_to_camera(V4f(point, 1));
-	}
-
-	void init() {
-		auto create_hdr_target = [&]() {
-			auto hdr_color = tg::create_texture_2d(1, 1, 0, tg::Format_rgb_f16);
-			auto hdr_depth = tg::create_texture_2d(1, 1, 0, tg::Format_depth);
-			return tg::create_render_target(hdr_color, hdr_depth);
-		};
-		source_target      = create_hdr_target();
-		destination_target = create_hdr_target();
-	}
-
-	void free() {
-		for (auto &effect : post_effects) {
-			effect.free();
-		}
-		tl::free(post_effects);
-	}
-	void resize_targets(v2u size) {
-		tg::resize_texture(source_target->color, size);
-		tg::resize_texture(source_target->depth, size);
-		tg::resize_texture(destination_target->color, size);
-		tg::resize_texture(destination_target->depth, size);
-	}
+	v3f world_to_camera(v4f point);
+	v3f world_to_camera(v3f point);
+	void init();
+	void free();
+	void resize_targets(v2u size);
 };
 
 #undef FIELDS
-
-REGISTER_COMPONENT(Camera)
