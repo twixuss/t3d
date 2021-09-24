@@ -45,12 +45,12 @@ struct ComponentStorage {
 	static constexpr u32 masks_per_block = values_per_block / bits_in_mask;
 
 	struct Block {
-		umm unfull_mask_count;
-		Mask *masks;
+		umm unfull_mask_count = masks_per_block;
 		void *values;
+		Mask masks[masks_per_block];
 	};
 
-	Allocator allocator = current_allocator;
+	Allocator allocator = default_allocator;
 	u32 bytes_per_entry = 0;
 	u32 entry_alignment = 0;
 	List<Block *> blocks;
@@ -59,6 +59,10 @@ struct ComponentStorage {
 		void *pointer;
 		u32 index;
 	};
+
+	ComponentStorage() {
+		blocks.allocator = allocator;
+	}
 
 	Added add() {
 		Added result;
@@ -89,27 +93,15 @@ struct ComponentStorage {
 			}
 		}
 
-		umm memory_aligment = max(alignof(Block), entry_alignment);
+		auto block = allocator.allocate<Block>();
+		block->values = allocator.allocate_uninitialized(bytes_per_entry * values_per_block, entry_alignment);
 
-		umm memory_size = ceil(sizeof(Block) + sizeof(Mask) * masks_per_block + bytes_per_entry * values_per_block, memory_aligment);
-
-		auto memory = (u8 *)allocator.allocate_uninitialized(memory_size, memory_aligment);
-
-		auto block_index = blocks.size;
-		auto block = blocks.add((Block *)memory);
-
-		block->masks = (Mask *)((u8 *)block + sizeof(Block));
-
-		block->values = ceil((u8 *)block->masks + sizeof(Mask) * masks_per_block, entry_alignment);
-
-		assert((u8 *)block->values + bytes_per_entry * values_per_block <= memory + memory_size);
-
-		block->unfull_mask_count = masks_per_block;
-		memset(block->masks, 0, sizeof(Mask) * masks_per_block);
 		block->masks[0] = 1;
 
+		result.index = blocks.size * values_per_block;
 		result.pointer = block->values;
-		result.index = block_index * values_per_block;
+
+		blocks.add(block);
 
 		return result;
 	}
@@ -125,6 +117,9 @@ struct ComponentStorage {
 
 		auto mask = block->masks[mask_index];
 		bounds_check(mask & ((Mask)1 << bit_index), "attempt to remove non-existant component");
+		if (mask == ~0) {
+			block->unfull_mask_count += 1;
+		}
 		mask &= ~((Mask)1 << bit_index);
 		block->masks[mask_index] = mask;
 	}
@@ -175,21 +170,13 @@ struct ComponentStorage {
 			}
 		}
 	}
+	void reallocate(u32 new_size, u32 new_alignment) {
+		for (auto block : blocks) {
+			allocator.free(block->values);
+			block->values = allocator.allocate_uninitialized(new_size * values_per_block, new_alignment);
+		}
+	}
 };
-
-using TokenKind = u16;
-enum : TokenKind {
-	Token_identifier = 0x100,
-	Token_number,
-	Token_null,
-	Token_entity,
-};
-
-struct Token {
-	TokenKind kind = {};
-	Span<utf8> string;
-};
-
 
 using ComponentSerialize         = void(*)(StringBuilder &builder, void *component, bool binary);
 using ComponentDeserializeText   = bool(*)(Token *&from, Token *end, void *component);
@@ -227,7 +214,7 @@ struct ComponentInfo {
 	ComponentStart start;
 	ComponentUpdate update;
 	ComponentFree free;
-	Span<utf8> name;
+	List<utf8> name;
 	ComponentStorage storage;
 };
 

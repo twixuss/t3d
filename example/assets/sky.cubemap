@@ -1,0 +1,6 @@
+left   "sky_x+.hdr"
+right  "sky_x-.hdr"
+top    "sky_y+.hdr"
+bottom "sky_y-.hdr"
+front  "sky_z-.hdr"
+back   "sky_z+.hdr"

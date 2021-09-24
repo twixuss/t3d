@@ -12,6 +12,10 @@ tg::Texture2D *translate_icon;
 tg::Texture2D *rotate_icon;
 tg::Texture2D *scale_icon;
 
+void recompile_all_scripts();
+void reload_all_scripts(bool recompile);
+void build_executable();
+
 struct SceneView : EditorWindow {
 	enum MovementState : u8 {
 		Movement_none,
@@ -148,9 +152,9 @@ struct SceneView : EditorWindow {
 		u32 const button_size = 32;
 
 		if (!translate_icon) {
-			translate_icon = shared->tg->load_texture_2d(tl_file_string("../data/icons/translate.png"ts), {.generate_mipmaps = true, .flip_y = true});
-			rotate_icon    = shared->tg->load_texture_2d(tl_file_string("../data/icons/rotate.png"ts)   , {.generate_mipmaps = true, .flip_y = true});
-			scale_icon     = shared->tg->load_texture_2d(tl_file_string("../data/icons/scale.png"ts)    , {.generate_mipmaps = true, .flip_y = true});
+			translate_icon = shared->tg->load_texture_2d(u8"../data/icons/translate.png"s, {.generate_mipmaps = true, .flip_y = true});
+			rotate_icon    = shared->tg->load_texture_2d(u8"../data/icons/rotate.png"s   , {.generate_mipmaps = true, .flip_y = true});
+			scale_icon     = shared->tg->load_texture_2d(u8"../data/icons/scale.png"s    , {.generate_mipmaps = true, .flip_y = true});
 		}
 
 		auto translate_viewport = shared->current_viewport;
@@ -168,6 +172,16 @@ struct SceneView : EditorWindow {
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
 		if (button(translate_viewport, u8"Camera"s, (umm)this)) selection.set(camera_entity);
+		translate_viewport.min.x += button_size + 2;
+		translate_viewport.max.x += button_size + 2;
+		if (button(translate_viewport, u8"Reload scripts"s, (umm)this)) {
+			reload_all_scripts(true);
+		}
+		translate_viewport.min.x += button_size + 2;
+		translate_viewport.max.x += button_size + 2;
+		if (button(translate_viewport, u8"Build"s, (umm)this)) {
+			build_executable();
+		}
 	}
 	void select_entity() {
 		//for_each_component_of_type(MeshRenderer, renderer) {

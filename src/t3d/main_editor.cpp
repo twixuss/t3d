@@ -65,7 +65,14 @@ Mesh *handle_plane_x_mesh;
 Mesh *handle_plane_y_mesh;
 Mesh *handle_plane_z_mesh;
 
+Span<utf8> editor_exe_path;
+Span<utf8> editor_directory;
 Span<utf8> editor_bin_directory;
+Span<utf8> project_name;
+Span<utf8> scripts_init_path;
+Span<utf8> project_directory;
+
+HMODULE scripts_dll;
 
 m4 local_to_world_position(v3f position, quaternion rotation, v3f scale) {
 	return m4::translation(position) * (m4)rotation * m4::scale(scale);
@@ -276,13 +283,19 @@ void add_files_recursive(ListList<utf8> &result, Span<pathchar> directory) {
 	}
 }
 
-#define scoped_directory(dir) \
-	auto previous_directory = get_current_directory(); \
-	create_directory(format(tl_file_string("%\\%"s), previous_directory, dir)); \
-	set_current_directory(format(tl_file_string("%\\%"s), previous_directory, dir)); \
-	defer { set_current_directory(previous_directory); };
+auto query_performance_counter() {
+	LARGE_INTEGER r;
+	QueryPerformanceCounter(&r);
+	return r.QuadPart;
+}
 
-bool invoke_msvc(Span<utf8> arguments) {
+template <class Fn>
+bool invoke_msvc(Span<utf8> arguments, Fn &&what_to_do_while_compiling) {
+	auto prev_allocator = current_allocator;
+	scoped_allocator(temporary_allocator);
+
+	create_directory(format(u8"%build/"s, editor_directory));
+
 	constexpr auto cl_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30037\\bin\\Hostx64\\x64\\cl.exe"s;
 
 	StringBuilder bat_builder;
@@ -290,11 +303,13 @@ bool invoke_msvc(Span<utf8> arguments) {
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 cmd /C cl )");
+	append_format(bat_builder, "/Fd\"%temp/%.pdb\" ", editor_directory, query_performance_counter());
 
 	append(bat_builder, arguments);
-	append_format(bat_builder, " | \"%\\stdin_duplicator\" \"stdout\" \"build_log.txt\"", editor_bin_directory);
+	append_format(bat_builder, " | \"%bin/stdin_duplicator.exe\" \"stdout\" \"%build/build_log.txt\"", editor_directory, editor_directory);
 
-	auto bat_path = tl_file_string("build.bat"s);
+	auto bat_path = format(u8"%build/build.bat"s, editor_directory);
+
 	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
 
 	auto process = execute(bat_path);
@@ -308,6 +323,11 @@ cmd /C cl )");
 
 	print("cl %\n", arguments);
 
+	{
+		scoped_allocator(prev_allocator);
+		what_to_do_while_compiling();
+	}
+
 	wait(process);
 	auto exit_code = get_exit_code(process);
 	if (exit_code != 0) {
@@ -320,10 +340,14 @@ cmd /C cl )");
 	return true;
 }
 
+bool invoke_msvc(Span<utf8> arguments) {
+	return invoke_msvc(arguments, []{});
+}
+
 void insert_scripts_paths(ListList<utf8> &scripts, Span<utf8> directory) {
 	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(shared->assets.directory)));
 	for (auto &item : items) {
-		auto item_path = with(temporary_allocator, concatenate(directory, '/', item.name));
+		auto item_path = with(temporary_allocator, (directory.back() == '/' || directory.back() == '\\') ? concatenate(directory, item.name) : concatenate(directory, '/', item.name));
 		if (item.kind == FileItem_directory) {
 			insert_scripts_paths(scripts, item_path);
 		} else {
@@ -386,8 +410,6 @@ ListList<utf8> get_component_names(ListList<utf8> script_paths) {
 	return component_names;
 }
 
-auto const scripts_init_path = u8"scripts_init.cpp"s;
-
 Span<ascii> include_dirs[] = {
 	"src"s,
 	"dep/tl/include"s,
@@ -400,46 +422,56 @@ Span<ascii> lib_dirs[] = {
 	"dep/freetype/win64"s,
 };
 
+void clear_build_directory() {
+	auto items = get_items_in_directory(to_pathchars(format(u8"%build"s, editor_directory), true));
+	for (auto item : items) {
+		delete_file(to_pathchars(format(u8"%build/%"s, editor_directory, item.name)));
+	}
+}
+
 void build_executable() {
 	scoped_allocator(temporary_allocator);
-	scoped_directory("build");
 
-	StringBuilder asset_builder;
+	auto build_assets = [&] {
+		StringBuilder asset_builder;
 
-	ListList<utf8> asset_paths;
-	add_files_recursive(asset_paths, to_pathchars(shared->assets.directory));
-	asset_paths.make_absolute();
+		ListList<utf8> asset_paths;
+		add_files_recursive(asset_paths, to_pathchars(shared->assets.directory));
+		asset_paths.make_absolute();
 
-	for (auto full_path : asset_paths) {
-		auto path = full_path.subspan(shared->assets.directory.size + 1, full_path.size - shared->assets.directory.size - 1);
-		print("asset %\n", path);
-		append_bytes(asset_builder, (u32)path.size);
-		append_bytes(asset_builder, path);
+		for (auto full_path : asset_paths) {
+			auto path = full_path.subspan(shared->assets.directory.size + 1, full_path.size - shared->assets.directory.size - 1);
+			print("asset %\n", path);
+			append_bytes(asset_builder, (u32)path.size);
+			append_bytes(asset_builder, path);
 
-		auto data = read_entire_file(to_pathchars(full_path));
-		append_bytes(asset_builder, (u32)data.size);
-		append_bytes(asset_builder, as_span(data));
-	}
+			auto data = read_entire_file(to_pathchars(full_path));
+			append_bytes(asset_builder, (u32)data.size);
+			append_bytes(asset_builder, as_span(data));
+		}
 
-	auto data_file = open_file(tl_file_string("data.bin"), {.write = true});
-	defer { close(data_file); };
+		auto data_path = format(u8"%build/data.bin", project_directory);
+		create_directory(parse_path(data_path).directory);
+		auto data_file = open_file(data_path, {.write = true});
+		defer { close(data_file); };
 
-	DataHeader header;
+		DataHeader header;
 
-	set_cursor(data_file, sizeof(header), File_begin);
+		set_cursor(data_file, sizeof(header), File_begin);
 
-	auto asset_data = as_bytes(to_string(asset_builder));
-	header.asset_offset = get_cursor(data_file);
-	header.asset_size = asset_data.size;
-	write(data_file, asset_data);
+		auto asset_data = as_bytes(to_string(asset_builder));
+		header.asset_offset = get_cursor(data_file);
+		header.asset_size = asset_data.size;
+		write(data_file, asset_data);
 
-	auto scene_data = serialize_scene_binary();
-	header.scene_offset = get_cursor(data_file);
-	header.scene_size = scene_data.size;
-	write(data_file, scene_data);
+		auto scene_data = serialize_scene_binary();
+		header.scene_offset = get_cursor(data_file);
+		header.scene_size = scene_data.size;
+		write(data_file, scene_data);
 
-	set_cursor(data_file, 0, File_begin);
-	write(data_file, value_as_bytes(header));
+		set_cursor(data_file, 0, File_begin);
+		write(data_file, value_as_bytes(header));
+	};
 
 
 	ListList<utf8> script_paths = get_scripts_paths();
@@ -447,13 +479,13 @@ void build_executable() {
 
 	StringBuilder builder;
 
-	auto cpp_files_file = read_entire_file(format("%/../data/cpp_files.txt", editor_bin_directory));
+	auto cpp_files_file = read_entire_file(format("%data/cpp_files.txt", editor_directory));
 
 	auto cpp_paths = split(as_utf8(cpp_files_file), u8"\n"s);
 
 	for (auto cpp_path : cpp_paths) {
 		if (!cpp_path.size) continue;
-		append_format(builder, "%/obj/%.obj ", editor_bin_directory, parse_path(cpp_path).name);
+		append_format(builder, "%data/obj/%.obj ", editor_directory, parse_path(cpp_path).name);
 	}
 
 	append_format(builder, "% ", scripts_init_path);
@@ -461,19 +493,22 @@ void build_executable() {
 		append_format(builder, "% ", format("%.cpp", script_path.subspan(0, script_path.size - 2)));
 	}
 
-	append_format(builder, u8"%\\..\\src\\t3d\\main_runtime.cpp "s, editor_bin_directory);
+	append_format(builder, u8"%src/t3d/main_runtime.cpp "s, editor_directory);
 
 	for (auto inc : include_dirs) {
-		append_format(builder, "/I\"%\\..\\%\" ", editor_bin_directory, inc);
+		append_format(builder, "/I\"%%\" ", editor_directory, inc);
 	}
 
-	append(builder, u8"/ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:project.exe "s);
+	create_directory(format(u8"%build", project_directory));
+	append_format(builder, u8"/ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:%build/%.exe "s, project_directory, project_name);
 
 	for (auto lib : lib_dirs) {
-		append_format(builder, "/LIBPATH:\"%\\..\\%\" ", editor_bin_directory, lib);
+		append_format(builder, "/LIBPATH:\"%..\\%\" ", editor_bin_directory, lib);
 	}
 
-	invoke_msvc((List<utf8>)to_string(builder));
+	if (!invoke_msvc((List<utf8>)to_string(builder), build_assets)) {
+		return;
+	}
 }
 
 
@@ -481,8 +516,10 @@ HashMap<ComponentUID, ComponentInfo> built_in_components;
 
 using T3dRegisterComponents = void (*)(List<ComponentDesc> &descs);
 
+Span<utf8> scripts_dll_path;
+
 void recompile_all_scripts() {
-	scoped_directory("build");
+	scripts_dll_path = format(u8"%build/scripts%.dll"s, editor_directory, query_performance_counter());
 
 	ListList<utf8> script_paths = get_scripts_paths();
 	ListList<utf8> component_names = get_component_names(script_paths);
@@ -509,67 +546,91 @@ void recompile_all_scripts() {
 		append(builder, u8"}"s);
 
 
+		create_directory(format("%build", editor_directory));
 		write_entire_file(to_pathchars(scripts_init_path), as_bytes(to_string(builder)));
 	}
 
 
 
-	// setup environment
-	Span<utf8> scripts_dll_path = u8"scripts.dll"s;
-
 	// compile dll
 	{
 		StringBuilder builder;
 
-		auto cpp_files_file = read_entire_file(format("%/../data/cpp_files.txt", editor_bin_directory));
+		auto cpp_files_file = read_entire_file(format("%data/cpp_files.txt", editor_directory));
 
-		auto cpp_paths = split(as_utf8(cpp_files_file), u8"\n"s);
+		auto cpp_paths = split(as_utf8(cpp_files_file), u8'\n');
 
 		for (auto cpp_path : cpp_paths) {
 			if (!cpp_path.size) continue;
-			append_format(builder, "%/obj/%.obj ", editor_bin_directory, parse_path(cpp_path).name);
+			append_format(builder, "%data/obj/%.obj ", editor_directory, parse_path(cpp_path).name);
 		}
 
 		append_format(builder, "% ", scripts_init_path);
 		for (auto script_path : script_paths) {
-			append_format(builder, "% ", format("%.cpp", script_path.subspan(0, script_path.size - 2)));
+			append_format(builder, "%.cpp ", script_path.subspan(0, script_path.size - 2));
 		}
 
 		for (auto inc : include_dirs) {
-			append_format(builder, "/I\"%\\..\\%\" ", editor_bin_directory, inc);
+			append_format(builder, "/I\"%%\" ", editor_directory, inc);
 		}
 
-		append(builder, "/LD /ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:scripts.dll ");
+		append_format(builder, "/LD /ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:\"%\" ", scripts_dll_path);
 
 
 		for (auto lib : lib_dirs) {
-			append_format(builder, "/LIBPATH:\"%\\..\\%\" ", editor_bin_directory, lib);
+			append_format(builder, "/LIBPATH:\"%..\\%\" ", editor_bin_directory, lib);
 		}
 		assert(invoke_msvc(as_utf8(to_string(builder))));
 	}
 
-	// load dll
-	HMODULE scripts_dll = LoadLibraryW(with(temporary_allocator, (wchar *)to_pathchars(scripts_dll_path, true).data));
+}
 
-	((void (*)())GetProcAddress(scripts_dll, "initialize_module"))();
-	set_module_shared(scripts_dll);
+void reload_all_scripts(bool recompile) {
+	scoped_allocator(temporary_allocator);
 
-	// register all components in dll
-	auto t3d_get_component_descs = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_get_component_descs");
 
+	//
+	// Serialize components that are about to be rebuilt
+	//
+	List<ComponentIndex> components_to_update;
+	components_to_update.allocator = temporary_allocator;
 	StringBuilder builder;
-
 	for_each(shared->entities, [&](Entity &entity) {
 		for (auto &component : entity.components) {
+			if (built_in_components.find(component.type)) {
+				continue;
+			}
 			auto found_info = shared->component_infos.find(component.type);
 			assert(found_info);
 			auto &info = *found_info;
 			info.serialize(builder, info.storage.get(component.index), false);
+
+			append(builder, '}'); // deserialier need this to finish parsing
+
+			components_to_update.add(component);
 		}
 	});
 
-	// Remove old components
-	//set(shared->component_infos, built_in_components);
+	//
+	// Reload dll
+	//
+	if (scripts_dll) {
+		FreeLibrary(scripts_dll);
+	}
+
+	if (recompile) {
+		recompile_all_scripts();
+	}
+
+	scripts_dll = LoadLibraryW(with(temporary_allocator, (wchar *)to_pathchars(scripts_dll_path, true).data));
+
+	((void (*)())GetProcAddress(scripts_dll, "initialize_module"))();
+	set_module_shared(scripts_dll);
+
+	//
+	// Register all components in dll
+	//
+	auto t3d_get_component_descs = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_get_component_descs");
 
 	List<ComponentDesc> descs;
 	descs.allocator = shared->allocator;
@@ -578,24 +639,69 @@ void recompile_all_scripts() {
 	for (auto &desc : descs) {
 		update_component_info(desc);
 	}
+
+	//
+	// Deserialize components that were rebuilt
+	//
+	auto tokens = parse_tokens(as_utf8(to_string(builder))).get();
+	auto t = tokens.data;
+	for (auto &component : components_to_update) {
+		auto found_info = shared->component_infos.find(component.type);
+		assert(found_info);
+		auto &info = *found_info;
+		auto data = info.storage.get(component.index);
+		info.construct(data);
+		info.deserialize_text(t, tokens.end(), data);
+	}
 }
 
+struct Task {
+	struct State {
+		bool finished = false;
+	};
+
+	Allocator allocator = current_allocator;
+	State *state = 0;
+
+};
+
+void wait(Task task) {
+	loop_until([&]{ return task.state->finished; });
+}
+
+template <class Fn>
+Task async(Fn &&fn) {
+	Task task;
+	task.state = task.allocator.allocate<Task::State>();
+	create_thread([task_state = task.state, fn = std::forward<Fn>(fn)] {
+		fn();
+		task_state->finished = true;
+	});
+	return task;
+}
+
+Task scripts_compilation_task;
+
 void run() {
+	allocate_shared();
+	shared->is_editor = true;
+	shared->assets.directory = format(u8"%assets/"s, project_directory);
+	shared->editor_assets.directory = format(u8"%data/"s, editor_directory);
 	construct(manipulator_draw_requests);
 	construct(manipulator_states);
 	construct(debug_lines);
 	construct(tab_moves);
 
+	scripts_compilation_task = async(recompile_all_scripts);
+
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
 		runtime_init(window);
-		shared->is_editor = true;
-		shared->assets.directory = format(u8"%/../example"s, editor_bin_directory);
-		shared->editor_assets.directory = format(u8"%/../data"s, editor_bin_directory);
 
 		built_in_components = copy(shared->component_infos);
 
-		recompile_all_scripts();
+		wait(scripts_compilation_task);
+		reload_all_scripts(false);
 
 		shared->tg->set_scissor(aabb_min_max({}, (v2s)window.client_size));
 
@@ -1095,7 +1201,22 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	current_allocator = tracking_allocator;
 #endif
 
-	editor_bin_directory = replace(parse_path(arguments[0]).directory, u8'\\', u8'/');
+	editor_exe_path = arguments[0];
+	if (!is_absolute_path(editor_exe_path)) {
+		editor_exe_path = make_absolute_path(editor_exe_path);
+	}
+	editor_bin_directory = parse_path(editor_exe_path).directory;
+	editor_bin_directory.size ++; // include slash
+
+	editor_directory = parent_directory(editor_bin_directory);
+
+	scripts_init_path = format(u8"%build/scripts_init.cpp", editor_directory);
+
+	project_name      = u8"example"s;
+	project_directory = format(u8"%example/"s, editor_directory);
+
+	clear_build_directory();
+	defer { clear_build_directory(); };
 
 	auto log_file = open_file(tl_file_string("editor_log.txt"s), {.write = true});
 	defer { close(log_file); };

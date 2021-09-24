@@ -155,8 +155,6 @@ void register_built_in_components() {
 // Called once on program start
 //
 void runtime_init(Window &window) {
-	allocate_shared();
-
 	register_built_in_components();
 
 #ifndef RUNTIME_REGISTER_COMPONENTS
@@ -573,14 +571,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		shared->default_light_mask->name = as_list(u8"default_light_mask"s);
 	}
 
-	shared->sky_box_texture = shared->tg->load_texture_cube({
-		.left   = tl_file_string("../example/sky_x+.hdr"s),
-		.right  = tl_file_string("../example/sky_x-.hdr"s),
-		.top    = tl_file_string("../example/sky_y+.hdr"s),
-		.bottom = tl_file_string("../example/sky_y-.hdr"s),
-		.front  = tl_file_string("../example/sky_z-.hdr"s),
-		.back   = tl_file_string("../example/sky_z+.hdr"s),
-	}, {.generate_mipmaps = true});
+	shared->sky_box_texture = shared->assets.get_texture_cube(u8"sky.cubemap"s);
 }
 
 //

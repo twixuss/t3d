@@ -66,6 +66,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	Profiler::init();
 	defer { Profiler::deinit(); };
 
+	allocate_shared();
+
 	print("Opening 'data.bin' ...\n");
 	data_file = open_file(tl_file_string("data.bin"), {.read = true});
 	defer { close(data_file); };
@@ -77,6 +79,9 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	data_buffer = mapped_assets.data;
 	data_header = (DataHeader *)data_buffer.data;
 
+	print("Loading assets ...\n");
+	load_assets();
+
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
 		print("Initializing runtime ...\n");
@@ -87,10 +92,6 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		for (auto desc : descs) {
 			update_component_info(desc);
 		}
-
-		print("Loading assets ...\n");
-		load_assets();
-
 		print("Loading scene ...\n");
 		assert_always(deserialize_scene_binary(Span(data_buffer.data + data_header->scene_offset, data_header->scene_size)));
 

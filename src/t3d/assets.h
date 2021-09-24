@@ -6,9 +6,8 @@ struct Assets {
 	Span<utf8> directory;
 	HashMap<Span<utf8>, Span<u8>> asset_path_to_data;
 
-	Span<u8> get_asset_data(Span<utf8> path);
-
 	HashMap<Span<utf8>, Texture2D *> textures_2d_by_path;
+	HashMap<Span<utf8>, TextureCube *> textures_cubes_by_path;
 
 	MaskedBlockList<Mesh, 256> meshes;
 	HashMap<Span<utf8>, Mesh *> meshes_by_name;
@@ -17,7 +16,9 @@ struct Assets {
 	HashMap<Span<utf8>, Scene3D *> scenes3d_by_name;
 	HashMap<Scene3D::Node *, Mesh *> meshes_by_node;
 
+	Span<u8> get_asset_data(Span<utf8> path);
 	Texture2D *get_texture_2d(Span<utf8> path);
+	TextureCube *get_texture_cube(Span<utf8> path);
 	Mesh *create_mesh(tl::CommonMesh &mesh);
 
 	Mesh *get_mesh(Span<utf8> path) {

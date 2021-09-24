@@ -2,3 +2,5 @@
 temp/
 *.pdb
 bin/
+build/
+data/obj/

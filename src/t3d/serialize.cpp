@@ -155,8 +155,7 @@ bool deserialize_scene_text(Span<utf8> path) {
 
 	HashMap<Span<utf8>, TokenKind> string_to_token_kind;
 	string_to_token_kind.allocator = temporary_allocator;
-	string_to_token_kind.get_or_insert(u8"null"s)   = Token_null;
-	string_to_token_kind.get_or_insert(u8"entity"s) = Token_entity;
+	string_to_token_kind.get_or_insert(u8"null"s) = Token_null;
 
 	auto current_char_p = source.data;
 	auto next_char_p = current_char_p;
@@ -281,7 +280,7 @@ bool deserialize_scene_text(Span<utf8> path) {
 
 		while (t != end) {
 
-			if (t->kind != Token_entity) {
+			if (t->string != u8"entity"s) {
 				print(Print_error, "Expected 'entity' keyword, but got '%'\n", t->string);
 				return false;
 			}
