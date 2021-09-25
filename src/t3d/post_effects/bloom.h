@@ -148,53 +148,49 @@ void main() {
 	}
 
 	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
-		timed_block("Bloom::render"s);
 
-		{
-			timed_block("Downsample"s);
-			app->tg->set_rasterizer(
-				app->tg->get_rasterizer()
-					.set_depth_test(false)
-					.set_depth_write(false)
-			);
+		app->tg->set_rasterizer(
+			app->tg->get_rasterizer()
+				.set_depth_test(false)
+				.set_depth_write(false)
+		);
 
-			app->tg->set_shader(downsample_filter_shader);
-			app->tg->set_shader_constants(constants, 0);
-			app->tg->set_sampler(tg::Filtering_linear, 0);
+		app->tg->set_shader(downsample_filter_shader);
+		app->tg->set_shader_constants(constants, 0);
+		app->tg->set_sampler(tg::Filtering_linear, 0);
 
-			auto sample_from = source;
-			for (auto &target : temp_targets) {
-				app->tg->set_render_target(target.destination);
-				app->tg->set_viewport(target.destination->color->size);
-				app->tg->set_texture(sample_from->color, 0);
-				app->tg->update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
-				app->tg->draw(3);
+		auto sample_from = source;
+		for (auto &target : temp_targets) {
+			app->tg->set_render_target(target.destination);
+			app->tg->set_viewport(target.destination->color->size);
+			app->tg->set_texture(sample_from->color, 0);
+			app->tg->update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
+			app->tg->draw(3);
 
-				swap(target.source, target.destination);
+			swap(target.source, target.destination);
 
-				sample_from = target.source;
+			sample_from = target.source;
 
-				if (&target == &temp_targets.front())
-					app->tg->set_shader(downsample_shader);
-			}
+			if (&target == &temp_targets.front())
+				app->tg->set_shader(downsample_shader);
+		}
 
-			app->tg->set_shader(blur_x_shader);
-			for (auto &target : temp_targets) {
-				app->tg->set_render_target(target.destination);
-				app->tg->set_viewport(target.destination->color->size);
-				app->tg->set_texture(target.source->color, 0);
-				app->tg->draw(3);
-				swap(target.source, target.destination);
-			}
+		app->tg->set_shader(blur_x_shader);
+		for (auto &target : temp_targets) {
+			app->tg->set_render_target(target.destination);
+			app->tg->set_viewport(target.destination->color->size);
+			app->tg->set_texture(target.source->color, 0);
+			app->tg->draw(3);
+			swap(target.source, target.destination);
+		}
 
-			app->tg->set_shader(blur_y_shader);
-			for (auto &target : temp_targets) {
-				app->tg->set_render_target(target.destination);
-				app->tg->set_viewport(target.destination->color->size);
-				app->tg->set_texture(target.source->color, 0);
-				app->tg->draw(3);
-				swap(target.source, target.destination);
-			}
+		app->tg->set_shader(blur_y_shader);
+		for (auto &target : temp_targets) {
+			app->tg->set_render_target(target.destination);
+			app->tg->set_viewport(target.destination->color->size);
+			app->tg->set_texture(target.source->color, 0);
+			app->tg->draw(3);
+			swap(target.source, target.destination);
 		}
 
 		app->tg->set_shader(app->blit_texture_shader);

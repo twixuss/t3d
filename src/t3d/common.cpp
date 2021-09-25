@@ -9,6 +9,11 @@
 #include <t3d/gui.h>
 #include <t3d/app.h>
 #include <tl/masked_block_list.h>
+#include <tl/thread.h>
+#include <tl/profiler.h>
+#include <tl/process.h>
+#include <tl/cpu.h>
+#include <tl/ram.h>
 
 AppData *app;
 EditorData *editor;
@@ -18,9 +23,9 @@ void allocate_app() {
 	app->allocator = default_allocator;
 }
 
-void set_module_shared(HMODULE module) {
-	*(AppData **)GetProcAddress(module, "app") = app;
-	*(EditorData **)GetProcAddress(module, "editor") = editor;
+void set_module_shared(void *module) {
+	*(AppData **)GetProcAddress((HMODULE)module, "app") = app;
+	*(EditorData **)GetProcAddress((HMODULE)module, "editor") = editor;
 }
 
 void initialize_module() {

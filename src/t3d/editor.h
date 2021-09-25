@@ -3,6 +3,7 @@
 #include <t3d/assets.h>
 #include <t3d/editor/window.h>
 #include <t3d/editor/input.h>
+#include <tl/font.h>
 
 struct GuiKey {
 	umm id;

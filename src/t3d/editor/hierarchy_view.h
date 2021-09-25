@@ -12,8 +12,6 @@ struct HierarchyView : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		app->tg->set_render_target(app->tg->back_buffer);
-
 		gui_panel(middle_color);
 
 		s32 const button_height = 16;

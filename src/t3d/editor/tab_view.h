@@ -47,8 +47,6 @@ struct TabView : EditorWindow {
 		tabs[selected_tab].needs_resize = false;
 	}
 	void render() {
-		app->tg->set_render_target(app->tg->back_buffer);
-
 		bool highlight_dnd = false;
 
 		auto bar_viewport = viewport;
@@ -129,26 +127,44 @@ struct TabView : EditorWindow {
 
 
 		if (highlight_dnd) {
-			s32 const area_radius = 16;
 
-			constexpr v2s offsets[] = {
-				{ area_radius * 3, 0},
-				{ 0, area_radius * 3},
-				{ -area_radius * 3, 0},
-				{ 0, -area_radius * 3},
-			};
+			auto base_viewport = viewport;
+			base_viewport.max.y -= tab_height;
+			if (in_bounds(app->current_mouse_position, base_viewport)) {
 
-			for (u32 offset_index = 0; offset_index < 4; offset_index += 1) {
-				v2s center = app->current_viewport.center() + offsets[offset_index];
+				v2f normalized_mouse_pos = (v2f)(app->current_mouse_position - base_viewport.min) / (v2f)base_viewport.size() * 2 - 1;
 
-				auto viewport = aabb_center_radius(center, V2s(area_radius));
+				f32 const k = 0.44721359549995793928183473374626f;
+
+				u32 direction;
+
+				if (max(absolute(normalized_mouse_pos)) < k) {
+					direction = -1;
+				} else {
+					switch ((normalized_mouse_pos.x - normalized_mouse_pos.y > 0) + (normalized_mouse_pos.x + normalized_mouse_pos.y > 0) * 2) {
+						case 0: direction = 2; break;
+						case 1: direction = 3; break;
+						case 2: direction = 1; break;
+						case 3: direction = 0; break;
+					}
+				}
+				print("%\n", direction);
+
+				v4f color = {.1,1,.1,.2};
+				tg::Viewport v = base_viewport;
+				switch (direction) {
+					case 0: v.min.x = v.center().x; break;
+					case 1: v.min.y = v.center().y; break;
+					case 2: v.max.x = v.center().x; break;
+					case 3: v.max.y = v.center().y; break;
+				}
 
 				assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
 				auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
 				if (data.tab_view == this && tabs.size == 1) {
 				} else {
-					push_current_viewport(viewport) {
+					push_current_viewport(v) {
 						gui_panel({.1,1,.1,.2});
 
 						if (accept_drag_and_drop(DragAndDrop_tab)) {
@@ -157,7 +173,7 @@ struct TabView : EditorWindow {
 								.from = data.tab_view,
 								.to = this,
 								.tab_index = data.tab_index,
-								.direction = offset_index,
+								.direction = direction,
 							});
 						}
 					}

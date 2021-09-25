@@ -9,7 +9,7 @@ struct FileView : EditorWindow {
 
 	struct Entry {
 		List<utf8> path;
-		List<utf8> name;
+		Span<utf8> name;
 		bool is_directory;
 		List<Entry> entries;
 	};
@@ -20,16 +20,20 @@ struct FileView : EditorWindow {
 	v2s next_pos;
 	s32 tab = 0;
 
-	void add_files(Entry &parent) {
+	void add_files(Entry &parent, bool append_directory) {
 		auto children = get_items_in_directory(with(temporary_allocator, to_pathchars(parent.path, true)));
 		for (auto &child : children) {
 			Entry result;
 			result.is_directory = child.kind == FileItem_directory;
-			result.name = to_utf8(child.name);
-			result.path = concatenate(parent.path, '/', result.name);
+			if (append_directory) {
+				result.path = concatenate(parent.path, '/', child.name);
+			} else {
+				result.path = to_utf8(child.name);
+			}
+			result.name = parse_path(result.path).name;
 
 			if (result.is_directory) {
-				add_files(result);
+				add_files(result, true);
 			}
 
 			parent.entries.add(result);
@@ -43,7 +47,6 @@ struct FileView : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		app->tg->set_render_target(app->tg->back_buffer);
 		gui_panel(middle_color);
 
 		next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
@@ -96,7 +99,7 @@ FileView *create_file_view() {
 	result->root.is_directory = true;
 	result->root.name = as_list(app->assets.directory);
 	result->root.path = as_list(app->assets.directory);
-	result->add_files(result->root);
+	result->add_files(result->root, false);
 	result->name = u8"Files"s;
 	return result;
 }

@@ -57,7 +57,6 @@ void main() {
 	}
 
 	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
-		timed_block("Dither::render"s);
 		app->tg->set_rasterizer(
 			app->tg->get_rasterizer()
 				.set_depth_test(false)

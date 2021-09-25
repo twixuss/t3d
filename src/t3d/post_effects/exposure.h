@@ -80,8 +80,6 @@ void main() {
 
 
 	void render(tg::RenderTarget *source, tg::RenderTarget *destination) {
-		timed_block("Exposure::render"s);
-
 		app->tg->set_rasterizer(
 			app->tg->get_rasterizer()
 				.set_depth_test(false)
@@ -89,23 +87,19 @@ void main() {
 		);
 
 		if (auto_adjustment) {
-			{
-				timed_block("Downsample"s);
+			app->tg->disable_blend();
 
-				app->tg->disable_blend();
+			app->tg->set_shader(app->blit_texture_shader);
+			app->tg->set_sampler(tg::Filtering_linear, 0);
 
-				app->tg->set_shader(app->blit_texture_shader);
-				app->tg->set_sampler(tg::Filtering_linear, 0);
-
-				auto sample_from = source;
-				for (auto &target : downsampled_targets) {
-					timed_block("blit"s);
-					app->tg->set_render_target(target);
-					app->tg->set_viewport(target->color->size);
-					app->tg->set_texture(sample_from->color, 0);
-					app->tg->draw(3);
-					sample_from = target;
-				}
+			auto sample_from = source;
+			for (auto &target : downsampled_targets) {
+				timed_block("blit"s);
+				app->tg->set_render_target(target);
+				app->tg->set_viewport(target->color->size);
+				app->tg->set_texture(sample_from->color, 0);
+				app->tg->draw(3);
+				sample_from = target;
 			}
 
 			v3f texels[Exposure::min_texture_size * Exposure::min_texture_size];

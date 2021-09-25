@@ -1,5 +1,6 @@
 #include <t3d/component.h>
 #include <t3d/app.h>
+#include <tl/thread.h>
 
 ComponentInfo &get_component_info(ComponentUID uid) {
 	auto result = app->component_infos.find(uid);

@@ -10,6 +10,8 @@
 #include <t3d/serialize.h>
 #include <t3d/blit.h>
 
+#include <tl/profiler.h>
+
 #define shader_value_location(struct, member) tg::ShaderValueLocation{offsetof(struct, member), sizeof(struct::member)}
 
 #define SHADOW_MAP_TEXTURE_SLOT 15
@@ -756,6 +758,11 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 		}
 
 		app->tg->set_render_target(app->tg->back_buffer);
+		app->tg->set_rasterizer({
+			.depth_test = false,
+			.depth_write = false,
+		});
+
 		app->tg->set_viewport(app->current_viewport);
 		blit(camera.source_target->color);
 	}

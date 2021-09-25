@@ -5,7 +5,7 @@
 
 struct KeyInputState {
 	KeyState state;
-	v2s start_position;
+	v2s start_position; //
 };
 
 struct InputQueryParams {

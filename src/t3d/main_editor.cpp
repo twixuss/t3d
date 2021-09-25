@@ -24,6 +24,15 @@ tl::umm get_hash(struct ManipulatorStateKey const &);
 #include <t3d/post_effects/dither.h>
 #include <t3d/post_effects/exposure.h>
 
+#include <tl/process.h>
+#include <tl/thread.h>
+#include <tl/profiler.h>
+#include <tl/cpu.h>
+#include <tl/ram.h>
+
+#define NOMINMAX
+#include <Windows.h>
+
 #define c(name) { \
 .init         = adapt_editor_window_init<name>, \
 .get_min_size = editor_window_get_min_size<name>, \
@@ -870,7 +879,7 @@ void run() {
 
 		runtime_render();
 
-		app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
+		//app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
 
 		{
 			timed_block("editor->main_window->render()"s);

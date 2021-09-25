@@ -4,6 +4,9 @@
 #include <t3d/material.h>
 #include <t3d/components/camera.h>
 #include <t3d/assets.h>
+#include <tl/time.h>
+#include <tl/window.h>
+#include <tl/font.h>
 
 struct GlobalConstants {
 	m4 camera_rotation_projection_matrix;

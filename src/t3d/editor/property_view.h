@@ -14,10 +14,7 @@ struct PropertyView : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		app->tg->set_render_target(app->tg->back_buffer);
 		gui_panel(middle_color);
-
-
 
 		editor->current_property_y = 0;
 
