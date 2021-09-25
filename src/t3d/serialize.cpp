@@ -1,6 +1,6 @@
 #include "serialize.h"
 #include <t3d/entity.h>
-#include <t3d/shared.h>
+#include <t3d/app.h>
 
 void serialize_binary(StringBuilder &builder, f32 value) {
 	append_bytes(builder, value);
@@ -32,7 +32,7 @@ List<u8> serialize_scene_binary() {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 
-	for_each(shared->entities, [&](Entity &entity) {
+	for_each(app->entities, [&](Entity &entity) {
 		if (is_editor_entity(entity)) {
 			return;
 		}
@@ -110,7 +110,7 @@ List<u8> serialize_scene_text() {
 	builder.allocator = temporary_allocator;
 
 
-	for_each(shared->entities, [&](Entity &entity) {
+	for_each(app->entities, [&](Entity &entity) {
 		if (is_editor_entity(entity)) {
 			return;
 		}
@@ -120,13 +120,13 @@ List<u8> serialize_scene_text() {
 
 		append(builder, " {\n\tposition ");
 		serialize_text(builder, entity.position);
-		append(builder, '\n');
+		append(builder, ";\n");
 
 		auto angles = degrees(to_euler_angles(entity.rotation));
-		append_format(builder, "\trotation % % %\n\tscale ", angles.x, angles.y, angles.z);
+		append_format(builder, "\trotation % % %;\n\tscale ", angles.x, angles.y, angles.z);
 
 		serialize_text(builder, entity.scale);
-		append(builder, '\n');
+		append(builder, ";\n");
 
 		for (auto &component : entity.components) {
 			append(builder, "\t");
@@ -246,6 +246,7 @@ bool deserialize_scene_text(Span<utf8> path) {
 					tokens.add(token);
 					break;
 				}
+				case ';':
 				case '{':
 				case '}': {
 					Token token;
@@ -319,7 +320,7 @@ bool deserialize_scene_text(Span<utf8> path) {
 			auto &entity = create_entity(unescaped_name);
 			added_entities.add(&entity);
 
-			auto found_entity_index = index_of(shared->entities, &entity);
+			auto found_entity_index = index_of(app->entities, &entity);
 			assert(found_entity_index.valid());
 			auto entity_index = (u32)found_entity_index.get();
 
@@ -350,11 +351,19 @@ bool deserialize_scene_text(Span<utf8> path) {
 					return true;
 				};
 
+				auto started_from = t;
+
 				if (t->string == u8"position"s) {
 					t += 1;
 					if (!parse_float(entity.position.x)) return false;
 					if (!parse_float(entity.position.y)) return false;
 					if (!parse_float(entity.position.z)) return false;
+					if (t->kind == ';') {
+						++t;
+					} else {
+						print(Print_error, "Error while parsing \"%\"'s position. Expected ';' at the end of line instead of %.", t->string);
+						go_to_next_property(started_from, t, end);
+					}
 				} else if (t->string == u8"rotation"s) {
 					t += 1;
 					v3f angles;
@@ -362,15 +371,27 @@ bool deserialize_scene_text(Span<utf8> path) {
 					if (!parse_float(angles.y)) return false;
 					if (!parse_float(angles.z)) return false;
 					entity.rotation = quaternion_from_euler(radians(angles));
+					if (t->kind == ';') {
+						++t;
+					} else {
+						print(Print_error, "Error while parsing \"%\"'s rotation. Expected ';' at the end of line instead of %.", t->string);
+						go_to_next_property(started_from, t, end);
+					}
 				} else if (t->string == u8"scale"s) {
 					t += 1;
 					if (!parse_float(entity.scale.x)) return false;
 					if (!parse_float(entity.scale.y)) return false;
 					if (!parse_float(entity.scale.z)) return false;
+					if (t->kind == ';') {
+						++t;
+					} else {
+						print(Print_error, "Error while parsing \"%\"'s scale. Expected ';' at the end of line instead of %.", t->string);
+						go_to_next_property(started_from, t, end);
+					}
 				} else {
 					ComponentInfo *found_info = 0;
 					ComponentUID component_type;
-					for_each(shared->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+					for_each(app->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
 						if (info.name == t->string) {
 							found_info = &info;
 							component_type = uid;
@@ -473,7 +494,7 @@ bool deserialize_text(Texture2D *&value, Token *&from, Token *end) {
 		return false;
 	}
 
-	value = shared->assets.get_texture_2d(successful_path.get());
+	value = app->assets.get_texture_2d(successful_path.get());
 
 	from += 1;
 
@@ -492,7 +513,7 @@ bool deserialize_text(Mesh *&value, Token *&from, Token *end) {
 		return false;
 	}
 
-	value = shared->assets.get_mesh(successful_path.get());
+	value = app->assets.get_mesh(successful_path.get());
 
 	from += 1;
 
@@ -505,7 +526,7 @@ bool deserialize_scene_binary(Span<u8> data) {
 
 	while(cursor != end) {
 		auto &entity = create_entity();
-		auto entity_index = (u32)index_of(shared->entities, &entity).get();
+		auto entity_index = (u32)index_of(app->entities, &entity).get();
 
 		u32 name_size;
 		if (cursor + sizeof(name_size) > end) {
@@ -565,7 +586,7 @@ bool deserialize_scene_binary(Span<u8> data) {
 			component_type = *(u32 *)cursor;
 			cursor += sizeof(component_type);
 
-			if (!shared->component_infos.find(component_type)) {
+			if (!app->component_infos.find(component_type)) {
 				print(Print_error, "Failed to deserialize scene: component type is invalid (%)\n", component_type);
 				return false;
 			}
@@ -637,7 +658,7 @@ bool deserialize_binary(Texture2D *&value, u8 *&from, u8 *end) {
 		return false;
 	}
 
-	value = shared->assets.get_texture_2d(Span((utf8 *)from, path_size));
+	value = app->assets.get_texture_2d(Span((utf8 *)from, path_size));
 	from += path_size;
 
 	return true;
@@ -662,7 +683,7 @@ bool deserialize_binary(Mesh *&value, u8 *&from, u8 *end) {
 		return false;
 	}
 
-	value = shared->assets.get_mesh(Span((utf8 *)from, path_size));
+	value = app->assets.get_mesh(Span((utf8 *)from, path_size));
 	from += path_size;
 
 	return true;

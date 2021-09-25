@@ -22,7 +22,7 @@ struct Bloom {
 	f32 intensity = 0.2f;
 
 	void init() {
-		constants = shared->tg->create_shader_constants<Bloom::Constants>();
+		constants = app->tg->create_shader_constants<Bloom::Constants>();
 
 		constexpr auto header = u8R"(
 #ifdef VERTEX_SHADER
@@ -113,7 +113,7 @@ vec4 blurred_sample(vec2 vertex_uv) {
 }
 
 )"s;
-		downsample_shader = shared->tg->create_shader(tconcatenate(header, u8R"(
+		downsample_shader = app->tg->create_shader(tconcatenate(header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -121,7 +121,7 @@ void main() {
 }
 #endif
 )"s));
-		downsample_filter_shader = shared->tg->create_shader(tconcatenate(header, u8R"(
+		downsample_filter_shader = app->tg->create_shader(tconcatenate(header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -129,7 +129,7 @@ void main() {
 }
 #endif
 )"s));
-		blur_x_shader = shared->tg->create_shader(tconcatenate(u8"#define BLUR_X\n"s, header, u8R"(
+		blur_x_shader = app->tg->create_shader(tconcatenate(u8"#define BLUR_X\n"s, header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -137,7 +137,7 @@ void main() {
 }
 #endif
 )"s));
-		blur_y_shader = shared->tg->create_shader(tconcatenate(header, u8R"(
+		blur_y_shader = app->tg->create_shader(tconcatenate(header, u8R"(
 #ifdef FRAGMENT_SHADER
 out vec4 fragment_color;
 void main() {
@@ -152,65 +152,65 @@ void main() {
 
 		{
 			timed_block("Downsample"s);
-			shared->tg->set_rasterizer(
-				shared->tg->get_rasterizer()
+			app->tg->set_rasterizer(
+				app->tg->get_rasterizer()
 					.set_depth_test(false)
 					.set_depth_write(false)
 			);
 
-			shared->tg->set_shader(downsample_filter_shader);
-			shared->tg->set_shader_constants(constants, 0);
-			shared->tg->set_sampler(tg::Filtering_linear, 0);
+			app->tg->set_shader(downsample_filter_shader);
+			app->tg->set_shader_constants(constants, 0);
+			app->tg->set_sampler(tg::Filtering_linear, 0);
 
 			auto sample_from = source;
 			for (auto &target : temp_targets) {
-				shared->tg->set_render_target(target.destination);
-				shared->tg->set_viewport(target.destination->color->size);
-				shared->tg->set_texture(sample_from->color, 0);
-				shared->tg->update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
-				shared->tg->draw(3);
+				app->tg->set_render_target(target.destination);
+				app->tg->set_viewport(target.destination->color->size);
+				app->tg->set_texture(sample_from->color, 0);
+				app->tg->update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
+				app->tg->draw(3);
 
 				swap(target.source, target.destination);
 
 				sample_from = target.source;
 
 				if (&target == &temp_targets.front())
-					shared->tg->set_shader(downsample_shader);
+					app->tg->set_shader(downsample_shader);
 			}
 
-			shared->tg->set_shader(blur_x_shader);
+			app->tg->set_shader(blur_x_shader);
 			for (auto &target : temp_targets) {
-				shared->tg->set_render_target(target.destination);
-				shared->tg->set_viewport(target.destination->color->size);
-				shared->tg->set_texture(target.source->color, 0);
-				shared->tg->draw(3);
+				app->tg->set_render_target(target.destination);
+				app->tg->set_viewport(target.destination->color->size);
+				app->tg->set_texture(target.source->color, 0);
+				app->tg->draw(3);
 				swap(target.source, target.destination);
 			}
 
-			shared->tg->set_shader(blur_y_shader);
+			app->tg->set_shader(blur_y_shader);
 			for (auto &target : temp_targets) {
-				shared->tg->set_render_target(target.destination);
-				shared->tg->set_viewport(target.destination->color->size);
-				shared->tg->set_texture(target.source->color, 0);
-				shared->tg->draw(3);
+				app->tg->set_render_target(target.destination);
+				app->tg->set_viewport(target.destination->color->size);
+				app->tg->set_texture(target.source->color, 0);
+				app->tg->draw(3);
 				swap(target.source, target.destination);
 			}
 		}
 
-		shared->tg->set_shader(shared->blit_texture_shader);
-		shared->tg->set_render_target(destination);
-		shared->tg->set_viewport(destination->color->size);
-		shared->tg->disable_blend();
-		shared->tg->set_texture(source->color, 0);
-		shared->tg->draw(3);
+		app->tg->set_shader(app->blit_texture_shader);
+		app->tg->set_render_target(destination);
+		app->tg->set_viewport(destination->color->size);
+		app->tg->disable_blend();
+		app->tg->set_texture(source->color, 0);
+		app->tg->draw(3);
 
-		shared->tg->set_shader(shared->blit_texture_color_shader);
-		shared->tg->update_shader_constants(shared->blit_texture_color_constants, {.color = V4f(intensity)});
-		shared->tg->set_shader_constants(shared->blit_texture_color_constants, 0);
-		shared->tg->set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
+		app->tg->set_shader(app->blit_texture_color_shader);
+		app->tg->update_shader_constants(app->blit_texture_color_constants, {.color = V4f(intensity)});
+		app->tg->set_shader_constants(app->blit_texture_color_constants, 0);
+		app->tg->set_blend(tg::BlendFunction_add, tg::Blend_one, tg::Blend_one);
 		for (auto &target : temp_targets) {
-			shared->tg->set_texture(target.source->color, 0);
-			shared->tg->draw(3);
+			app->tg->set_texture(target.source->color, 0);
+			app->tg->draw(3);
 		}
 	}
 
@@ -220,12 +220,12 @@ void main() {
 
 		for (u32 target_index = 0; target_index < 8; ++target_index) {
 			if (target_index < temp_targets.size) {
-				shared->tg->resize_texture(temp_targets[target_index].source     ->color, next_size);
-				shared->tg->resize_texture(temp_targets[target_index].destination->color, next_size);
+				app->tg->resize_texture(temp_targets[target_index].source     ->color, next_size);
+				app->tg->resize_texture(temp_targets[target_index].destination->color, next_size);
 			} else {
 				auto create_temp_target = [&]() {
-					return shared->tg->create_render_target(
-						shared->tg->create_texture_2d(next_size.x, next_size.y, 0, tg::Format_rgb_f16),
+					return app->tg->create_render_target(
+						app->tg->create_texture_2d(next_size.x, next_size.y, 0, tg::Format_rgb_f16),
 						0
 					);
 				};

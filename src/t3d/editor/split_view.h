@@ -74,26 +74,26 @@ struct SplitView : EditorWindow {
 		}
 		f32 const grab_distance = 4;
 		Cursor cursor = horizontal ? Cursor_vertical : Cursor_horizontal;
-		if (distance((v2f)shared->current_mouse_position, bar_line) <= grab_distance) {
+		if (distance((v2f)app->current_mouse_position, bar_line) <= grab_distance) {
 			if (mouse_down(0, {.anywhere = true})) {
 				is_sizing = true;
 				lock_input();
 				if (horizontal) {
-					grab_offset = bar_position - shared->current_mouse_position.y;
+					grab_offset = bar_position - app->current_mouse_position.y;
 				} else {
-					grab_offset = bar_position - shared->current_mouse_position.x;
+					grab_offset = bar_position - app->current_mouse_position.x;
 				}
 			}
 		} else if (!is_sizing) {
-			if (shared->current_cursor != Cursor_none) {
+			if (app->current_cursor != Cursor_none) {
 				cursor = Cursor_default;
 			}
 		}
-		//if ((cursor == Cursor_vertical && shared->current_cursor == Cursor_horizontal) || (cursor == Cursor_horizontal && shared->current_cursor == Cursor_vertical)) {
-		//	shared->current_cursor = Cursor_horizontal_and_vertical;
+		//if ((cursor == Cursor_vertical && app->current_cursor == Cursor_horizontal) || (cursor == Cursor_horizontal && app->current_cursor == Cursor_vertical)) {
+		//	app->current_cursor = Cursor_horizontal_and_vertical;
 		//} else
-		if (shared->current_cursor == Cursor_default) {
-			shared->current_cursor = cursor;
+		if (app->current_cursor == Cursor_default) {
+			app->current_cursor = cursor;
 		}
 
 		if (is_sizing) {
@@ -104,7 +104,7 @@ struct SplitView : EditorWindow {
 		}
 
 		if (is_sizing) {
-			v2s mouse_position = {shared->window->mouse_position.x, (s32)shared->window->client_size.y - shared->window->mouse_position.y};
+			v2s mouse_position = {app->window->mouse_position.x, (s32)app->window->client_size.y - app->window->mouse_position.y};
 			if (horizontal) {
 				split_t = map<f32>(mouse_position.y + grab_offset, viewport.min.y, viewport.min.y + viewport.size().y, 0, 1);
 			} else {

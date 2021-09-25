@@ -5,7 +5,8 @@
 #include <t3d/editor/current.h>
 #include <t3d/editor/window.h>
 #include <t3d/editor/input.h>
-#include <t3d/shared.h>
+#include <t3d/app.h>
+#include <t3d/editor.h>
 
 inline tg::Viewport pad(tg::Viewport viewport) {
 	viewport.min += 2;
@@ -96,16 +97,16 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	bool apply_input = false;
 	bool set_caret_from_mouse = false;
 	if (state.editing) {
-		if ((shared->key_state[256 + 0].state & KeyState_down)) {
-			if (in_bounds(shared->current_mouse_position, shared->current_scissor)) {
+		if ((editor->key_state[256 + 0].state & KeyState_down)) {
+			if (in_bounds(app->current_mouse_position, app->current_scissor)) {
 				set_caret_from_mouse = true;
 			} else {
 				apply_input = true;
 				stop_edit = true;
-				shared->key_state[256 + 0].start_position = shared->current_mouse_position;
+				editor->key_state[256 + 0].start_position = app->current_mouse_position;
 			}
 		}
-		if ((shared->key_state[256 + 1].state & KeyState_down)) {
+		if ((editor->key_state[256 + 1].state & KeyState_down)) {
 			apply_input = true;
 			stop_edit = true;
 		}
@@ -120,7 +121,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 			lock_input();
 		}
 		if (mouse_drag(0)) {
-			callbacks.on_drag(shared->window->mouse_delta.x);
+			callbacks.on_drag(app->window->mouse_delta.x);
 			value_changed = true;
 		}
 		if (mouse_end_drag(0)) {
@@ -142,7 +143,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	}
 
 	if (state.editing) {
-		if (shared->key_state[Key_left_arrow].state & KeyState_repeated) {
+		if (editor->key_state[Key_left_arrow].state & KeyState_repeated) {
 			if (state.caret_position) {
 				if (state.selection_start == state.caret_position) {
 					state.caret_position -= 1;
@@ -159,7 +160,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				state.selection_start = state.caret_position;
 			}
 		}
-		if (shared->key_state[Key_right_arrow].state & KeyState_repeated) {
+		if (editor->key_state[Key_right_arrow].state & KeyState_repeated) {
 			if (state.caret_position != state.string.size) {
 				if (state.selection_start == state.caret_position) {
 					state.caret_position += 1;
@@ -197,7 +198,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 
 		Erase erase = Erase_none;
 
-		for (auto c : shared->input_string) {
+		for (auto c : editor->input_string) {
 			switch (c) {
 				case '\b': {
 					erase = Erase_backspace;
@@ -219,12 +220,12 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 						sel_max = state.string.size;
 					}
 					if (sel_max != sel_min) {
-						set_clipboard(shared->window, Clipboard_text, Span<utf8>{state.string.data + sel_min, sel_max - sel_min});
+						set_clipboard(app->window, Clipboard_text, Span<utf8>{state.string.data + sel_min, sel_max - sel_min});
 					}
 					break;
 				}
 				case 22: { // Control + V
-					auto clipboard = with(temporary_allocator, (List<utf8>)get_clipboard(shared->window, Clipboard_text));
+					auto clipboard = with(temporary_allocator, (List<utf8>)get_clipboard(app->window, Clipboard_text));
 					defer { free(clipboard); };
 
 					u32 new_caret_position;
@@ -256,10 +257,10 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				case '\t': {
 					stop_edit = true;
 					apply_input = true;
-					if (shared->key_state[Key_shift].state & KeyState_held) {
-						shared->should_switch_focus_to = shared->focusable_input_user_index - 1;
+					if (editor->key_state[Key_shift].state & KeyState_held) {
+						editor->should_switch_focus_to = editor->focusable_input_user_index - 1;
 					} else {
-						shared->should_switch_focus_to = shared->focusable_input_user_index + 1;
+						editor->should_switch_focus_to = editor->focusable_input_user_index + 1;
 					}
 					break;
 				}
@@ -280,9 +281,9 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				}
 			}
 		}
-		shared->input_string.clear();
+		editor->input_string.clear();
 
-		if (shared->key_state[Key_delete].state & KeyState_repeated) {
+		if (editor->key_state[Key_delete].state & KeyState_repeated) {
 			erase = Erase_delete;
 		}
 
@@ -335,20 +336,20 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	v4f color = theme.color;
 	if (state.editing) {
 		color = theme.edit_color;
-	} else if (in_bounds(shared->current_mouse_position, shared->current_scissor)) {
+	} else if (in_bounds(app->current_mouse_position, app->current_scissor)) {
 		color = theme.hovered_color;
 	}
 
 	gui_panel(color);
 
 	if (state.editing) {
-		tg::Viewport caret_viewport = shared->current_viewport;
-		caret_viewport.min.x = shared->current_viewport.min.x;
+		tg::Viewport caret_viewport = app->current_viewport;
+		caret_viewport.min.x = app->current_viewport.min.x;
 		caret_viewport.max.x = caret_viewport.min.x + 1;
 
 
 		if (state.string.size) {
-			auto font = get_font_at_size(shared->font_collection, font_size);
+			auto font = get_font_at_size(app->font_collection, font_size);
 			ensure_all_chars_present(state.string, font);
 			auto placed_chars = with(temporary_allocator, place_text(state.string, font));
 
@@ -356,7 +357,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				u32 new_caret_position = placed_chars.size;
 
 				for (u32 char_index = 0; char_index < placed_chars.size; char_index += 1) {
-					if (placed_chars[char_index].position.center().x - state.text_offset > (shared->current_mouse_position.x - shared->current_viewport.min.x)) {
+					if (placed_chars[char_index].position.center().x - state.text_offset > (app->current_mouse_position.x - app->current_viewport.min.x)) {
 						new_caret_position = char_index;
 						break;
 					}
@@ -373,21 +374,21 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 			if (caret_x == 0)
 				state.text_offset = 0;
 
-			if (placed_chars.back().position.max.x > shared->current_viewport.size().x) {
-				state.text_offset = max(state.text_offset, caret_x - (s32)(shared->current_viewport.size().x * 3 / 4));
-				state.text_offset = min(state.text_offset, caret_x - (s32)(shared->current_viewport.size().x * 1 / 4));
-				state.text_offset = min(state.text_offset, (s32)placed_chars.back().position.max.x - shared->current_viewport.size().x + 1);
+			if (placed_chars.back().position.max.x > app->current_viewport.size().x) {
+				state.text_offset = max(state.text_offset, caret_x - (s32)(app->current_viewport.size().x * 3 / 4));
+				state.text_offset = min(state.text_offset, caret_x - (s32)(app->current_viewport.size().x * 1 / 4));
+				state.text_offset = min(state.text_offset, (s32)placed_chars.back().position.max.x - app->current_viewport.size().x + 1);
 				state.text_offset = max(state.text_offset, 0);
-				//state.text_offset = min<s32>(state.text_offset, caret_x - (s32)(shared->current_viewport.size().x * 1 / 4));
+				//state.text_offset = min<s32>(state.text_offset, caret_x - (s32)(app->current_viewport.size().x * 1 / 4));
 
 				//s32 rel_caret_pos = caret_x - state.text_offset;
-				//s32 diff = rel_caret_pos - (s32)(shared->current_viewport.size().x * 3 / 4);
+				//s32 diff = rel_caret_pos - (s32)(app->current_viewport.size().x * 3 / 4);
 				//if (diff < 0) {
 				//	state.text_offset += diff;
 				//}
 				//
 				//rel_caret_pos = caret_x - state.text_offset;
-				//diff = rel_caret_pos - (s32)(shared->current_viewport.size().x / 4);
+				//diff = rel_caret_pos - (s32)(app->current_viewport.size().x / 4);
 				//if (diff > 0) {
 				//	state.text_offset -= diff;
 				//}
@@ -396,9 +397,9 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				print("%\n", state.text_offset);
 
 				//state.text_offset = clamp<s32>(
-				//	(s32)shared->current_viewport.size().x / 4 - (s32)caret_x,
+				//	(s32)app->current_viewport.size().x / 4 - (s32)caret_x,
 				//	0,
-				//	-placed_chars.back().position.max.x + shared->current_viewport.size().x - 1
+				//	-placed_chars.back().position.max.x + app->current_viewport.size().x - 1
 				//);
 			}
 
@@ -412,8 +413,8 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				u32 min_x = placed_chars[sel_min    ].position.min.x;
 				u32 max_x = placed_chars[sel_max - 1].position.max.x;
 
-				tg::Viewport selection_viewport = shared->current_viewport;
-				selection_viewport.min.x = shared->current_viewport.min.x + min_x;
+				tg::Viewport selection_viewport = app->current_viewport;
+				selection_viewport.min.x = app->current_viewport.min.x + min_x;
 				selection_viewport.max.x = selection_viewport.min.x + max_x - min_x;
 
 				push_current_viewport(selection_viewport) gui_panel({0.25f,0.25f,0.5f,1});
@@ -430,7 +431,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				gui_panel({1, 1, 1, 1});
 			}
 		}
-		state.caret_blink_time += shared->frame_time;
+		state.caret_blink_time += app->frame_time;
 		if (state.caret_blink_time >= 1) {
 			state.caret_blink_time -= 1;
 		}
@@ -507,7 +508,7 @@ inline Optional<f64> parse_expression(FloatFieldToken *&t, FloatFieldToken *end)
 }
 
 inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
-	auto &state = shared->float_field_states.get_or_insert({id, location});
+	auto &state = editor->float_field_states.get_or_insert({id, location});
 
 	return input_field(InputFieldCallbacks{
 		.on_init = [&]() {
@@ -631,7 +632,7 @@ inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = de
 }
 
 inline bool text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
-	auto &state = shared->text_field_states.get_or_insert({id, location});
+	auto &state = editor->text_field_states.get_or_insert({id, location});
 
 	return input_field(InputFieldCallbacks{
 		.on_init = [&]() {
@@ -649,30 +650,30 @@ inline bool text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &them
 
 
 inline void begin_scrollbar(umm id = 0, std::source_location location = std::source_location::current()) {
-	auto &state = shared->scroll_bar_states.get_or_insert({id, location});
+	auto &state = editor->scroll_bar_states.get_or_insert({id, location});
 }
 inline void end_scrollbar(umm id = 0, std::source_location location = std::source_location::current()) {
-	auto &state = shared->scroll_bar_states.get_or_insert({id, location});
+	auto &state = editor->scroll_bar_states.get_or_insert({id, location});
 }
 
 
 s32 const line_height = 16;
 
 inline void header(Span<utf8> text) {
-	tg::Viewport line_viewport = shared->current_viewport;
-	line_viewport.min.y = shared->current_viewport.max.y - line_height - shared->current_property_y;
+	tg::Viewport line_viewport = app->current_viewport;
+	line_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 	push_current_viewport(line_viewport) label(text);
-	shared->current_property_y += line_height + 2;
+	editor->current_property_y += line_height + 2;
 }
 
 inline void property_separator() {
 	s32 const separator_height = 2;
-	tg::Viewport line_viewport = shared->current_viewport;
-	line_viewport.min.y = shared->current_viewport.max.y - separator_height - shared->current_property_y;
+	tg::Viewport line_viewport = app->current_viewport;
+	line_viewport.min.y = app->current_viewport.max.y - separator_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + separator_height;
 	push_current_viewport(line_viewport) gui_panel({.05, .05, .05, 1});
-	shared->current_property_y += separator_height + 2;
+	editor->current_property_y += separator_height + 2;
 }
 
 inline u64 get_id(u64 id, std::source_location location) {
@@ -682,33 +683,33 @@ inline u64 get_id(u64 id, std::source_location location) {
 
 template <class Fn>
 void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_location location, Span<Span<utf8>> file_extensions, Fn &&update) {
-	tg::Viewport line_viewport = shared->current_viewport;
-	line_viewport.min.y = shared->current_viewport.max.y - line_height - shared->current_property_y;
+	tg::Viewport line_viewport = app->current_viewport;
+	line_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 	push_current_viewport(line_viewport) {
 		s32 text_width;
 
-		auto font = get_font_at_size(shared->font_collection, font_size);
+		auto font = get_font_at_size(app->font_collection, font_size);
 		ensure_all_chars_present(name, font);
 		auto placed_text = with(temporary_allocator, place_text(name, font));
 		text_width = placed_text.back().position.max.x;
 		label(placed_text, font);
 
-		auto value_viewport = shared->current_viewport;
+		auto value_viewport = app->current_viewport;
 		value_viewport.min.x += text_width + 2;
 
 		push_current_viewport(value_viewport) {
 			gui_panel({.05, .05, .05, 1});
 			label(path);
 
-			bool result = (shared->key_state[256 + 0].state & KeyState_up) && in_bounds(shared->current_mouse_position, shared->current_scissor);
+			bool result = (editor->key_state[256 + 0].state & KeyState_up) && in_bounds(app->current_mouse_position, app->current_scissor);
 
 			if (result) {
 				int x = 5;
 			}
 
-			if (shared->drag_and_drop_kind == DragAndDrop_file) {
-				auto dragging_path = as_utf8(shared->drag_and_drop_data);
+			if (editor->drag_and_drop_kind == DragAndDrop_file) {
+				auto dragging_path = as_utf8(editor->drag_and_drop_data);
 				auto found = find_if(file_extensions, [&](Span<utf8> extension) {
 					return ends_with(dragging_path, extension);
 				});
@@ -718,10 +719,10 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 				}
 			}
 			if (accept_drag_and_drop(DragAndDrop_file)) {
-				update(as_utf8(shared->drag_and_drop_data));
+				update(as_utf8(editor->drag_and_drop_data));
 			}
 		}
 	}
 
-	shared->current_property_y += line_height + 2;
+	editor->current_property_y += line_height + 2;
 }

@@ -11,7 +11,7 @@ Span<u8> data_buffer;
 DataHeader *data_header;
 
 void load_assets() {
-	shared->assets.asset_path_to_data = {};
+	app->assets.asset_path_to_data = {};
 
 	auto cursor = data_buffer.data + data_header->asset_offset;
 	auto end    = data_buffer.data + data_header->asset_offset + data_header->asset_size;
@@ -42,7 +42,7 @@ void load_assets() {
 
 		cursor += asset_size;
 
-		shared->assets.asset_path_to_data.get_or_insert(asset_path) = asset;
+		app->assets.asset_path_to_data.get_or_insert(asset_path) = asset;
 
 		print("Got asset '%'\n", asset_path);
 	}
@@ -66,7 +66,7 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	Profiler::init();
 	defer { Profiler::deinit(); };
 
-	allocate_shared();
+	allocate_app();
 
 	print("Opening 'data.bin' ...\n");
 	data_file = open_file(tl_file_string("data.bin"), {.read = true});
@@ -108,18 +108,18 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		static v2u old_window_size;
 		if (any_true(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
-			shared->tg->resize_render_targets(window.client_size);
+			app->tg->resize_render_targets(window.client_size);
 			main_camera->resize_targets(window.client_size);
 		}
 
 		runtime_update();
 		runtime_render();
 
-		shared->tg->clear(shared->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, {}, 1);
-		shared->current_viewport = aabb_min_max({}, (v2s)window.client_size);
-		shared->tg->set_viewport(window.client_size);
+		app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, {}, 1);
+		app->current_viewport = aabb_min_max({}, (v2s)window.client_size);
+		app->tg->set_viewport(window.client_size);
 		render_camera(*main_camera, main_camera->entity());
-		shared->tg->present();
+		app->tg->present();
 
 		update_time();
 	};
@@ -130,7 +130,7 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 	assert_always(window);
 
-	shared->frame_timer = create_precise_timer();
+	app->frame_timer = create_precise_timer();
 
 
 	while (update(window)) {

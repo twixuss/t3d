@@ -1,8 +1,8 @@
 #include "assets.h"
-#include <t3d/shared.h>
+#include <t3d/app.h>
 
 Span<u8> Assets::get_asset_data(Span<utf8> local_path) {
-	if (shared->is_editor) {
+	if (app->is_editor) {
 		auto full_path = tconcatenate(directory, local_path);
 		auto buffer = with(temporary_allocator, read_entire_file(to_pathchars(full_path, true)));
 		if (!buffer.data) {
@@ -24,7 +24,7 @@ Texture2D *Assets::get_texture_2d(Span<utf8> path) {
 	}
 
 	print(Print_info, "Loading texture %.\n", path);
-	auto result = shared->tg->load_texture_2d(get_asset_data(path), {.generate_mipmaps = true});
+	auto result = app->tg->load_texture_2d(get_asset_data(path), {.generate_mipmaps = true});
 
 	if (!result) {
 		return 0;
@@ -116,12 +116,12 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 		}
 	};
 
-	auto result = shared->tg->create_texture_cube(size, datas, format);
+	auto result = app->tg->create_texture_cube(size, datas, format);
 
 	if (!result) {
 		return 0;
 	}
-	shared->tg->generate_mipmaps_cube(result, {});
+	app->tg->generate_mipmaps_cube(result, {});
 
 	result->name.set(path);
 	textures_cubes_by_path.get_or_insert(result->name) = result;
@@ -130,7 +130,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 
 Mesh *Assets::create_mesh(tl::CommonMesh &mesh) {
 	Mesh result = {};
-	result.vertex_buffer = shared->tg->create_vertex_buffer(
+	result.vertex_buffer = app->tg->create_vertex_buffer(
 		as_bytes(mesh.vertices),
 		{
 			tg::Element_f32x3, // position
@@ -140,7 +140,7 @@ Mesh *Assets::create_mesh(tl::CommonMesh &mesh) {
 		}
 	);
 
-	result.index_buffer = shared->tg->create_index_buffer(as_bytes(mesh.indices), sizeof(u32));
+	result.index_buffer = app->tg->create_index_buffer(as_bytes(mesh.indices), sizeof(u32));
 
 	result.index_count = mesh.indices.size;
 

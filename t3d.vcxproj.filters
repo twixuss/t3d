@@ -56,8 +56,10 @@
     <ClInclude Include="src\t3d\runtime.h" />
     <ClInclude Include="src\t3d\selection.h" />
     <ClInclude Include="src\t3d\serialize.h" />
-    <ClInclude Include="src\t3d\shared.h" />
+    <ClInclude Include="src\t3d\app.h" />
     <ClInclude Include="src\t3d\draw_property.h" />
+    <ClInclude Include="src\t3d\editor.h" />
+    <ClInclude Include="src\t3d\input.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

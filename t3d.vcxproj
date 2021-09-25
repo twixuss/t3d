@@ -53,6 +53,7 @@
     <ClInclude Include="src\t3d\component_list_.h" />
     <ClInclude Include="src\t3d\debug.h" />
     <ClInclude Include="src\t3d\draw_property.h" />
+    <ClInclude Include="src\t3d\editor.h" />
     <ClInclude Include="src\t3d\editor\current.h" />
     <ClInclude Include="src\t3d\editor\file_view.h" />
     <ClInclude Include="src\t3d\editor\hierarchy_view.h" />
@@ -66,6 +67,7 @@
     <ClInclude Include="src\t3d\entity.h" />
     <ClInclude Include="src\t3d\font.h" />
     <ClInclude Include="src\t3d\gui.h" />
+    <ClInclude Include="src\t3d\input.h" />
     <ClInclude Include="src\t3d\manipulator.h" />
     <ClInclude Include="src\t3d\material.h" />
     <ClInclude Include="src\t3d\mesh.h" />
@@ -76,7 +78,7 @@
     <ClInclude Include="src\t3d\runtime.h" />
     <ClInclude Include="src\t3d\selection.h" />
     <ClInclude Include="src\t3d\serialize.h" />
-    <ClInclude Include="src\t3d\shared.h" />
+    <ClInclude Include="src\t3d\app.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="after_build.vcxproj">

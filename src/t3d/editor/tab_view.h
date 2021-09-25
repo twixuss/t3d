@@ -47,7 +47,7 @@ struct TabView : EditorWindow {
 		tabs[selected_tab].needs_resize = false;
 	}
 	void render() {
-		shared->tg->set_render_target(shared->tg->back_buffer);
+		app->tg->set_render_target(app->tg->back_buffer);
 
 		bool highlight_dnd = false;
 
@@ -56,12 +56,12 @@ struct TabView : EditorWindow {
 		push_current_viewport(bar_viewport) {
 			gui_panel(background_color);
 
-			if (shared->drag_and_drop_kind == DragAndDrop_tab) {
+			if (editor->drag_and_drop_kind == DragAndDrop_tab) {
 				highlight_dnd = true;
 
 				if (accept_drag_and_drop(DragAndDrop_tab)) {
-					assert(shared->drag_and_drop_data.size == sizeof(DragDropTabInfo));
-					auto data = *(DragDropTabInfo *)shared->drag_and_drop_data.data;
+					assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
+					auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
 					if (data.tab_view != this) {
 						tab_moves.add({
@@ -76,7 +76,7 @@ struct TabView : EditorWindow {
 
 			s32 tab_start_x = 2;
 
-			auto font = get_font_at_size(shared->font_collection, font_size);
+			auto font = get_font_at_size(app->font_collection, font_size);
 			for (u32 tab_index = 0; tab_index < tabs.size; tab_index += 1) {
 				auto &tab = tabs[tab_index];
 				ensure_all_chars_present(tab.window->name, font);
@@ -108,13 +108,13 @@ struct TabView : EditorWindow {
 						DragDropTabInfo data;
 						data.tab_view = this;
 						data.tab_index = tab_index;
-						shared->drag_and_drop_data.set({(u8 *)&data, sizeof(data)});
+						editor->drag_and_drop_data.set({(u8 *)&data, sizeof(data)});
 					}
 				}
 			}
 			if (highlight_dnd) {
-				assert(shared->drag_and_drop_data.size == sizeof(DragDropTabInfo));
-				auto data = *(DragDropTabInfo *)shared->drag_and_drop_data.data;
+				assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
+				auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
 				if (data.tab_view != this) {
 					gui_panel({.1,1,.1,.2});
@@ -139,12 +139,12 @@ struct TabView : EditorWindow {
 			};
 
 			for (u32 offset_index = 0; offset_index < 4; offset_index += 1) {
-				v2s center = shared->current_viewport.center() + offsets[offset_index];
+				v2s center = app->current_viewport.center() + offsets[offset_index];
 
 				auto viewport = aabb_center_radius(center, V2s(area_radius));
 
-				assert(shared->drag_and_drop_data.size == sizeof(DragDropTabInfo));
-				auto data = *(DragDropTabInfo *)shared->drag_and_drop_data.data;
+				assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
+				auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
 				if (data.tab_view == this && tabs.size == 1) {
 				} else {

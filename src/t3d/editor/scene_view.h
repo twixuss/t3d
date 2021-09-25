@@ -43,17 +43,17 @@ struct SceneView : EditorWindow {
 	void render() {
 		begin_input_user();
 
-		auto old_camera_entity = shared->current_camera_entity;
-		auto old_camera        = shared->current_camera;
-		auto old_viewport      = shared->current_viewport;
+		auto old_camera_entity = app->current_camera_entity;
+		auto old_camera        = app->current_camera;
+		auto old_viewport      = app->current_viewport;
 		defer {
-			shared->current_camera_entity = old_camera_entity;
-			shared->current_camera        = old_camera;
-			shared->current_viewport      = old_viewport;
+			app->current_camera_entity = old_camera_entity;
+			app->current_camera        = old_camera;
+			app->current_viewport      = old_viewport;
 		};
-		shared->current_camera_entity = camera_entity;
-		shared->current_camera = camera;
-		shared->current_viewport = viewport;
+		app->current_camera_entity = camera_entity;
+		app->current_camera = camera;
+		app->current_viewport = viewport;
 
 		if (movement_state == Movement_none) {
 			if (mouse_down(1)) movement_state = Movement_flying;
@@ -90,7 +90,7 @@ struct SceneView : EditorWindow {
 		if (key_down('3')) manipulator_kind = Manipulate_scale;
 
 		if (key_held(Key_control)) {
-			camera->fov = clamp(camera->fov - shared->window->mouse_wheel * radians(10), radians(30.0f), radians(120.0f));
+			camera->fov = clamp(camera->fov - app->window->mouse_wheel * radians(10), radians(30.0f), radians(120.0f));
 		}
 
 		v3f camera_move_direction = {};
@@ -98,8 +98,8 @@ struct SceneView : EditorWindow {
 
 		f32 const mouse_scale = -0.003f;
 		quaternion rotation_delta =
-			quaternion_from_axis_angle({0,1,0}, shared->window->mouse_delta.x * mouse_scale * camera->fov) *
-			quaternion_from_axis_angle(camera_entity->rotation * v3f{1,0,0}, shared->window->mouse_delta.y * mouse_scale * camera->fov);
+			quaternion_from_axis_angle({0,1,0}, app->window->mouse_delta.x * mouse_scale * camera->fov) *
+			quaternion_from_axis_angle(camera_entity->rotation * v3f{1,0,0}, app->window->mouse_delta.y * mouse_scale * camera->fov);
 
 		switch (movement_state) {
 			case Movement_flying: {
@@ -116,7 +116,7 @@ struct SceneView : EditorWindow {
 					if (camera_velocity < 1) {
 						camera_velocity = 1;
 					} else {
-						camera_velocity *= 1 + shared->frame_time * 0.5f;
+						camera_velocity *= 1 + app->frame_time * 0.5f;
 					}
 				} else {
 					camera_velocity = 0;
@@ -133,7 +133,7 @@ struct SceneView : EditorWindow {
 			}
 			case Movement_panning: {
 
-				camera_entity->position += camera_entity->rotation * V3f(shared->window->mouse_delta * v2f{-1,1} / shared->window->client_size.y, 0) * 5;
+				camera_entity->position += camera_entity->rotation * V3f(app->window->mouse_delta * v2f{-1,1} / app->window->client_size.y, 0) * 5;
 
 				break;
 			}
@@ -144,22 +144,22 @@ struct SceneView : EditorWindow {
 		if (movement_state != Movement_flying) {
 			camera_velocity = 0;
 		}
-		camera_entity->position += camera_entity->rotation * camera_move_direction * shared->frame_time * camera_velocity;
+		camera_entity->position += camera_entity->rotation * camera_move_direction * app->frame_time * camera_velocity;
 
-		shared->tg->disable_scissor();
+		app->tg->disable_scissor();
 		render_scene(this);
 
 		u32 const button_size = 32;
 
 		if (!translate_icon) {
-			translate_icon = shared->tg->load_texture_2d(u8"../data/icons/translate.png"s, {.generate_mipmaps = true, .flip_y = true});
-			rotate_icon    = shared->tg->load_texture_2d(u8"../data/icons/rotate.png"s   , {.generate_mipmaps = true, .flip_y = true});
-			scale_icon     = shared->tg->load_texture_2d(u8"../data/icons/scale.png"s    , {.generate_mipmaps = true, .flip_y = true});
+			translate_icon = app->tg->load_texture_2d(u8"../data/icons/translate.png"s, {.generate_mipmaps = true, .flip_y = true});
+			rotate_icon    = app->tg->load_texture_2d(u8"../data/icons/rotate.png"s   , {.generate_mipmaps = true, .flip_y = true});
+			scale_icon     = app->tg->load_texture_2d(u8"../data/icons/scale.png"s    , {.generate_mipmaps = true, .flip_y = true});
 		}
 
-		auto translate_viewport = shared->current_viewport;
+		auto translate_viewport = app->current_viewport;
 		translate_viewport.min.x += 2;
-		translate_viewport.min.y = shared->current_viewport.max.y - 2 - button_size;
+		translate_viewport.min.y = app->current_viewport.max.y - 2 - button_size;
 		translate_viewport.max.x = translate_viewport.min.x + button_size;
 		translate_viewport.max.y = translate_viewport.min.y + button_size;
 		if (button(translate_viewport, translate_icon, (umm)this)) manipulator_kind = Manipulate_position;

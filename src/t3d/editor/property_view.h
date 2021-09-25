@@ -14,33 +14,33 @@ struct PropertyView : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		shared->tg->set_render_target(shared->tg->back_buffer);
+		app->tg->set_render_target(app->tg->back_buffer);
 		gui_panel(middle_color);
 
 
 
-		shared->current_property_y = 0;
+		editor->current_property_y = 0;
 
 		switch (selection.kind) {
 			case Selection_entity: {
 				s32 const add_component_button_height = 16;
 
-				auto add_component_button_viewport = shared->current_viewport;
+				auto add_component_button_viewport = app->current_viewport;
 				add_component_button_viewport.min.y = add_component_button_viewport.max.y - add_component_button_height;
 				if (button(add_component_button_viewport, adding_component ? u8"Back to Properties"s : u8"Add Component"s)) {
 					adding_component = !adding_component;
 				}
 
-				auto content_viewport = shared->current_viewport;
+				auto content_viewport = app->current_viewport;
 				content_viewport.max.y -= add_component_button_height;
 				push_current_viewport(pad(content_viewport)) {
 					if (adding_component) {
-						aabb<v2s> button_viewport = shared->current_viewport;
+						aabb<v2s> button_viewport = app->current_viewport;
 						button_viewport.min.y = button_viewport.max.y - 16;
 
 						s32 button_height_plus_padding = 16 + 2;
 
-						for_each(shared->component_infos, [&](ComponentUID component_type, ComponentInfo &info) {
+						for_each(app->component_infos, [&](ComponentUID component_type, ComponentInfo &info) {
 							if (button(button_viewport, info.name, component_type)) {
 								adding_component = false;
 								add_component(*selection.entity, component_type);
@@ -64,8 +64,8 @@ struct PropertyView : EditorWindow {
 
 							auto &info = get_component_info(component.type);
 
-							auto x_viewport = shared->current_viewport;
-							x_viewport.min.y = shared->current_viewport.max.y - line_height - shared->current_property_y;
+							auto x_viewport = app->current_viewport;
+							x_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
 							x_viewport.max.y = x_viewport.min.y + line_height;
 							x_viewport.min.x = x_viewport.max.x - x_viewport.size().y;
 
@@ -85,8 +85,8 @@ struct PropertyView : EditorWindow {
 			}
 			case Selection_texture: {
 				header(selection.texture->name);
-				auto viewport = shared->current_viewport;
-				viewport.max.y -= shared->current_property_y;
+				auto viewport = app->current_viewport;
+				viewport.max.y -= editor->current_property_y;
 				viewport.min.y = viewport.max.y - viewport.size().x * selection.texture->size.y / selection.texture->size.x;
 				push_current_viewport(viewport) {
 					blit(selection.texture);

@@ -2,14 +2,14 @@
 #include "gui.h"
 
 void draw_property(Span<utf8> name, f32 &value, u64 id, std::source_location location) {
-	tg::Viewport line_viewport = shared->current_viewport;
-	line_viewport.min.y = shared->current_viewport.max.y - line_height - shared->current_property_y;
+	tg::Viewport line_viewport = app->current_viewport;
+	line_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 
 	push_current_viewport(line_viewport) {
 		s32 text_width = 0;
 
-		auto font = get_font_at_size(shared->font_collection, font_size);
+		auto font = get_font_at_size(app->font_collection, font_size);
 		ensure_all_chars_present(name, font);
 		auto placed_text = with(temporary_allocator, place_text(name, font));
 		text_width = placed_text.back().position.max.x;
@@ -23,13 +23,13 @@ void draw_property(Span<utf8> name, f32 &value, u64 id, std::source_location loc
 		}
 	}
 
-	shared->current_property_y += line_height + 2;
+	editor->current_property_y += line_height + 2;
 }
 void draw_property(Span<utf8> name, v3f &value, u64 id, std::source_location location) {
 	header(name);
 
-	auto line_viewport = shared->current_viewport;
-	line_viewport.min.y = line_viewport.max.y - line_height - shared->current_property_y;
+	auto line_viewport = app->current_viewport;
+	line_viewport.min.y = line_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 
 
@@ -57,7 +57,7 @@ void draw_property(Span<utf8> name, v3f &value, u64 id, std::source_location loc
 	push_current_viewport(y_viewport) float_field(value.y, get_id(id, location));
 	push_current_viewport(z_viewport) float_field(value.z, get_id(id, location));
 
-	shared->current_property_y += line_height + 2;
+	editor->current_property_y += line_height + 2;
 }
 
 void draw_property(Span<utf8> name, quaternion &value, u64 id, std::source_location location) {
@@ -69,13 +69,13 @@ void draw_property(Span<utf8> name, quaternion &value, u64 id, std::source_locat
 void draw_property(Span<utf8> name, List<utf8> &value, u64 id, std::source_location location) {
 	header(name);
 
-	tg::Viewport line_viewport = shared->current_viewport;
-	line_viewport.min.y = line_viewport.max.y - line_height - shared->current_property_y;
+	tg::Viewport line_viewport = app->current_viewport;
+	line_viewport.min.y = line_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 
 	push_current_viewport(line_viewport) text_field(value, get_id(id, location));
 
-	shared->current_property_y += line_height + 2;
+	editor->current_property_y += line_height + 2;
 }
 
 void draw_property(Span<utf8> name, Texture2D *&value, u64 id, std::source_location location) {
@@ -85,7 +85,7 @@ void draw_property(Span<utf8> name, Texture2D *&value, u64 id, std::source_locat
 		u8".hdr"s,
 	};
 	draw_asset_property(name, value ? value->name : u8"null"s, id, location, extensions, [&] (Span<utf8> path) {
-		auto new_texture = shared->assets.get_texture_2d(path);
+		auto new_texture = app->assets.get_texture_2d(path);
 		if (new_texture) {
 			value = new_texture;
 		}

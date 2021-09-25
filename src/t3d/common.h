@@ -124,9 +124,10 @@ inline Optional<f32> parse_f32(Span<utf8> string) {
 	return result;
 }
 
-extern "C" TL_DLL_EXPORT struct SharedData *shared;
+extern "C" TL_DLL_EXPORT struct AppData *app;
+extern "C" TL_DLL_EXPORT struct EditorData *editor;
 
-void allocate_shared();
+void allocate_app();
 
 extern "C" TL_DLL_EXPORT void initialize_module();
 

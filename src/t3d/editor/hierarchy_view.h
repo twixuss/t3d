@@ -12,7 +12,7 @@ struct HierarchyView : EditorWindow {
 		this->viewport = viewport;
 	}
 	void render() {
-		shared->tg->set_render_target(shared->tg->back_buffer);
+		app->tg->set_render_target(app->tg->back_buffer);
 
 		gui_panel(middle_color);
 
@@ -20,7 +20,7 @@ struct HierarchyView : EditorWindow {
 		s32 const button_padding = 2;
 		v2s next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
 
-		for_each(shared->entities, [&](Entity &entity) {
+		for_each(app->entities, [&](Entity &entity) {
 			if (is_editor_entity(entity)) {
 				return;
 			}

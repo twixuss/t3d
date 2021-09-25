@@ -1,5 +1,5 @@
 #pragma once
-#include <t3d/shared.h>
+#include <t3d/app.h>
 #include <t3d/material.h>
 #include <t3d/mesh.h>
 

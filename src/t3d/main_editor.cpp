@@ -93,16 +93,16 @@ void render_scene(SceneView *view) {
 
 	render_camera(camera, camera_entity);
 
-	shared->tg->disable_blend();
+	app->tg->disable_blend();
 
-	//shared->tg->clear(shared->tg->back_buffer, tg::ClearFlags_depth, {}, 1);
+	//app->tg->clear(app->tg->back_buffer, tg::ClearFlags_depth, {}, 1);
 
-	shared->tg->set_rasterizer({
+	app->tg->set_rasterizer({
 		.depth_test = true,
 		.depth_write = true,
 		.depth_func = tg::Comparison_less,
 	});
-	shared->tg->set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
+	app->tg->set_blend(tg::BlendFunction_add, tg::Blend_source_alpha, tg::Blend_one_minus_source_alpha);
 
 	if (selection.kind == Selection_entity) {
 		auto new_transform = manipulate_transform(selection.entity->position, selection.entity->rotation, selection.entity->scale, view->manipulator_kind);
@@ -112,7 +112,7 @@ void render_scene(SceneView *view) {
 
 		for (auto &request : manipulator_draw_requests) {
 			v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
-			shared->tg->update_shader_constants(shared->entity_constants, {
+			app->tg->update_shader_constants(app->entity_constants, {
 				.local_to_camera_matrix =
 					camera.world_to_camera_matrix
 					* m4::translation(camera_entity.position + camera_to_handle_direction)
@@ -121,59 +121,59 @@ void render_scene(SceneView *view) {
 				.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
 				.object_rotation_matrix = (m4)request.rotation,
 			});
-			shared->tg->set_shader(shared->handle_shader);
-			shared->tg->set_shader_constants(shared->handle_constants, 0);
+			app->tg->set_shader(app->handle_shader);
+			app->tg->set_shader_constants(app->handle_constants, 0);
 
 			u32 selected_element = request.highlighted_part_index;
 
 			v3f to_camera = normalize(camera_entity.position - selection.entity->position);
 			switch (request.kind) {
 				case Manipulate_position: {
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_axis_x_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_axis_y_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_axis_z_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_arrow_x_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_arrow_y_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_arrow_z_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
 					draw_mesh(handle_plane_x_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
 					draw_mesh(handle_plane_y_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
 					draw_mesh(handle_plane_z_mesh);
 					break;
 				}
 				case Manipulate_rotation: {
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::rotation_r_zxy(0,0,pi/2), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::rotation_r_zxy(pi/2,0,0), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera, .is_rotation = 1});
 					draw_mesh(handle_circle_mesh);
 
 					if (request.dragging) {
 						quaternion rotation = quaternion_look(request.tangent.direction);
 						v3f position = request.tangent.origin;
-						shared->tg->update_shader_constants(shared->entity_constants, {
+						app->tg->update_shader_constants(app->entity_constants, {
 							.local_to_camera_matrix =
 								camera.world_to_camera_matrix
 								* m4::translation(camera_entity.position + camera_to_handle_direction)
@@ -181,41 +181,41 @@ void render_scene(SceneView *view) {
 							.local_to_world_normal_matrix = local_to_world_normal(rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
 							.object_rotation_matrix = (m4)rotation,
 						});
-						shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
+						app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1,1,1), .selected = 1, .to_camera = to_camera});
 						draw_mesh(handle_tangent_mesh);
 					}
 
 					break;
 				}
 				case Manipulate_scale: {
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1), .selected = (f32)(selected_element != null_manipulator_part), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::scale(request.scale.x, 1, 1), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_axis_x_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::scale(1, request.scale.y, 1), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_axis_y_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::scale(1, 1, request.scale.z), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_axis_z_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::translation(0.8f*request.scale.x,0,0) * m4::scale(1.5f), .color = V3f(1,0,0), .selected = (f32)(selected_element == 0), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::translation(0,0.8f*request.scale.y,0) * m4::scale(1.5f), .color = V3f(0,1,0), .selected = (f32)(selected_element == 1), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.matrix = m4::translation(0,0,0.8f*request.scale.z) * m4::scale(1.5f), .color = V3f(0,0,1), .selected = (f32)(selected_element == 2), .to_camera = to_camera});
 					draw_mesh(handle_sphere_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(1,0,0), .selected = (f32)(selected_element == 3), .to_camera = to_camera});
 					draw_mesh(handle_plane_x_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,1,0), .selected = (f32)(selected_element == 4), .to_camera = to_camera});
 					draw_mesh(handle_plane_y_mesh);
 
-					shared->tg->update_shader_constants(shared->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
+					app->tg->update_shader_constants(app->handle_constants, {.color = V3f(0,0,1), .selected = (f32)(selected_element == 5), .to_camera = to_camera});
 					draw_mesh(handle_plane_z_mesh);
 					break;
 				}
@@ -312,9 +312,9 @@ cmd /C cl )");
 
 	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
 
-	auto process = execute(bat_path);
+	auto process = start_process(bat_path);
 
-	if (!process) {
+	if (!is_valid(process)) {
 		print(Print_error, "Cannot execute file '%'\n", bat_path);
 		return false;
 	}
@@ -326,6 +326,16 @@ cmd /C cl )");
 	{
 		scoped_allocator(prev_allocator);
 		what_to_do_while_compiling();
+	}
+
+	while (1) {
+		u8 buf[256];
+		auto bytes_read = process.standard_out->read(array_as_span(buf));
+
+		if (bytes_read == 0)
+			break;
+
+		print(Span((utf8 *)buf, bytes_read));
 	}
 
 	wait(process);
@@ -345,7 +355,7 @@ bool invoke_msvc(Span<utf8> arguments) {
 }
 
 void insert_scripts_paths(ListList<utf8> &scripts, Span<utf8> directory) {
-	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(shared->assets.directory)));
+	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(app->assets.directory)));
 	for (auto &item : items) {
 		auto item_path = with(temporary_allocator, (directory.back() == '/' || directory.back() == '\\') ? concatenate(directory, item.name) : concatenate(directory, '/', item.name));
 		if (item.kind == FileItem_directory) {
@@ -360,7 +370,7 @@ void insert_scripts_paths(ListList<utf8> &scripts, Span<utf8> directory) {
 
 ListList<utf8> get_scripts_paths() {
 	ListList<utf8> script_paths;
-	insert_scripts_paths(script_paths, shared->assets.directory);
+	insert_scripts_paths(script_paths, app->assets.directory);
 	script_paths.make_absolute();
 	return script_paths;
 }
@@ -436,11 +446,11 @@ void build_executable() {
 		StringBuilder asset_builder;
 
 		ListList<utf8> asset_paths;
-		add_files_recursive(asset_paths, to_pathchars(shared->assets.directory));
+		add_files_recursive(asset_paths, to_pathchars(app->assets.directory));
 		asset_paths.make_absolute();
 
 		for (auto full_path : asset_paths) {
-			auto path = full_path.subspan(shared->assets.directory.size + 1, full_path.size - shared->assets.directory.size - 1);
+			auto path = full_path.subspan(app->assets.directory.size + 1, full_path.size - app->assets.directory.size - 1);
 			print("asset %\n", path);
 			append_bytes(asset_builder, (u32)path.size);
 			append_bytes(asset_builder, path);
@@ -595,12 +605,12 @@ void reload_all_scripts(bool recompile) {
 	List<ComponentIndex> components_to_update;
 	components_to_update.allocator = temporary_allocator;
 	StringBuilder builder;
-	for_each(shared->entities, [&](Entity &entity) {
+	for_each(app->entities, [&](Entity &entity) {
 		for (auto &component : entity.components) {
 			if (built_in_components.find(component.type)) {
 				continue;
 			}
-			auto found_info = shared->component_infos.find(component.type);
+			auto found_info = app->component_infos.find(component.type);
 			assert(found_info);
 			auto &info = *found_info;
 			info.serialize(builder, info.storage.get(component.index), false);
@@ -633,7 +643,7 @@ void reload_all_scripts(bool recompile) {
 	auto t3d_get_component_descs = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_get_component_descs");
 
 	List<ComponentDesc> descs;
-	descs.allocator = shared->allocator;
+	descs.allocator = app->allocator;
 	t3d_get_component_descs(descs);
 
 	for (auto &desc : descs) {
@@ -646,7 +656,7 @@ void reload_all_scripts(bool recompile) {
 	auto tokens = parse_tokens(as_utf8(to_string(builder))).get();
 	auto t = tokens.data;
 	for (auto &component : components_to_update) {
-		auto found_info = shared->component_infos.find(component.type);
+		auto found_info = app->component_infos.find(component.type);
 		assert(found_info);
 		auto &info = *found_info;
 		auto data = info.storage.get(component.index);
@@ -683,10 +693,12 @@ Task async(Fn &&fn) {
 Task scripts_compilation_task;
 
 void run() {
-	allocate_shared();
-	shared->is_editor = true;
-	shared->assets.directory = format(u8"%assets/"s, project_directory);
-	shared->editor_assets.directory = format(u8"%data/"s, editor_directory);
+	allocate_app();
+	allocate(editor);
+
+	app->is_editor = true;
+	app->assets.directory = format(u8"%assets/"s, project_directory);
+	editor->assets.directory = format(u8"%data/"s, editor_directory);
 	construct(manipulator_draw_requests);
 	construct(manipulator_states);
 	construct(debug_lines);
@@ -698,16 +710,16 @@ void run() {
 	info.on_create = [](Window &window) {
 		runtime_init(window);
 
-		built_in_components = copy(shared->component_infos);
+		built_in_components = copy(app->component_infos);
 
 		wait(scripts_compilation_task);
 		reload_all_scripts(false);
 
-		shared->tg->set_scissor(aabb_min_max({}, (v2s)window.client_size));
+		app->tg->set_scissor(aabb_min_max({}, (v2s)window.client_size));
 
 		init_font();
 
-		debug_lines_vertex_buffer = shared->tg->create_vertex_buffer(
+		debug_lines_vertex_buffer = app->tg->create_vertex_buffer(
 			{},
 			{
 				tg::Element_f32x3, // position
@@ -715,41 +727,41 @@ void run() {
 			}
 		);
 
-		shared->tg->set_vsync(true);
+		app->tg->set_vsync(true);
 
-		handle_sphere_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:Sphere"s);
-		handle_circle_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:Circle"s);
-		handle_tangent_mesh = shared->editor_assets.get_mesh(u8"handle.glb:Tangent"s);
-		handle_axis_x_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:AxisX"s );
-		handle_axis_y_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:AxisY"s );
-		handle_axis_z_mesh  = shared->editor_assets.get_mesh(u8"handle.glb:AxisZ"s );
-		handle_arrow_x_mesh = shared->editor_assets.get_mesh(u8"handle.glb:ArrowX"s );
-		handle_arrow_y_mesh = shared->editor_assets.get_mesh(u8"handle.glb:ArrowY"s );
-		handle_arrow_z_mesh = shared->editor_assets.get_mesh(u8"handle.glb:ArrowZ"s );
-		handle_plane_x_mesh = shared->editor_assets.get_mesh(u8"handle.glb:PlaneX"s);
-		handle_plane_y_mesh = shared->editor_assets.get_mesh(u8"handle.glb:PlaneY"s);
-		handle_plane_z_mesh = shared->editor_assets.get_mesh(u8"handle.glb:PlaneZ"s);
+		handle_sphere_mesh  = editor->assets.get_mesh(u8"handle.glb:Sphere"s);
+		handle_circle_mesh  = editor->assets.get_mesh(u8"handle.glb:Circle"s);
+		handle_tangent_mesh = editor->assets.get_mesh(u8"handle.glb:Tangent"s);
+		handle_axis_x_mesh  = editor->assets.get_mesh(u8"handle.glb:AxisX"s );
+		handle_axis_y_mesh  = editor->assets.get_mesh(u8"handle.glb:AxisY"s );
+		handle_axis_z_mesh  = editor->assets.get_mesh(u8"handle.glb:AxisZ"s );
+		handle_arrow_x_mesh = editor->assets.get_mesh(u8"handle.glb:ArrowX"s );
+		handle_arrow_y_mesh = editor->assets.get_mesh(u8"handle.glb:ArrowY"s );
+		handle_arrow_z_mesh = editor->assets.get_mesh(u8"handle.glb:ArrowZ"s );
+		handle_plane_x_mesh = editor->assets.get_mesh(u8"handle.glb:PlaneX"s);
+		handle_plane_y_mesh = editor->assets.get_mesh(u8"handle.glb:PlaneY"s);
+		handle_plane_z_mesh = editor->assets.get_mesh(u8"handle.glb:PlaneZ"s);
 
 		auto create_default_scene = [&]() {
 			auto &suzanne = create_entity("suzan\"ne");
 			suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
 			{
 				auto &mr = add_component<MeshRenderer>(suzanne);
-				mr.mesh = shared->assets.get_mesh(u8"scene.glb:Suzanne"s);
-				mr.material = &shared->surface_material;
-				mr.lightmap = shared->assets.get_texture_2d(u8"suzanne_lightmap.png"s);
+				mr.mesh = app->assets.get_mesh(u8"scene.glb:Suzanne"s);
+				mr.material = &app->surface_material;
+				mr.lightmap = app->assets.get_texture_2d(u8"suzanne_lightmap.png"s);
 			}
 			selection.set(&suzanne);
 
 			auto &floor = create_entity("floor");
 			{
 				auto &mr = add_component<MeshRenderer>(floor);
-				mr.mesh = shared->assets.get_mesh(u8"scene.glb:Room"s);
-				mr.material = &shared->surface_material;
-				mr.lightmap = shared->assets.get_texture_2d(u8"floor_lightmap.png"s);
+				mr.mesh = app->assets.get_mesh(u8"scene.glb:Room"s);
+				mr.material = &app->surface_material;
+				mr.lightmap = app->assets.get_texture_2d(u8"floor_lightmap.png"s);
 			}
 
-			auto light_texture = shared->assets.get_texture_2d(u8"spotlight_mask.png"s);
+			auto light_texture = app->assets.get_texture_2d(u8"spotlight_mask.png"s);
 
 			{
 				auto &light = create_entity("light1");
@@ -786,7 +798,7 @@ void run() {
 		};
 
 		//if (!deserialize_window_layout())
-			shared->main_window = create_split_view(
+			editor->main_window = create_split_view(
 				create_split_view(
 					create_tab_view(create_file_view()),
 					create_tab_view(create_scene_view()),
@@ -803,28 +815,28 @@ void run() {
 		if (!deserialize_scene_text(u8"test.scene"s))
 			create_default_scene();
 
-		window.min_window_size = client_size_to_window_size(window, shared->main_window->get_min_size());
+		window.min_window_size = client_size_to_window_size(window, editor->main_window->get_min_size());
 	};
 	info.on_draw = [](Window &window) {
-		shared->current_cursor = Cursor_default;
+		app->current_cursor = Cursor_default;
 
 		static v2u old_window_size;
 		if (any_true(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
 
-			shared->main_window->resize({.min = {}, .max = (v2s)window.client_size});
+			editor->main_window->resize({.min = {}, .max = (v2s)window.client_size});
 
-			shared->tg->resize_render_targets(window.client_size);
+			app->tg->resize_render_targets(window.client_size);
 		}
 
-		shared->current_viewport = shared->current_scissor = {
+		app->current_viewport = app->current_scissor = {
 			.min = {},
 			.max = (v2s)window.client_size,
 		};
-		shared->tg->set_viewport(shared->current_viewport);
-		shared->tg->set_scissor(shared->current_scissor);
+		app->tg->set_viewport(app->current_viewport);
+		app->tg->set_scissor(app->current_scissor);
 
-		shared->current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
+		app->current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
 
 		if (key_down(Key_f1, {.anywhere = true})) {
 			Profiler::enabled = true;
@@ -838,7 +850,7 @@ void run() {
 		};
 
 		if (key_down(Key_f2, {.anywhere = true})) {
-			for_each(shared->entities, [](Entity &e) {
+			for_each(app->entities, [](Entity &e) {
 				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, get_entity_index(e), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
 				for (auto &c : e.components) {
 					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, get_component_info(c.type).name, c.index);
@@ -849,28 +861,28 @@ void run() {
 		if (key_down(Key_f6, {.anywhere = true})) {
 			build_executable();
 		}
-		window.min_window_size = client_size_to_window_size(window, shared->main_window->get_min_size());
+		window.min_window_size = client_size_to_window_size(window, editor->main_window->get_min_size());
 
-		shared->input_user_index = 0;
-		shared->focusable_input_user_index = 0;
+		editor->input_user_index = 0;
+		editor->focusable_input_user_index = 0;
 
 		timed_block("frame"s);
 
 		runtime_render();
 
-		shared->tg->clear(shared->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
+		app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
 
 		{
-			timed_block("shared->main_window->render()"s);
-			shared->main_window->render();
+			timed_block("editor->main_window->render()"s);
+			editor->main_window->render();
 		}
 
-		switch (shared->drag_and_drop_kind) {
+		switch (editor->drag_and_drop_kind) {
 			case DragAndDrop_file: {
-				auto texture = shared->assets.get_texture_2d(as_utf8(shared->drag_and_drop_data));
+				auto texture = app->assets.get_texture_2d(as_utf8(editor->drag_and_drop_data));
 				if (texture) {
 					aabb<v2s> thumbnail_viewport;
-					thumbnail_viewport.min = thumbnail_viewport.max = shared->current_mouse_position;
+					thumbnail_viewport.min = thumbnail_viewport.max = app->current_mouse_position;
 					thumbnail_viewport.max.x += 128;
 					thumbnail_viewport.min.y -= 128;
 					push_current_viewport(thumbnail_viewport) {
@@ -880,15 +892,15 @@ void run() {
 				break;
 			}
 			case DragAndDrop_tab: {
-				auto tab_info = *(DragDropTabInfo *)shared->drag_and_drop_data.data;
+				auto tab_info = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 				auto tab = tab_info.tab_view->tabs[tab_info.tab_index];
 
-				auto font = get_font_at_size(shared->font_collection, font_size);
+				auto font = get_font_at_size(app->font_collection, font_size);
 				ensure_all_chars_present(tab.window->name, font);
 				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
 
 				tg::Viewport tab_viewport;
-				tab_viewport.min = tab_viewport.max = shared->current_mouse_position;
+				tab_viewport.min = tab_viewport.max = app->current_mouse_position;
 
 				tab_viewport.min.y -= TabView::tab_height;
 				tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
@@ -903,15 +915,15 @@ void run() {
 		}
 
 		if (drag_and_dropping()) {
-			if (shared->key_state[256].state & KeyState_up) {
-				shared->drag_and_drop_kind = DragAndDrop_none;
+			if (editor->key_state[256].state & KeyState_up) {
+				editor->drag_and_drop_kind = DragAndDrop_none;
 				unlock_input_nocheck();
 			}
 		}
 
 		debug_frame();
 
-		bool debug_print_editor_window_hierarchy = shared->frame_index == 0;
+		bool debug_print_editor_window_hierarchy = app->frame_index == 0;
 		for (auto &move : tab_moves) {
 			auto from = move.from;
 			auto tab_index = move.tab_index;
@@ -943,9 +955,9 @@ void run() {
 						}
 					}
 				} else {
-					auto main_window_viewport = shared->main_window->viewport;
-					shared->main_window = what_is_left;
-					shared->main_window->resize(main_window_viewport);
+					auto main_window_viewport = editor->main_window->viewport;
+					editor->main_window = what_is_left;
+					editor->main_window->resize(main_window_viewport);
 				}
 			};
 
@@ -1003,13 +1015,13 @@ void run() {
 
 					to_parent->replace_child(to, create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal}));
 				} else {
-					assert(to == shared->main_window);
-					shared->main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
+					assert(to == editor->main_window);
+					editor->main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
 				}
 
 				tg::Viewport window_viewport = {};
-				window_viewport.max = (v2s)max(shared->main_window->get_min_size(), window.client_size);
-				shared->main_window->resize(window_viewport);
+				window_viewport.max = (v2s)max(editor->main_window->get_min_size(), window.client_size);
+				editor->main_window->resize(window_viewport);
 				resize(window, (v2u)window_viewport.max);
 
 				//to_parent->resize(to_parent->viewport);
@@ -1022,19 +1034,19 @@ void run() {
 		tab_moves.clear();
 
 
-		if (shared->should_unlock_input) {
-			shared->should_unlock_input = false;
-			shared->input_is_locked = false;
-			shared->input_locker = 0;
+		if (editor->should_unlock_input) {
+			editor->should_unlock_input = false;
+			editor->input_is_locked = false;
+			editor->input_locker = 0;
 		}
 
-		if (debug_print_editor_window_hierarchy || (shared->key_state[Key_f4].state & KeyState_down)) {
+		if (debug_print_editor_window_hierarchy || (editor->key_state[Key_f4].state & KeyState_down)) {
 			debug_print_editor_window_hierarchy = false;
 
-			shared->main_window->debug_print();
+			editor->main_window->debug_print();
 		}
 
-		for (auto &state : shared->key_state) {
+		for (auto &state : editor->key_state) {
 			if (state.state & KeyState_down) {
 				state.state &= ~KeyState_down;
 			} else if (state.state & KeyState_up) {
@@ -1044,16 +1056,16 @@ void run() {
 				state.state &= ~KeyState_repeated;
 			}
 			state.state &= ~KeyState_begin_drag;
-			if ((state.state & KeyState_held) && !(state.state & KeyState_drag) && (distance_squared(state.start_position, shared->current_mouse_position) >= pow2(8))) {
+			if ((state.state & KeyState_held) && !(state.state & KeyState_drag) && (distance_squared(state.start_position, app->current_mouse_position) >= pow2(8))) {
 				state.state |= KeyState_drag | KeyState_begin_drag;
 			}
 		}
 
-		shared->input_string.clear();
+		editor->input_string.clear();
 
-		for (auto &draw : shared->gui_draws) {
-			shared->tg->set_viewport(draw.viewport);
-			shared->tg->set_scissor(draw.scissor);
+		for (auto &draw : editor->gui_draws) {
+			app->tg->set_viewport(draw.viewport);
+			app->tg->set_scissor(draw.scissor);
 			switch (draw.kind) {
 				case GuiDraw_rect_colored: {
 					auto &rect_colored = draw.rect_colored;
@@ -1094,49 +1106,49 @@ void run() {
 						};
 					}
 
-					if (shared->text_vertex_buffer) {
-						shared->tg->update_vertex_buffer(shared->text_vertex_buffer, as_bytes(vertices));
+					if (app->text_vertex_buffer) {
+						app->tg->update_vertex_buffer(app->text_vertex_buffer, as_bytes(vertices));
 					} else {
-						shared->text_vertex_buffer = shared->tg->create_vertex_buffer(as_bytes(vertices), {
+						app->text_vertex_buffer = app->tg->create_vertex_buffer(as_bytes(vertices), {
 							tg::Element_f32x2, // position
 							tg::Element_f32x2, // uv
 						});
 					}
-					shared->tg->set_rasterizer({.depth_test = false, .depth_write = false});
-					shared->tg->set_topology(tg::Topology_triangle_list);
-					shared->tg->set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
-					shared->tg->set_shader(shared->text_shader);
-					shared->tg->set_shader_constants(shared->text_shader_constants, 0);
-					shared->tg->update_shader_constants(shared->text_shader_constants, {
+					app->tg->set_rasterizer({.depth_test = false, .depth_write = false});
+					app->tg->set_topology(tg::Topology_triangle_list);
+					app->tg->set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
+					app->tg->set_shader(app->text_shader);
+					app->tg->set_shader_constants(app->text_shader_constants, 0);
+					app->tg->update_shader_constants(app->text_shader_constants, {
 						.inv_half_viewport_size = v2f{2,-2} / (v2f)draw.viewport.size(),
 						.offset = (v2f)label.position,
 					});
-					shared->tg->set_vertex_buffer(shared->text_vertex_buffer);
-					shared->tg->set_sampler(tg::Filtering_nearest, 0);
-					shared->tg->set_texture(font->texture, 0);
-					shared->tg->draw(vertices.size);
+					app->tg->set_vertex_buffer(app->text_vertex_buffer);
+					app->tg->set_sampler(tg::Filtering_nearest, 0);
+					app->tg->set_texture(font->texture, 0);
+					app->tg->draw(vertices.size);
 					break;
 				}
 				default: invalid_code_path("not implemented"); break;
 			}
 		}
-		shared->gui_draws.clear();
+		editor->gui_draws.clear();
 
 		clear_temporary_storage();
 
 		{
 			timed_block("present"s);
-			shared->tg->present();
+			app->tg->present();
 		}
 
 		update_time();
 
 		++fps_counter;
-		set_title(&window, tformat(u8"frame_time: % ms, fps: %", shared->frame_time * 1000, fps_counter_result));
+		set_title(&window, tformat(u8"frame_time: % ms, fps: %", app->frame_time * 1000, fps_counter_result));
 
-		set_cursor(window, shared->current_cursor);
+		set_cursor(window, app->current_cursor);
 
-		fps_timer += shared->frame_time;
+		fps_timer += app->frame_time;
 		if (fps_timer >= 1) {
 			fps_counter_result = fps_counter;
 			fps_timer -= 1;
@@ -1144,46 +1156,46 @@ void run() {
 		}
 	};
 	info.on_key_down = [](u8 key) {
-		shared->key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
-		shared->key_state[key].start_position = shared->input_is_locked ? shared->input_lock_mouse_position : shared->current_mouse_position;
+		editor->key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
+		editor->key_state[key].start_position = editor->input_is_locked ? editor->input_lock_mouse_position : app->current_mouse_position;
 	};
 	info.on_key_up = [](u8 key) {
-		shared->key_state[key].state = KeyState_up;
+		editor->key_state[key].state = KeyState_up;
 	};
 	info.on_key_repeat = [](u8 key) {
-		shared->key_state[key].state |= KeyState_repeated;
+		editor->key_state[key].state |= KeyState_repeated;
 	};
 	info.on_mouse_down = [](u8 button){
-		shared->key_state[256 + button].state = KeyState_down | KeyState_held;
-		shared->key_state[256 + button].start_position = shared->input_is_locked ? shared->input_lock_mouse_position : shared->current_mouse_position;
+		editor->key_state[256 + button].state = KeyState_down | KeyState_held;
+		editor->key_state[256 + button].start_position = editor->input_is_locked ? editor->input_lock_mouse_position : app->current_mouse_position;
 	};
 	info.on_mouse_up = [](u8 button){
-		auto &state = shared->key_state[256 + button];
+		auto &state = editor->key_state[256 + button];
 		state.state = KeyState_up | ((state.state & KeyState_drag) ? KeyState_end_drag : 0);
 	};
 	info.on_char = [](u32 ch) {
-		shared->input_string.add(encode_utf8(ch));
+		editor->input_string.add(encode_utf8(ch));
 	};
 	info.client_size = {1280, 720};
-	shared->window = create_window(info);
-	defer { free(shared->window); };
+	app->window = create_window(info);
+	defer { free(app->window); };
 
-	assert_always(shared->window);
+	assert_always(app->window);
 
 
-	shared->frame_timer = create_precise_timer();
+	app->frame_timer = create_precise_timer();
 
 	Profiler::enabled = false;
 	Profiler::reset();
 
-	while (update(shared->window)) {
+	while (update(app->window)) {
 	}
 
 	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene_text())));
 
 	//serialize_window_layout();
 
-	for_each(shared->entities, [](Entity &e) {
+	for_each(app->entities, [](Entity &e) {
 		destroy_entity(e);
 	});
 

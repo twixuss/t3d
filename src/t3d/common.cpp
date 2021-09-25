@@ -7,18 +7,20 @@
 #include <t3d/common.h>
 #include <t3d/component.h>
 #include <t3d/gui.h>
-#include <t3d/shared.h>
+#include <t3d/app.h>
 #include <tl/masked_block_list.h>
 
-SharedData *shared;
+AppData *app;
+EditorData *editor;
 
-void allocate_shared() {
-	allocate(shared);
-	shared->allocator = default_allocator;
+void allocate_app() {
+	allocate(app);
+	app->allocator = default_allocator;
 }
 
 void set_module_shared(HMODULE module) {
-	*(SharedData **)GetProcAddress(module, "shared") = shared;
+	*(AppData **)GetProcAddress(module, "app") = app;
+	*(EditorData **)GetProcAddress(module, "editor") = editor;
 }
 
 void initialize_module() {
@@ -29,7 +31,7 @@ void initialize_module() {
 void update_component_info(ComponentDesc const &desc) {
 	scoped_allocator(default_allocator);
 
-	auto found_uid = shared->component_name_to_uid.find(desc.name);
+	auto found_uid = app->component_name_to_uid.find(desc.name);
 
 	ComponentInfo *info;
 
@@ -37,7 +39,7 @@ void update_component_info(ComponentDesc const &desc) {
 		ComponentUID uid = *found_uid;
 		print("Re-registered component '%' with uid '%'\n", desc.name, uid);
 
-		auto found_info = shared->component_infos.find(uid);
+		auto found_info = app->component_infos.find(uid);
 		assert(found_info);
 		info = found_info;
 
@@ -47,16 +49,16 @@ void update_component_info(ComponentDesc const &desc) {
 			info->storage.reallocate(desc.size, desc.alignment);
 		}
 	} else {
-		ComponentUID uid = atomic_increment(&shared->component_uid_counter);
+		ComponentUID uid = atomic_increment(&app->component_uid_counter);
 		print("Registered new component '%' with uid '%'\n", desc.name, uid);
 
 		*desc.uid = uid;
 
-		info = &shared->component_infos.get_or_insert(uid);
+		info = &app->component_infos.get_or_insert(uid);
 
 		info->name.set(desc.name);
 
-		shared->component_name_to_uid.get_or_insert(info->name) = uid;
+		app->component_name_to_uid.get_or_insert(info->name) = uid;
 	}
 
 	info->storage.bytes_per_entry = desc.size;

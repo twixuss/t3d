@@ -1,24 +1,24 @@
 #include "font.h"
-#include <t3d/shared.h>
+#include <t3d/app.h>
 
 void init_font() {
 	Span<pathchar> font_paths[] = {
 		tl_file_string("../data/segoeui.ttf"ts),
 	};
-	shared->font_collection = create_font_collection(font_paths);
-	shared->font_collection->update_atlas = [](TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size) -> TL_FONT_TEXTURE_HANDLE {
+	app->font_collection = create_font_collection(font_paths);
+	app->font_collection->update_atlas = [](TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size) -> TL_FONT_TEXTURE_HANDLE {
 		if (texture) {
-			shared->tg->update_texture(texture, size, data);
+			app->tg->update_texture(texture, size, data);
 		} else {
-			texture = shared->tg->create_texture_2d(size, data, tg::Format_rgb_u8n);
+			texture = app->tg->create_texture_2d(size, data, tg::Format_rgb_u8n);
 		}
 		return texture;
 	};
 
-	assert(shared->font_collection->update_atlas);
+	assert(app->font_collection->update_atlas);
 
-	shared->text_shader_constants = shared->tg->create_shader_constants<TextShaderConstants>();
-	shared->text_shader = shared->tg->create_shader(u8R"(
+	app->text_shader_constants = app->tg->create_shader_constants<TextShaderConstants>();
+	app->text_shader = app->tg->create_shader(u8R"(
 #ifdef VERTEX_SHADER
 #define V2F out
 #else

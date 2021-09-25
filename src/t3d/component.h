@@ -35,8 +35,6 @@ struct Component {
 	void free() { invalid_code_path(); }
 };
 
-#define is_statically_overridden(function, derived, base) (&base::function != &derived::function)
-
 
 struct ComponentStorage {
 	using Mask = umm;
@@ -290,7 +288,7 @@ if (binary) { \
 } else { \
 	append(builder, "\t\t" #name " "); \
 	serialize_text(builder, name); \
-	append(builder, "\n"); \
+	append(builder, ";\n"); \
 }
 
 
@@ -316,9 +314,30 @@ bool deserialize_text(Token *&from, Token *end, T &value, Span<utf8> name) {
 }
 
 
+inline void go_to_next_property(Token *started_from, Token *&from, Token *end) {
+	from = started_from;
+	while (from != end) {
+		if (from->kind == ';') {
+			++from;
+			break;
+		}
+		++from;
+	}
+}
+
 #define DESERIALIZE_FIELD_TEXT(type, name, default) \
 else if (from->string == u8#name##s) { \
-	if (!::deserialize_text(from, end, name, from->string)) return false; \
+	type _t3d_deserialized_##name; \
+	if (::deserialize_text(from, end, _t3d_deserialized_##name, from->string)) { \
+		if (from->kind == ';') { \
+			++from; \
+			name = _t3d_deserialized_##name; \
+		} else { \
+			go_to_next_property(started_from, from, end); \
+		}\
+	} else { \
+		go_to_next_property(started_from, from, end); \
+	} \
 }
 
 
@@ -341,8 +360,13 @@ struct ComponentBase<ComponentT> : Component { \
 				print(Print_error, "Expected an identifier while parsing " #ComponentT "'s properties, but got '%'\n", from->string); \
 				return false; \
 			} \
+			auto started_from = from; \
 			if (false) {} \
 			FIELDS(DESERIALIZE_FIELD_TEXT) \
+			else { \
+				print(Print_warning, "Got unknown field while parsing " #ComponentT "'s properties: '%'\n", from->string); \
+				go_to_next_property(started_from, from, end); \
+			} \
 		} \
 		from += 1; \
 		return true; \

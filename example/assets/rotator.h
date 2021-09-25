@@ -1,5 +1,5 @@
 #pragma once
-#include <t3d/shared.h>
+#include <t3d/app.h>
 
 #define FIELDS(f) \
 f(v3f, axis,               {}) \
@@ -14,8 +14,8 @@ DECLARE_COMPONENT(Rotator) {
 	}
 	void update() {
 		auto &entity = this->entity();
-		entity.rotation *= quaternion_from_axis_angle(normalize(axis, {1, 0, 0}), degrees_per_second * (pi * shared->frame_time / 180));
-		entity.position.y = start_pos + tl::sin(shared->time * 10) * test_test;
+		entity.rotation *= quaternion_from_axis_angle(normalize(axis, {1, 0, 0}), degrees_per_second * (pi * app->frame_time / 180));
+		entity.position.y = start_pos + tl::sin(app->time * 10) * test_test;
 	}
 };
 
