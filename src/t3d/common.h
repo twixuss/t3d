@@ -39,7 +39,7 @@ inline Optional<f32> parse_f32(Span<utf8> string) {
 	u64 whole_part = 0;
 	auto c = string.data;
 	auto end = string.end();
-
+	
 	bool negative = false;
 	if (*c == '-') {
 		negative = true;

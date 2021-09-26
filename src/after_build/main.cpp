@@ -21,16 +21,18 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		return false;
 	}
 
+	create_directory(concatenate(exe_dir, u8"../../data/obj"s));
 
 	auto paths = split(data, u8"\n"s);
 
 	for (auto path : paths) {
 		if (!path.size) continue;
+		if (path.back()== '\r')
+			path.size--;
 
 		auto source = format(u8"%../t3d/%.obj"s, exe_dir, parse_path(path).name);
 		auto destination = format(u8"%../../data/obj/%.obj"s, exe_dir, parse_path(path).name);
-		print("Copying '%' -> '%'\n", source, destination);
-		copy_file(source, destination);
+		print("Copying '%' -> '%'. success = %\n", source, destination, copy_file(source, destination));
 	}
 
 	return 0;

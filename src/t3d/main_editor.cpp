@@ -311,11 +311,11 @@ bool invoke_msvc(Span<utf8> arguments, Fn &&what_to_do_while_compiling) {
 	append(bat_builder, u8R"(
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-cmd /C cl )");
+cl )");
 	append_format(bat_builder, "/Fd\"%temp/%.pdb\" ", editor_directory, query_performance_counter());
 
 	append(bat_builder, arguments);
-	append_format(bat_builder, " | \"%bin/stdin_duplicator.exe\" \"stdout\" \"%build/build_log.txt\"", editor_directory, editor_directory);
+	//append_format(bat_builder, " | \"%bin/stdin_duplicator.exe\" \"stdout\" \"%build/build_log.txt\"", editor_directory, editor_directory);
 
 	auto bat_path = format(u8"%build/build.bat"s, editor_directory);
 
@@ -337,6 +337,8 @@ cmd /C cl )");
 		what_to_do_while_compiling();
 	}
 
+
+	StringBuilder log_builder;
 	while (1) {
 		u8 buf[256];
 		auto bytes_read = process.standard_out->read(array_as_span(buf));
@@ -344,8 +346,11 @@ cmd /C cl )");
 		if (bytes_read == 0)
 			break;
 
-		print(Span((utf8 *)buf, bytes_read));
+		auto string = Span((utf8 *)buf, bytes_read);
+		append(log_builder, string);
+		print(string);
 	}
+	write_entire_file(format("%build/build_log.txt", editor_directory), as_bytes(to_string(log_builder)));
 
 	wait(process);
 	auto exit_code = get_exit_code(process);
