@@ -151,7 +151,7 @@ Mesh *Assets::create_mesh(tl::CommonMesh &mesh) {
 
 	result.indices = copy(mesh.indices);
 
-	auto pointer = &meshes.add();
-	*pointer = result;
-	return pointer;
+	auto added = meshes.add();
+	*added.pointer = result;
+	return added.pointer;
 }

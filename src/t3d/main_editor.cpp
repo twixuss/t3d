@@ -78,10 +78,60 @@ Span<utf8> editor_exe_path;
 Span<utf8> editor_directory;
 Span<utf8> editor_bin_directory;
 Span<utf8> project_name;
-Span<utf8> scripts_init_path;
+Span<utf8> component_descs_getter_path;
 Span<utf8> project_directory;
 
+ListList<utf8> all_component_names;
+
 HMODULE scripts_dll;
+
+void update_component_info(ComponentDesc const &desc) {
+	scoped_allocator(default_allocator);
+
+	auto found_uid = app->component_name_to_uid.find(desc.name);
+
+	ComponentInfo *info;
+
+	Uid uid;
+
+	if (found_uid) {
+		uid = found_uid.get_unchecked();
+		print("Re-registered component '%' with uid '%'\n", desc.name, uid);
+
+		auto found_info = app->component_infos.find(uid);
+		assert(found_info);
+		info = found_info.raw();
+
+		assert(info->name == desc.name);
+
+		if (desc.size != info->size || desc.alignment != info->alignment) {
+			for (auto scene : app->scenes) {
+				scene->component_storages.find(uid).get().reallocate(desc.size, desc.alignment);
+			}
+		}
+	} else {
+		uid = create_uid();
+		print("Registered new component '%' with uid '%'\n", desc.name, uid);
+
+		info = &app->component_infos.get_or_insert(uid);
+
+		info->name.set(desc.name);
+
+		app->component_name_to_uid.get_or_insert(info->name) = uid;
+	}
+
+	info->size = desc.size;
+	info->alignment = desc.alignment;
+	info->serialize          = desc.serialize         ;
+	info->construct          = desc.construct         ;
+	info->deserialize_binary = desc.deserialize_binary;
+	info->deserialize_text   = desc.deserialize_text  ;
+	info->draw_properties    = desc.draw_properties   ;
+	info->free               = desc.free              ;
+	info->init               = desc.init              ;
+	info->start              = desc.start             ;
+	info->update             = desc.update            ;
+}
 
 m4 local_to_world_position(v3f position, quaternion rotation, v3f scale) {
 	return m4::translation(position) * (m4)rotation * m4::scale(scale);
@@ -233,7 +283,9 @@ void render_scene(SceneView *view) {
 		manipulator_draw_requests.clear();
 	}
 
-	for_each_component<Camera>([&](Camera &camera) {
+	auto scene = app->current_scene;
+
+	scene->for_each_component<Camera>([&](Camera &camera) {
 		auto &camera_entity = camera.entity();
 		if (!is_editor_entity(camera_entity)) {
 			m4 projection_matrix = m4::perspective_right_handed((f32)view->viewport.size().x / view->viewport.size().y, camera.fov, camera.near_plane, camera.far_plane);
@@ -368,71 +420,60 @@ bool invoke_msvc(Span<utf8> arguments) {
 	return invoke_msvc(arguments, []{});
 }
 
-void insert_scripts_paths(ListList<utf8> &scripts, Span<utf8> directory) {
-	FileItemList items = get_items_in_directory(with(temporary_allocator, to_pathchars(app->assets.directory)));
-	for (auto &item : items) {
-		auto item_path = with(temporary_allocator, (directory.back() == '/' || directory.back() == '\\') ? concatenate(directory, item.name) : concatenate(directory, '/', item.name));
-		if (item.kind == FileItem_directory) {
-			insert_scripts_paths(scripts, item_path);
-		} else {
-			if (ends_with(item.name, u8".h"s)) {
-				scripts.add(item_path);
-			}
+ListList<utf8> project_h_files;
+ListList<utf8> project_cpp_files;
+ListList<utf8> editor_cpp_files;
+
+void update_scripts_paths() {
+	project_h_files.clear();
+	project_cpp_files.clear();
+
+	project_h_files.make_relative();
+	project_cpp_files.make_relative();
+
+	for_each_file_recursive(app->assets.directory, [] (Span<utf8> item) {
+		if (ends_with(item, u8".h"s)) {
+			project_h_files.add(item);
 		}
-	}
+		if (ends_with(item, u8".cpp"s)) {
+			project_cpp_files.add(item);
+		}
+	});
+
+	project_h_files.make_absolute();
+	project_cpp_files.make_absolute();
 }
 
-ListList<utf8> get_scripts_paths() {
-	ListList<utf8> script_paths;
-	insert_scripts_paths(script_paths, app->assets.directory);
-	script_paths.make_absolute();
-	return script_paths;
+#include <ImageHlp.h>
+#pragma comment(lib, "imagehlp.lib")
+#pragma comment(lib, "dbghelp.lib")
+
+ListList<ascii> get_exported_functions_in_dll(Span<utf8> dll_path) {
+    DWORD *name_rvas = 0;
+    _IMAGE_EXPORT_DIRECTORY *ied;
+    ULONG dir_size;
+    _LOADED_IMAGE loaded_image;
+
+	ListList<ascii> result;
+    if (MapAndLoad((ascii *)temporary_null_terminate(dll_path).data, NULL, &loaded_image, TRUE, TRUE)) {
+
+        ied = (_IMAGE_EXPORT_DIRECTORY *)ImageDirectoryEntryToData(loaded_image.MappedAddress, false, IMAGE_DIRECTORY_ENTRY_EXPORT, &dir_size);
+
+		if (ied != NULL) {
+            name_rvas = (DWORD *)ImageRvaToVa(loaded_image.FileHeader, loaded_image.MappedAddress, ied->AddressOfNames, NULL);
+
+            for (DWORD i = 0; i < ied->NumberOfNames; i++) {
+				auto span = as_span((ascii *)ImageRvaToVa(loaded_image.FileHeader, loaded_image.MappedAddress, name_rvas[i], NULL));
+				span.size += 1; // include null terminator for future GetProcAddress calls
+				result.add(span);
+            }
+        }
+        UnMapAndLoad(&loaded_image);
+    }
+	result.make_absolute();
+	return result;
 }
 
-
-ListList<utf8> get_component_names(ListList<utf8> script_paths) {
-	ListList<utf8> component_names;
-	for (auto &path : script_paths) {
-		auto file = open_file(to_pathchars(path, true).data, {.read = true});
-		if (!is_valid(file)) {
-			print(Print_error, "Couldn't open script file %\n", path);
-			continue;
-		}
-		defer { close(file); };
-
-		auto mapped = map_file(file);
-		defer { unmap_file(mapped); };
-
-		auto decls = find_all(mapped.data, "DECLARE_COMPONENT"b);
-		for (auto &decl : decls) {
-			if (decl.end() >= mapped.data.end()) {
-				print(Print_error, "DECLARE_COMPONENT was at the end of the file %\n", path);
-				continue;
-			}
-			if (*decl.end() != '(') {
-				print(Print_error, "'(' was expected after DECLARE_COMPONENT in file %\n", path);
-				continue;
-			}
-			u8 *closing_paren = decl.end() + 1;
-			while (1) {
-				if (closing_paren == mapped.data.end()) {
-					print(Print_error, "DECLARE_COMPONENT was unclosed in file %\n", path);
-					goto skip_decl;
-				}
-				if (*closing_paren == ')') {
-					break;
-				}
-				++closing_paren;
-			}
-
-			component_names.add((Span<utf8>)Span(decl.end() + 1, closing_paren));
-
-		skip_decl:;
-		}
-	}
-	component_names.make_absolute();
-	return component_names;
-}
 
 Span<ascii> include_dirs[] = {
 	"src"s,
@@ -450,6 +491,27 @@ void clear_build_directory() {
 	auto items = get_items_in_directory(to_pathchars(format(u8"%build"s, editor_directory), true));
 	for (auto item : items) {
 		delete_file(to_pathchars(format(u8"%build/%"s, editor_directory, item.name)));
+	}
+}
+
+void append_editor_cpp_or_obj_files(StringBuilder &builder) {
+	for (auto cpp_path : editor_cpp_files) {
+		auto name = parse_path(cpp_path).name;
+		if (name == u8"main_editor"s ||
+			name == u8"main_runtime"s ||
+			name == u8"main"s)
+		{
+			continue;
+		}
+
+		auto obj_path = tformat("%data/obj/%.obj", editor_directory, name);
+		if (file_exists(obj_path)) {
+			append(builder, obj_path);
+			append(builder, ' ');
+		} else {
+			append(builder, cpp_path);
+			append(builder, ' ');
+		}
 	}
 }
 
@@ -488,7 +550,14 @@ void build_executable() {
 		header.asset_size = asset_data.size;
 		write(data_file, asset_data);
 
-		auto scene_data = serialize_scene_binary();
+
+		HashMap<Uid, Uid> uid_remap;
+		u64 uid_counter = 0;
+		for (auto name : all_component_names) {
+			uid_remap.get_or_insert(component_name_to_uid(name)).value = uid_counter++;
+		}
+
+		auto scene_data = serialize_scene_binary(app->current_scene, uid_remap);
 		header.scene_offset = get_cursor(data_file);
 		header.scene_size = scene_data.size;
 		write(data_file, scene_data);
@@ -498,33 +567,84 @@ void build_executable() {
 	};
 
 
-	ListList<utf8> script_paths = get_scripts_paths();
+	// Generate source
+	{
+		StringBuilder builder;
+		append(builder, u8R"(#pragma once
+#include <t3d/component.h>
+#include <t3d/serialize.h>
+#include <t3d/app.h>
 
+#pragma comment(lib, "freetype.lib")
+
+static u64 uid_generator = 0;
+
+void update_component_info(ComponentDesc const &desc) {
+	scoped_allocator(default_allocator);
+
+	assert(!app->component_name_to_uid.find(desc.name));
+
+	Uid uid;
+	uid.value = uid_generator++;
+
+	assert(!app->component_infos.find(uid));
+
+	print("Registered new component '%' with uid '%'\n", desc.name, uid);
+
+	auto &info = app->component_infos.get_or_insert(uid);
+
+	info.name.set(desc.name);
+
+	app->component_name_to_uid.get_or_insert(info.name) = uid;
+
+	info.size      = desc.size;
+	info.alignment = desc.alignment;
+	info.serialize          = desc.serialize;
+	info.construct          = desc.construct;
+	info.deserialize_binary = desc.deserialize_binary;
+	info.deserialize_text   = desc.deserialize_text;
+	info.draw_properties    = desc.draw_properties;
+	info.free               = desc.free;
+	info.init               = desc.init;
+	info.start              = desc.start;
+	info.update             = desc.update;
+}
+
+)"s);
+
+
+		for (auto component_name : all_component_names) {
+			append_format(builder, u8"extern \"C\" ComponentDesc t3dcd%();\n", component_name);
+		}
+		append(builder, u8"extern \"C\" void t3d_get_component_descs(List<ComponentDesc> &descs) {\n");
+		for (auto component_name : all_component_names) {
+			append_format(builder, u8"	descs.add(t3dcd%());\n", component_name);
+		}
+		append(builder, u8"}"s);
+
+
+		create_directory(format("%build", editor_directory));
+		write_entire_file(to_pathchars(component_descs_getter_path), as_bytes(to_string(builder)));
+	}
 
 	StringBuilder builder;
 
-	auto cpp_files_file = read_entire_file(format("%data/cpp_files.txt", editor_directory));
+	append_editor_cpp_or_obj_files(builder);
 
-	auto cpp_paths = split(as_utf8(cpp_files_file), u8"\n"s);
-
-	for (auto cpp_path : cpp_paths) {
-		if (!cpp_path.size) continue;
-		append_format(builder, "%data/obj/%.obj ", editor_directory, parse_path(cpp_path).name);
-	}
-
-	append_format(builder, "% ", scripts_init_path);
-	for (auto script_path : script_paths) {
-		append_format(builder, "% ", format("%.cpp", script_path.subspan(0, script_path.size - 2)));
-	}
+	append_format(builder, "% ", component_descs_getter_path);
 
 	append_format(builder, u8"%src/t3d/main_runtime.cpp "s, editor_directory);
+
+	for (auto cpp_file : project_cpp_files) {
+		append_format(builder, "% ", cpp_file);
+	}
 
 	for (auto inc : include_dirs) {
 		append_format(builder, "/I\"%%\" ", editor_directory, inc);
 	}
 
 	create_directory(format(u8"%build", project_directory));
-	append_format(builder, u8"/ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:%build/%.exe "s, project_directory, project_name);
+	append_format(builder, u8"/Zi /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:%build/%.exe "s, project_directory, project_name);
 
 	for (auto lib : lib_dirs) {
 		append_format(builder, "/LIBPATH:\"%..\\%\" ", editor_bin_directory, lib);
@@ -536,43 +656,12 @@ void build_executable() {
 }
 
 
-HashMap<ComponentUID, ComponentInfo> built_in_components;
-
-using T3dRegisterComponents = void (*)(List<ComponentDesc> &descs);
-
 Span<utf8> scripts_dll_path;
 
 void recompile_all_scripts() {
 	scripts_dll_path = format(u8"%build/scripts%.dll"s, editor_directory, query_performance_counter());
 
-	ListList<utf8> script_paths = get_scripts_paths();
-	ListList<utf8> component_names = get_component_names(script_paths);
-
-	// Generate source
-	{
-		StringBuilder builder;
-		append(builder, u8R"(#pragma once
-#include <t3d/component.h>
-#include <t3d/serialize.h>
-
-#pragma comment(lib, "freetype.lib")
-
-)"s);
-		for (auto component_name : component_names) {
-			append_format(builder, "ComponentDesc get_component_desc_%();\n", component_name);
-		}
-		append(builder, u8R"(extern "C" __declspec(dllexport) void t3d_get_component_descs(List<ComponentDesc> &descs) {
-)");
-		for (auto component_name : component_names) {
-			append_format(builder, u8R"(	descs.add(get_component_desc_%());
-)", component_name);
-		}
-		append(builder, u8"}"s);
-
-
-		create_directory(format("%build", editor_directory));
-		write_entire_file(to_pathchars(scripts_init_path), as_bytes(to_string(builder)));
-	}
+	update_scripts_paths();
 
 
 
@@ -580,25 +669,17 @@ void recompile_all_scripts() {
 	{
 		StringBuilder builder;
 
-		auto cpp_files_file = read_entire_file(format("%data/cpp_files.txt", editor_directory));
-
-		auto cpp_paths = split(as_utf8(cpp_files_file), u8'\n');
-
-		for (auto cpp_path : cpp_paths) {
-			if (!cpp_path.size) continue;
-			append_format(builder, "%data/obj/%.obj ", editor_directory, parse_path(cpp_path).name);
+		for (auto cpp_file : project_cpp_files) {
+			append_format(builder, "% ", cpp_file);
 		}
 
-		append_format(builder, "% ", scripts_init_path);
-		for (auto script_path : script_paths) {
-			append_format(builder, "%.cpp ", script_path.subspan(0, script_path.size - 2));
-		}
+		append_editor_cpp_or_obj_files(builder);
 
 		for (auto inc : include_dirs) {
 			append_format(builder, "/I\"%%\" ", editor_directory, inc);
 		}
 
-		append_format(builder, "/LD /ZI /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:\"%\" ", scripts_dll_path);
+		append_format(builder, "/LD /Zi /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:\"%\" ", scripts_dll_path);
 
 
 		for (auto lib : lib_dirs) {
@@ -616,24 +697,25 @@ void reload_all_scripts(bool recompile) {
 	//
 	// Serialize components that are about to be rebuilt
 	//
+	// `app->current_scene` will be null on first call because scene is not loaded yet, so do nothing
+	//
 	List<ComponentIndex> components_to_update;
-	components_to_update.allocator = temporary_allocator;
 	StringBuilder builder;
-	for_each(app->entities, [&](Entity &entity) {
-		for (auto &component : entity.components) {
-			if (built_in_components.find(component.type)) {
-				continue;
+	if (app->current_scene) {
+		components_to_update.allocator = temporary_allocator;
+		for_each(app->current_scene->entities, [&](Entity &entity) {
+			for (auto &component : entity.components) {
+				auto found_info = app->component_infos.find(component.type_uid);
+				assert(found_info);
+				auto &info = *found_info;
+				info.serialize(builder, app->current_scene->get_component_data(component), false);
+
+				append(builder, '}'); // deserialier need this to finish parsing
+
+				components_to_update.add(component);
 			}
-			auto found_info = app->component_infos.find(component.type);
-			assert(found_info);
-			auto &info = *found_info;
-			info.serialize(builder, info.storage.get(component.index), false);
-
-			append(builder, '}'); // deserialier need this to finish parsing
-
-			components_to_update.add(component);
-		}
-	});
+		});
+	}
 
 	//
 	// Reload dll
@@ -654,28 +736,41 @@ void reload_all_scripts(bool recompile) {
 	//
 	// Register all components in dll
 	//
-	auto t3d_get_component_descs = (T3dRegisterComponents)GetProcAddress(scripts_dll, "t3d_get_component_descs");
+	auto exported_funcs = get_exported_functions_in_dll(scripts_dll_path);
 
 	List<ComponentDesc> descs;
 	descs.allocator = app->allocator;
-	t3d_get_component_descs(descs);
+	all_component_names.make_relative();
+	all_component_names.clear();
+	for (auto func_name : exported_funcs) {
+		auto prefix = u8"t3dcd"s;
+		if (starts_with(func_name, prefix)) {
+			all_component_names.add(as_utf8(func_name.subspan(prefix.size, func_name.size - 1 - prefix.size)));
+			using GetComponentDesc = ComponentDesc (*)();
+			descs.add(((GetComponentDesc)GetProcAddress(scripts_dll, func_name.data))());
+		}
+	}
+	all_component_names.make_absolute();
 
 	for (auto &desc : descs) {
 		update_component_info(desc);
 	}
 
-	//
-	// Deserialize components that were rebuilt
-	//
-	auto tokens = parse_tokens(as_utf8(to_string(builder))).get();
-	auto t = tokens.data;
-	for (auto &component : components_to_update) {
-		auto found_info = app->component_infos.find(component.type);
-		assert(found_info);
-		auto &info = *found_info;
-		auto data = info.storage.get(component.index);
-		info.construct(data);
-		info.deserialize_text(t, tokens.end(), data);
+	if (app->current_scene) {
+		//
+		// Deserialize components that were rebuilt
+		//
+		auto string = as_utf8(to_string(builder));
+		auto tokens = parse_tokens(string).get();
+		auto t = tokens.data;
+		for (auto &component : components_to_update) {
+			auto found_info = app->component_infos.find(component.type_uid);
+			assert(found_info);
+			auto &info = *found_info;
+			auto data = app->current_scene->get_component_data(component);
+			info.construct(data);
+			info.deserialize_text(t, tokens.end(), data);
+		}
 	}
 }
 
@@ -693,41 +788,450 @@ void wait(Task task) {
 	loop_until([&]{ return task.state->finished; });
 }
 
+Printer log_printer;
+
 template <class Fn>
 Task async(Fn &&fn) {
 	Task task;
 	task.state = task.allocator.allocate<Task::State>();
 	create_thread([task_state = task.state, fn = std::forward<Fn>(fn)] {
+		current_printer = log_printer;
 		fn();
 		task_state->finished = true;
 	});
 	return task;
 }
 
-Task scripts_compilation_task;
+void load_project(Span<utf8> directory) {
+	project_directory = directory;
+	project_name = parse_path(directory).name;
+
+	app->assets.directory = format(u8"%assets/"s, project_directory);
+
+	recompile_all_scripts();
+	reload_all_scripts(false);
+
+	auto create_default_scene = [&]() {
+		auto scene = default_allocator.allocate<Scene>();
+
+		auto &suzanne = scene->create_entity("suzan\"ne");
+		suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
+		{
+			auto &mr = add_component<MeshRenderer>(suzanne);
+			mr.mesh = app->assets.get_mesh(u8"scene.glb:Suzanne"s);
+			mr.material = &app->surface_material;
+			mr.lightmap = app->assets.get_texture_2d(u8"suzanne_lightmap.png"s);
+		}
+		selection.set(&suzanne);
+
+		auto &floor = scene->create_entity("floor");
+		{
+			auto &mr = add_component<MeshRenderer>(floor);
+			mr.mesh = app->assets.get_mesh(u8"scene.glb:Room"s);
+			mr.material = &app->surface_material;
+			mr.lightmap = app->assets.get_texture_2d(u8"floor_lightmap.png"s);
+		}
+
+		auto light_texture = app->assets.get_texture_2d(u8"spotlight_mask.png"s);
+
+		{
+			auto &light = scene->create_entity("light1");
+			light.position = {0,2,6};
+			//light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
+			light.rotation = quaternion_from_euler(0,0,0);
+			add_component<Light>(light).mask = light_texture;
+		}
+
+		{
+			auto &light = scene->create_entity("light2");
+			light.position = {6,2,-6};
+			light.rotation = quaternion_from_euler(-pi/10,pi*0.75,0);
+			add_component<Light>(light).mask = light_texture;
+		}
+
+		auto &camera_entity = scene->create_entity("main camera");
+		camera_entity.position = {0, 0, 4};
+
+		auto &camera = add_component<Camera>(camera_entity);
+
+		auto &exposure = camera.add_post_effect<Exposure>();
+		exposure.auto_adjustment = false;
+		exposure.exposure = 1.5;
+		exposure.limit_min = 1.0f / 16;
+		exposure.limit_max = 1024;
+		exposure.approach_kind = Exposure::Approach_log_lerp;
+		exposure.mask_kind = Exposure::Mask_one;
+		exposure.mask_radius = 1;
+
+		auto &bloom = camera.add_post_effect<Bloom>();
+
+		auto &dither = camera.add_post_effect<Dither>();
+
+		return scene;
+	};
+
+	//if (!deserialize_window_layout())
+		editor->main_window = create_split_view(
+			create_split_view(
+				create_tab_view(create_file_view()),
+				create_tab_view(create_scene_view()),
+				{ .split_t = 0 }
+			),
+			create_split_view(
+				create_tab_view(create_hierarchy_view()),
+				create_tab_view(create_property_view()),
+				{ .horizontal = true }
+			),
+			{ .split_t = 1 }
+		);
+
+	editor->main_window->resize(aabb_min_max({}, (v2s)app->window->client_size));
+
+	auto scene = deserialize_scene_text(u8"test.scene"s);
+	app->current_scene = scene ? scene : create_default_scene();
+	app->scenes.add(app->current_scene);
+
+	app->window->min_window_size = client_size_to_window_size(*app->window, editor->main_window->get_min_size());
+	app->sky_box_texture = app->assets.get_texture_cube(u8"sky.cubemap"s);
+}
+
+struct RecentProject {
+	List<utf8> path;
+	Date date;
+};
+List<RecentProject> recent_projects;
+bool initted_recent_projects;
+
+template <class T>
+List<Span<T>> split_by_any(Span<T> what, Span<T> by) {
+	List<Span<T>> result;
+
+	T *start = what.data;
+
+	for (auto w = what.data; w != what.end(); ++w) {
+		for (auto &by_it : by) {
+			if (*w == by_it) {
+				result.add(Span(start, w));
+				start = w + 1;
+				break;
+			}
+		}
+	}
+
+	result.add(Span(start, what.end()));
+
+	return result;
+}
+
+void split_test(Span<char> a, Span<char> b) {
+	print("split_by_any(\"%\", \"%\") = %\n", a, b, split_by_any(a, b));
+}
+
+void init_recent_projects() {
+	recent_projects.allocator = default_allocator;
+
+	auto recent_list_path = tformat(u8"%user/recent_projects", editor_directory);
+	Span<u8> recent_list;
+	if (!file_exists(recent_list_path)) {
+		create_directory(parent_directory(recent_list_path));
+		StringBuilder builder;
+		builder.allocator = temporary_allocator;
+
+		auto default_path = with(temporary_allocator, replace(as_span(format(u8"%example/", editor_directory)), u8'\\', u8'/'));
+
+		append_bytes(builder, (u32)default_path.size);
+		append_bytes(builder, default_path);
+
+		append_bytes(builder, get_date());
+
+		recent_list = (List<u8>)to_string(builder);
+		write_entire_file(recent_list_path, as_bytes(recent_list));
+	} else {
+		recent_list = with(temporary_allocator, read_entire_file(recent_list_path));
+	}
+
+	u8 *cursor = recent_list.data;
+	u8 *end = recent_list.end();
+
+	while (cursor != end) {
+		RecentProject rp;
+
+		u32 path_size;
+		if (cursor + sizeof(u32) > end) {
+			print(Print_error, "Recent projects list file is corrupted ('%' is past the end of buffer)", "path_size");
+			return;
+		}
+		path_size = *(u32 *)cursor;
+		cursor += sizeof(u32);
+
+		if (cursor + path_size > end) {
+			print(Print_error, "Recent projects list file is corrupted ('%' is past the end of buffer)", "path");
+			return;
+		}
+		rp.path.set(Span((utf8 *)cursor, path_size));
+		cursor += path_size;
+
+
+		if (cursor + sizeof(Date) > end) {
+			print(Print_error, "Recent projects list file is corrupted ('%' is past the end of buffer)", "date");
+			return;
+		}
+		rp.date = *(Date *)cursor;
+		cursor += sizeof(Date);
+
+		recent_projects.add(rp);
+	}
+}
+
+List<utf8> project_directory_text_field;
+
+void draw_project_selection() {
+	if (!initted_recent_projects) {
+		initted_recent_projects = true;
+		init_recent_projects();
+	}
+
+	app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, middle_color, 1);
+
+	tg::Viewport v;
+	v2s size = {480, 24};
+	v2s offset = {0, recent_projects.size * 32 / 2};
+	v.min = app->current_viewport.center() - size / 2 + offset;
+	v.max = app->current_viewport.center() + size / 2 + offset;
+	push_current_viewport(v) {
+		auto theme = default_text_field_theme;
+		theme.font_size = 16;
+		text_field(project_directory_text_field, 0, theme);
+	}
+
+	u32 id = 0;
+	for (auto p : recent_projects) {
+		v.min.y -= 32;
+		v.max.y -= 32;
+
+		auto theme = default_button_theme;
+		theme.font_size = 16;
+		if (button(v, tformat(u8"% - %", p.path, p.date), id, theme)) {
+			assert(p.path.back() == '\\' || p.path.back() == '/');
+			load_project(p.path);
+		}
+		++id;
+	}
+}
+
+void draw_editor() {
+	if (app->did_resize) {
+		editor->main_window->resize({.min = {}, .max = (v2s)app->window->client_size});
+	}
+
+	if (key_down(Key_f2, {.anywhere = true})) {
+		for_each(app->current_scene->entities, [](Entity &e) {
+			print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, get_entity_index(e), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
+			for (auto &c : e.components) {
+				print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type_uid, get_component_info(c.type_uid).name, c.storage_index);
+			}
+		});
+	}
+
+
+	if (key_down(Key_f6, {.anywhere = true})) {
+		build_executable();
+	}
+	app->window->min_window_size = client_size_to_window_size(*app->window, editor->main_window->get_min_size());
+
+	timed_block("frame"s);
+
+	runtime_render();
+
+	//app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
+
+	{
+		timed_block("editor->main_window->render()"s);
+		editor->main_window->render();
+	}
+
+	switch (editor->drag_and_drop_kind) {
+		case DragAndDrop_file: {
+			auto texture = app->assets.get_texture_2d(as_utf8(editor->drag_and_drop_data));
+			if (texture) {
+				aabb<v2s> thumbnail_viewport;
+				thumbnail_viewport.min = thumbnail_viewport.max = app->current_mouse_position;
+				thumbnail_viewport.max.x += 128;
+				thumbnail_viewport.min.y -= 128;
+				push_current_viewport(thumbnail_viewport) {
+					gui_image(texture);
+				}
+			}
+			break;
+		}
+		case DragAndDrop_tab: {
+			auto tab_info = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
+			auto tab = tab_info.tab_view->tabs[tab_info.tab_index];
+
+			auto font = get_font_at_size(app->font_collection, font_size);
+			ensure_all_chars_present(tab.window->name, font);
+			auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
+
+			tg::Viewport tab_viewport;
+			tab_viewport.min = tab_viewport.max = app->current_mouse_position;
+
+			tab_viewport.min.y -= TabView::tab_height;
+			tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
+
+			push_current_viewport(tab_viewport) {
+				gui_panel({.1,.1,.1,1});
+
+				label(placed_chars, font, {.position = {2, 0}});
+			}
+			break;
+		}
+	}
+
+	if (drag_and_dropping()) {
+		if (editor->key_state[256].state & KeyState_up) {
+			editor->drag_and_drop_kind = DragAndDrop_none;
+			unlock_input_nocheck();
+		}
+	}
+
+	debug_frame();
+
+	bool debug_print_editor_window_hierarchy = app->frame_index == 0;
+	for (auto &move : tab_moves) {
+		auto from = move.from;
+		auto tab_index = move.tab_index;
+		auto to = move.to;
+		auto direction = move.direction;
+
+		auto tab = from->tabs[tab_index];
+
+		auto remove_tab_view = [&]() {
+			auto split_view = (SplitView *)from->parent;
+			assert(split_view);
+			assert(split_view->kind == EditorWindow_split_view);
+
+			EditorWindow *what_is_left = split_view->get_other_part(from);
+
+			what_is_left->parent = split_view->parent;
+
+			if (split_view->parent) {
+				switch (split_view->parent->kind) {
+					case EditorWindow_split_view: {
+						auto parent_view = (SplitView *)split_view->parent;
+						parent_view->get_part(split_view) = what_is_left;
+						parent_view->resize(parent_view->viewport);
+						break;
+					}
+					default: {
+						invalid_code_path();
+						break;
+					}
+				}
+			} else {
+				auto main_window_viewport = editor->main_window->viewport;
+				editor->main_window = what_is_left;
+				editor->main_window->resize(main_window_viewport);
+			}
+		};
+
+		if (direction == (u32)-1) {
+			if (!tab.window->parent->parent)
+				return;
+
+			to->tabs.add(tab);
+			from->tabs.erase_at(tab_index);
+			if (tab_index < from->selected_tab) {
+				--from->selected_tab;
+			}
+			from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
+
+			if (from->tabs.size == 0) {
+				remove_tab_view();
+			}
+		} else {
+			bool horizontal = (direction & 1);
+			bool swap_parts = direction >= 2;
+
+			TabView *new_tab_view;
+			if (from->tabs.size == 1) {
+				new_tab_view = from;
+
+				auto from_parent = (SplitView *)from->parent;
+				assert(from_parent);
+				assert(from_parent->kind == EditorWindow_split_view);
+				auto what_is_left = from_parent->get_other_part(from);
+				auto from_parent_parent = (SplitView *)from_parent->parent;
+				assert(from_parent_parent);
+				assert(from_parent_parent->kind == EditorWindow_split_view);
+				from_parent_parent->replace_child(from_parent, what_is_left);
+			} else {
+				if (tab_index < from->selected_tab) {
+					--from->selected_tab;
+				}
+				from->tabs.erase_at(tab_index);
+				from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
+				if (from->tabs.size == 0) {
+					remove_tab_view();
+				}
+				new_tab_view = create_tab_view(tab.window);
+			}
+
+			auto left = to;
+			auto right = new_tab_view;
+			if (swap_parts) {
+				swap(left, right);
+			}
+
+			if (to->parent) {
+				auto to_parent = (SplitView *)to->parent;
+				assert(to_parent->kind == EditorWindow_split_view);
+
+				to_parent->replace_child(to, create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal}));
+			} else {
+				assert(to == editor->main_window);
+				editor->main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
+			}
+
+			tg::Viewport window_viewport = {};
+			window_viewport.max = (v2s)max(editor->main_window->get_min_size(), app->window->client_size);
+			editor->main_window->resize(window_viewport);
+			resize(*app->window, (v2u)window_viewport.max);
+
+			//to_parent->resize(to_parent->viewport);
+		}
+
+		//split_view->free();
+
+		debug_print_editor_window_hierarchy = true;
+	}
+	tab_moves.clear();
+
+
+	if (debug_print_editor_window_hierarchy || (editor->key_state[Key_f4].state & KeyState_down)) {
+		debug_print_editor_window_hierarchy = false;
+
+		editor->main_window->debug_print();
+	}
+
+}
 
 void run() {
 	allocate_app();
 	allocate(editor);
+	editor->scene = default_allocator.allocate<Scene>();
 
 	app->is_editor = true;
-	app->assets.directory = format(u8"%assets/"s, project_directory);
 	editor->assets.directory = format(u8"%data/"s, editor_directory);
 	construct(manipulator_draw_requests);
 	construct(manipulator_states);
 	construct(debug_lines);
 	construct(tab_moves);
 
-	scripts_compilation_task = async(recompile_all_scripts);
-
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
-		runtime_init(window);
+		app->window = &window;
 
-		built_in_components = copy(app->component_infos);
-
-		wait(scripts_compilation_task);
-		reload_all_scripts(false);
+		runtime_init();
 
 		app->tg->set_scissor(aabb_min_max({}, (v2s)window.client_size));
 
@@ -756,101 +1260,24 @@ void run() {
 		handle_plane_y_mesh = editor->assets.get_mesh(u8"handle.glb:PlaneY"s);
 		handle_plane_z_mesh = editor->assets.get_mesh(u8"handle.glb:PlaneZ"s);
 
-		auto create_default_scene = [&]() {
-			auto &suzanne = create_entity("suzan\"ne");
-			suzanne.rotation = quaternion_from_euler(radians(v3f{-54.7, 45, 0}));
-			{
-				auto &mr = add_component<MeshRenderer>(suzanne);
-				mr.mesh = app->assets.get_mesh(u8"scene.glb:Suzanne"s);
-				mr.material = &app->surface_material;
-				mr.lightmap = app->assets.get_texture_2d(u8"suzanne_lightmap.png"s);
-			}
-			selection.set(&suzanne);
-
-			auto &floor = create_entity("floor");
-			{
-				auto &mr = add_component<MeshRenderer>(floor);
-				mr.mesh = app->assets.get_mesh(u8"scene.glb:Room"s);
-				mr.material = &app->surface_material;
-				mr.lightmap = app->assets.get_texture_2d(u8"floor_lightmap.png"s);
-			}
-
-			auto light_texture = app->assets.get_texture_2d(u8"spotlight_mask.png"s);
-
-			{
-				auto &light = create_entity("light1");
-				light.position = {0,2,6};
-				//light.rotation = quaternion_from_euler(-pi/10,0,pi/6);
-				light.rotation = quaternion_from_euler(0,0,0);
-				add_component<Light>(light).mask = light_texture;
-			}
-
-			{
-				auto &light = create_entity("light2");
-				light.position = {6,2,-6};
-				light.rotation = quaternion_from_euler(-pi/10,pi*0.75,0);
-				add_component<Light>(light).mask = light_texture;
-			}
-
-			auto &camera_entity = create_entity("main camera");
-			camera_entity.position = {0, 0, 4};
-
-			auto &camera = add_component<Camera>(camera_entity);
-
-			auto &exposure = camera.add_post_effect<Exposure>();
-			exposure.auto_adjustment = false;
-			exposure.exposure = 1.5;
-			exposure.limit_min = 1.0f / 16;
-			exposure.limit_max = 1024;
-			exposure.approach_kind = Exposure::Approach_log_lerp;
-			exposure.mask_kind = Exposure::Mask_one;
-			exposure.mask_radius = 1;
-
-			auto &bloom = camera.add_post_effect<Bloom>();
-
-			auto &dither = camera.add_post_effect<Dither>();
-		};
-
-		//if (!deserialize_window_layout())
-			editor->main_window = create_split_view(
-				create_split_view(
-					create_tab_view(create_file_view()),
-					create_tab_view(create_scene_view()),
-					{ .split_t = 0 }
-				),
-				create_split_view(
-					create_tab_view(create_hierarchy_view()),
-					create_tab_view(create_property_view()),
-					{ .horizontal = true }
-				),
-				{ .split_t = 1 }
-			);
-
-		if (!deserialize_scene_text(u8"test.scene"s))
-			create_default_scene();
-
-		window.min_window_size = client_size_to_window_size(window, editor->main_window->get_min_size());
 	};
 	info.on_draw = [](Window &window) {
-		app->current_cursor = Cursor_default;
-
 		static v2u old_window_size;
-		if (any_true(old_window_size != window.client_size)) {
-			old_window_size = window.client_size;
-
-			editor->main_window->resize({.min = {}, .max = (v2s)window.client_size});
-
-			app->tg->resize_render_targets(window.client_size);
+		app->did_resize = false;
+		if (any_true(old_window_size != app->window->client_size)) {
+			old_window_size = app->window->client_size;
+			app->tg->resize_render_targets(app->window->client_size);
+			app->did_resize = true;
 		}
 
 		app->current_viewport = app->current_scissor = {
 			.min = {},
-			.max = (v2s)window.client_size,
+			.max = (v2s)app->window->client_size,
 		};
 		app->tg->set_viewport(app->current_viewport);
 		app->tg->set_scissor(app->current_scissor);
 
-		app->current_mouse_position = {window.mouse_position.x, (s32)window.client_size.y - window.mouse_position.y};
+		app->current_mouse_position = {app->window->mouse_position.x, (s32)app->window->client_size.y - app->window->mouse_position.y};
 
 		if (key_down(Key_f1, {.anywhere = true})) {
 			Profiler::enabled = true;
@@ -863,201 +1290,20 @@ void run() {
 			}
 		};
 
-		if (key_down(Key_f2, {.anywhere = true})) {
-			for_each(app->entities, [](Entity &e) {
-				print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, get_entity_index(e), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
-				for (auto &c : e.components) {
-					print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type, get_component_info(c.type).name, c.index);
-				}
-			});
+		app->current_cursor = Cursor_default;
+
+		gui_begin_frame();
+
+		if (project_directory.size) {
+			draw_editor();
+		} else {
+			draw_project_selection();
 		}
-
-		if (key_down(Key_f6, {.anywhere = true})) {
-			build_executable();
-		}
-		window.min_window_size = client_size_to_window_size(window, editor->main_window->get_min_size());
-
-		editor->input_user_index = 0;
-		editor->focusable_input_user_index = 0;
-
-		timed_block("frame"s);
-
-		runtime_render();
-
-		//app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
-
-		{
-			timed_block("editor->main_window->render()"s);
-			editor->main_window->render();
-		}
-
-		switch (editor->drag_and_drop_kind) {
-			case DragAndDrop_file: {
-				auto texture = app->assets.get_texture_2d(as_utf8(editor->drag_and_drop_data));
-				if (texture) {
-					aabb<v2s> thumbnail_viewport;
-					thumbnail_viewport.min = thumbnail_viewport.max = app->current_mouse_position;
-					thumbnail_viewport.max.x += 128;
-					thumbnail_viewport.min.y -= 128;
-					push_current_viewport(thumbnail_viewport) {
-						gui_image(texture);
-					}
-				}
-				break;
-			}
-			case DragAndDrop_tab: {
-				auto tab_info = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
-				auto tab = tab_info.tab_view->tabs[tab_info.tab_index];
-
-				auto font = get_font_at_size(app->font_collection, font_size);
-				ensure_all_chars_present(tab.window->name, font);
-				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
-
-				tg::Viewport tab_viewport;
-				tab_viewport.min = tab_viewport.max = app->current_mouse_position;
-
-				tab_viewport.min.y -= TabView::tab_height;
-				tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
-
-				push_current_viewport(tab_viewport) {
-					gui_panel({.1,.1,.1,1});
-
-					label(placed_chars, font, {.position = {2, 0}});
-				}
-				break;
-			}
-		}
-
-		if (drag_and_dropping()) {
-			if (editor->key_state[256].state & KeyState_up) {
-				editor->drag_and_drop_kind = DragAndDrop_none;
-				unlock_input_nocheck();
-			}
-		}
-
-		debug_frame();
-
-		bool debug_print_editor_window_hierarchy = app->frame_index == 0;
-		for (auto &move : tab_moves) {
-			auto from = move.from;
-			auto tab_index = move.tab_index;
-			auto to = move.to;
-			auto direction = move.direction;
-
-			auto tab = from->tabs[tab_index];
-
-			auto remove_tab_view = [&]() {
-				auto split_view = (SplitView *)from->parent;
-				assert(split_view);
-				assert(split_view->kind == EditorWindow_split_view);
-
-				EditorWindow *what_is_left = split_view->get_other_part(from);
-
-				what_is_left->parent = split_view->parent;
-
-				if (split_view->parent) {
-					switch (split_view->parent->kind) {
-						case EditorWindow_split_view: {
-							auto parent_view = (SplitView *)split_view->parent;
-							parent_view->get_part(split_view) = what_is_left;
-							parent_view->resize(parent_view->viewport);
-							break;
-						}
-						default: {
-							invalid_code_path();
-							break;
-						}
-					}
-				} else {
-					auto main_window_viewport = editor->main_window->viewport;
-					editor->main_window = what_is_left;
-					editor->main_window->resize(main_window_viewport);
-				}
-			};
-
-			if (direction == (u32)-1) {
-				if (!tab.window->parent->parent)
-					return;
-
-				to->tabs.add(tab);
-				from->tabs.erase_at(tab_index);
-				if (tab_index < from->selected_tab) {
-					--from->selected_tab;
-				}
-				from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
-
-				if (from->tabs.size == 0) {
-					remove_tab_view();
-				}
-			} else {
-				bool horizontal = (direction & 1);
-				bool swap_parts = direction >= 2;
-
-				TabView *new_tab_view;
-				if (from->tabs.size == 1) {
-					new_tab_view = from;
-
-					auto from_parent = (SplitView *)from->parent;
-					assert(from_parent);
-					assert(from_parent->kind == EditorWindow_split_view);
-					auto what_is_left = from_parent->get_other_part(from);
-					auto from_parent_parent = (SplitView *)from_parent->parent;
-					assert(from_parent_parent);
-					assert(from_parent_parent->kind == EditorWindow_split_view);
-					from_parent_parent->replace_child(from_parent, what_is_left);
-				} else {
-					if (tab_index < from->selected_tab) {
-						--from->selected_tab;
-					}
-					from->tabs.erase_at(tab_index);
-					from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
-					if (from->tabs.size == 0) {
-						remove_tab_view();
-					}
-					new_tab_view = create_tab_view(tab.window);
-				}
-
-				auto left = to;
-				auto right = new_tab_view;
-				if (swap_parts) {
-					swap(left, right);
-				}
-
-				if (to->parent) {
-					auto to_parent = (SplitView *)to->parent;
-					assert(to_parent->kind == EditorWindow_split_view);
-
-					to_parent->replace_child(to, create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal}));
-				} else {
-					assert(to == editor->main_window);
-					editor->main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
-				}
-
-				tg::Viewport window_viewport = {};
-				window_viewport.max = (v2s)max(editor->main_window->get_min_size(), window.client_size);
-				editor->main_window->resize(window_viewport);
-				resize(window, (v2u)window_viewport.max);
-
-				//to_parent->resize(to_parent->viewport);
-			}
-
-			//split_view->free();
-
-			debug_print_editor_window_hierarchy = true;
-		}
-		tab_moves.clear();
-
 
 		if (editor->should_unlock_input) {
 			editor->should_unlock_input = false;
 			editor->input_is_locked = false;
 			editor->input_locker = 0;
-		}
-
-		if (debug_print_editor_window_hierarchy || (editor->key_state[Key_f4].state & KeyState_down)) {
-			debug_print_editor_window_hierarchy = false;
-
-			editor->main_window->debug_print();
 		}
 
 		for (auto &state : editor->key_state) {
@@ -1077,78 +1323,7 @@ void run() {
 
 		editor->input_string.clear();
 
-		for (auto &draw : editor->gui_draws) {
-			app->tg->set_viewport(draw.viewport);
-			app->tg->set_scissor(draw.scissor);
-			switch (draw.kind) {
-				case GuiDraw_rect_colored: {
-					auto &rect_colored = draw.rect_colored;
-					blit(rect_colored.color);
-					break;
-				}
-				case GuiDraw_rect_textured: {
-					auto &rect_textured = draw.rect_textured;
-					blit(rect_textured.texture);
-					break;
-				}
-				case GuiDraw_label: {
-					auto &label = draw.label;
-
-					auto font = label.font;
-					auto placed_text = label.placed_chars;
-
-					assert(placed_text.size);
-
-					struct Vertex {
-						v2f position;
-						v2f uv;
-					};
-
-					List<Vertex> vertices;
-					vertices.allocator = temporary_allocator;
-
-					for (auto &c : placed_text) {
-						Span<Vertex> quad = {
-							{{c.position.min.x, c.position.min.y}, {c.uv.min.x, c.uv.min.y}},
-							{{c.position.max.x, c.position.min.y}, {c.uv.max.x, c.uv.min.y}},
-							{{c.position.max.x, c.position.max.y}, {c.uv.max.x, c.uv.max.y}},
-							{{c.position.min.x, c.position.max.y}, {c.uv.min.x, c.uv.max.y}},
-						};
-						vertices += {
-							quad[1], quad[0], quad[2],
-							quad[2], quad[0], quad[3],
-						};
-					}
-
-					if (app->text_vertex_buffer) {
-						app->tg->update_vertex_buffer(app->text_vertex_buffer, as_bytes(vertices));
-					} else {
-						app->text_vertex_buffer = app->tg->create_vertex_buffer(as_bytes(vertices), {
-							tg::Element_f32x2, // position
-							tg::Element_f32x2, // uv
-						});
-					}
-					app->tg->set_rasterizer({.depth_test = false, .depth_write = false});
-					app->tg->set_topology(tg::Topology_triangle_list);
-					app->tg->set_blend(tg::BlendFunction_add, tg::Blend_secondary_color, tg::Blend_one_minus_secondary_color);
-					app->tg->set_shader(app->text_shader);
-					app->tg->set_shader_constants(app->text_shader_constants, 0);
-					app->tg->update_shader_constants(app->text_shader_constants, {
-						.inv_half_viewport_size = v2f{2,-2} / (v2f)draw.viewport.size(),
-						.offset = (v2f)label.position,
-					});
-					app->tg->set_vertex_buffer(app->text_vertex_buffer);
-					app->tg->set_sampler(tg::Filtering_nearest, 0);
-					app->tg->set_texture(font->texture, 0);
-					app->tg->draw(vertices.size);
-					break;
-				}
-				default: invalid_code_path("not implemented"); break;
-			}
-		}
-		editor->gui_draws.clear();
-
-		clear_temporary_storage();
+		gui_draw();
 
 		{
 			timed_block("present"s);
@@ -1158,9 +1333,9 @@ void run() {
 		update_time();
 
 		++fps_counter;
-		set_title(&window, tformat(u8"frame_time: % ms, fps: %", app->frame_time * 1000, fps_counter_result));
+		set_title(app->window, tformat(u8"frame_time: % ms, fps: %", app->frame_time * 1000, fps_counter_result));
 
-		set_cursor(window, app->current_cursor);
+		set_cursor(*app->window, app->current_cursor);
 
 		fps_timer += app->frame_time;
 		if (fps_timer >= 1) {
@@ -1168,6 +1343,8 @@ void run() {
 			fps_timer -= 1;
 			fps_counter = 0;
 		}
+
+		clear_temporary_storage();
 	};
 	info.on_key_down = [](u8 key) {
 		editor->key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
@@ -1191,7 +1368,9 @@ void run() {
 		editor->input_string.add(encode_utf8(ch));
 	};
 	info.client_size = {1280, 720};
-	app->window = create_window(info);
+	if (!create_window(info)) {
+		return;
+	}
 	defer { free(app->window); };
 
 	assert_always(app->window);
@@ -1205,15 +1384,19 @@ void run() {
 	while (update(app->window)) {
 	}
 
-	write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene_text())));
+	if (app->current_scene) {
+		write_entire_file(tl_file_string("test.scene"s), as_bytes(with(temporary_allocator, serialize_scene_text(app->current_scene))));
 
-	//serialize_window_layout();
+		//serialize_window_layout();
 
-	for_each(app->entities, [](Entity &e) {
-		destroy_entity(e);
-	});
+		for_each(app->current_scene->entities, [](Entity &e) {
+			destroy_entity(e);
+		});
+	}
 
-	free_component_storages();
+	for (auto scene : app->scenes) {
+		scene->free();
+	}
 }
 
 s32 tl_main(Span<Span<utf8>> arguments) {
@@ -1227,26 +1410,26 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	current_allocator = tracking_allocator;
 #endif
 
+	construct(project_cpp_files);
+	construct(project_h_files  );
+	construct(editor_cpp_files );
+	construct(all_component_names);
+	construct(project_directory_text_field);
+
 	editor_exe_path = arguments[0];
 	if (!is_absolute_path(editor_exe_path)) {
 		editor_exe_path = make_absolute_path(editor_exe_path);
 	}
+
 	editor_bin_directory = parse_path(editor_exe_path).directory;
 	editor_bin_directory.size ++; // include slash
 
 	editor_directory = parent_directory(editor_bin_directory);
 
-	scripts_init_path = format(u8"%build/scripts_init.cpp", editor_directory);
 
-	project_name      = u8"example"s;
-	project_directory = format(u8"%example/"s, editor_directory);
-
-	clear_build_directory();
-	defer { clear_build_directory(); };
-
-	auto log_file = open_file(tl_file_string("editor_log.txt"s), {.write = true});
+	auto log_file = open_file(tformat("%bin/editor_log.txt"s, editor_directory), {.write = true});
 	defer { close(log_file); };
-	auto log_printer = Printer {
+	log_printer = Printer {
 		[](PrintKind kind, Span<utf8> string, void *data) {
 			console_printer(kind, string);
 			write({data}, as_bytes(string));
@@ -1255,6 +1438,22 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	};
 
 	current_printer = log_printer;
+
+
+	component_descs_getter_path = format(u8"%build/get_component_descs.cpp", editor_directory);
+
+	//project_name      = u8"example"s;
+	//project_directory = format(u8"%example/"s, editor_directory);
+
+	for_each_file_recursive(tformat(u8"%src/t3d/", editor_directory), [] (Span<utf8> item) {
+		if (ends_with(item, u8".cpp"s)) {
+			editor_cpp_files.add(item);
+		}
+	});
+	editor_cpp_files.make_absolute();
+
+	clear_build_directory();
+	defer { clear_build_directory(); };
 
 	auto cpu_info = get_cpu_info();
 	print(R"(CPU:

@@ -45,9 +45,9 @@ void draw_property(Span<utf8> name, v3f &value, u64 id, std::source_location loc
 	z_viewport.min.x = y_viewport.max.x;
 	z_viewport.max.x = line_viewport.max.x;
 
-	push_current_viewport(x_viewport) label("X");
-	push_current_viewport(y_viewport) label("Y");
-	push_current_viewport(z_viewport) label("Z");
+	push_current_viewport(x_viewport) label("X", font_size);
+	push_current_viewport(y_viewport) label("Y", font_size);
+	push_current_viewport(z_viewport) label("Z", font_size);
 
 	x_viewport.min.x += font_size;
 	y_viewport.min.x += font_size;

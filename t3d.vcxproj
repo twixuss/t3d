@@ -36,6 +36,7 @@
     <ClCompile Include="src\t3d\main.cpp" />
     <ClCompile Include="src\t3d\main_editor.cpp" />
     <ClCompile Include="src\t3d\mesh.cpp" />
+    <ClCompile Include="src\t3d\scene.cpp" />
     <ClCompile Include="src\t3d\serialize.cpp" />
     <None Include="src\t3d\main_runtime.cpp" />
   </ItemGroup>
@@ -76,6 +77,7 @@
     <ClInclude Include="src\t3d\post_effects\dither.h" />
     <ClInclude Include="src\t3d\post_effects\exposure.h" />
     <ClInclude Include="src\t3d\runtime.h" />
+    <ClInclude Include="src\t3d\scene.h" />
     <ClInclude Include="src\t3d\selection.h" />
     <ClInclude Include="src\t3d\serialize.h" />
     <ClInclude Include="src\t3d\app.h" />
@@ -182,6 +184,7 @@
       <PreprocessToFile>false</PreprocessToFile>
       <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -227,6 +230,7 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <PreprocessToFile>false</PreprocessToFile>
       <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

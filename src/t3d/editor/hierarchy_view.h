@@ -18,7 +18,7 @@ struct HierarchyView : EditorWindow {
 		s32 const button_padding = 2;
 		v2s next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
 
-		for_each(app->entities, [&](Entity &entity) {
+		for_each(app->current_scene->entities, [&](Entity &entity) {
 			if (is_editor_entity(entity)) {
 				return;
 			}

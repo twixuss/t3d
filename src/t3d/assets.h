@@ -24,7 +24,7 @@ struct Assets {
 	Mesh *get_mesh(Span<utf8> path) {
 		auto found = meshes_by_name.find(path);
 		if (found) {
-			return *found;
+			return found.get_unchecked();
 		} else {
 			auto submesh_separator = find(path, u8':');
 			if (submesh_separator) {
@@ -36,7 +36,7 @@ struct Assets {
 
 				auto &scene = scenes3d_by_name.get_or_insert(scene_path);
 				if (!scene) {
-					scene = &scenes3d.add();
+					scene = scenes3d.add().pointer;
 					auto parsed = parse_glb_from_memory(scene_data);
 					//if (!parsed) {
 					//	print(Print_error, "Failed to parse scene file '%'\n", scene_path);

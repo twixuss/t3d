@@ -37,8 +37,8 @@ struct PropertyView : EditorWindow {
 
 						s32 button_height_plus_padding = 16 + 2;
 
-						for_each(app->component_infos, [&](ComponentUID component_type, ComponentInfo &info) {
-							if (button(button_viewport, info.name, component_type)) {
+						for_each(app->component_infos, [&](Uid component_type, ComponentInfo &info) {
+							if (button(button_viewport, info.name, component_type.value)) {
 								adding_component = false;
 								add_component(*selection.entity, component_type);
 							}
@@ -59,7 +59,7 @@ struct PropertyView : EditorWindow {
 						for (auto component : selection.entity->components) {
 							defer { ++component_index_in_entity; };
 
-							auto &info = get_component_info(component.type);
+							auto &info = get_component_info(component.type_uid);
 
 							auto x_viewport = app->current_viewport;
 							x_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
@@ -68,7 +68,7 @@ struct PropertyView : EditorWindow {
 
 							header(info.name);
 
-							info.draw_properties(info.storage.get(component.index));
+							info.draw_properties(selection.entity->scene->get_component_data(component));
 							property_separator();
 
 							if (button(x_viewport, u8"X"s, component_index_in_entity)) {

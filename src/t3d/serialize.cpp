@@ -28,11 +28,11 @@ void serialize_binary(StringBuilder &builder, Mesh *value) {
 	}
 }
 
-List<u8> serialize_scene_binary() {
+List<u8> serialize_scene_binary(Scene *scene, HashMap<Uid, Uid> component_type_uid_remap) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 
-	for_each(app->entities, [&](Entity &entity) {
+	for_each(scene->entities, [&](Entity &entity) {
 		if (is_editor_entity(entity)) {
 			return;
 		}
@@ -45,9 +45,9 @@ List<u8> serialize_scene_binary() {
 
 		append_bytes(builder, (u32)entity.components.size);
 		for (auto &component : entity.components) {
-			append_bytes(builder, (u32)component.type);
-			auto &info = get_component_info(component.type);
-			info.serialize(builder, info.storage.get(component.index), true);
+			append_bytes(builder, component_type_uid_remap.find(component.type_uid).get());
+			auto &info = get_component_info(component.type_uid);
+			info.serialize(builder, app->current_scene->get_component_data(component), true);
 		}
 	});
 
@@ -105,12 +105,12 @@ void serialize_text(StringBuilder &builder, Mesh *value) {
 	}
 }
 
-List<u8> serialize_scene_text() {
+List<u8> serialize_scene_text(Scene *scene) {
 	StringBuilder builder;
 	builder.allocator = temporary_allocator;
 
 
-	for_each(app->entities, [&](Entity &entity) {
+	for_each(scene->entities, [&](Entity &entity) {
 		if (is_editor_entity(entity)) {
 			return;
 		}
@@ -130,10 +130,10 @@ List<u8> serialize_scene_text() {
 
 		for (auto &component : entity.components) {
 			append(builder, "\t");
-			auto &info = get_component_info(component.type);
+			auto &info = get_component_info(component.type_uid);
 			append(builder, info.name);
 			append(builder, " {\n");
-			info.serialize(builder, info.storage.get(component.index), false);
+			info.serialize(builder, scene->get_component_data(component), false);
 			append(builder, "\t}\n");
 		}
 		append(builder, "}\n");
@@ -142,324 +142,213 @@ List<u8> serialize_scene_text() {
 	return (List<u8>)to_string(builder, current_allocator);
 }
 
-bool deserialize_scene_text(Span<utf8> path) {
+Scene *deserialize_scene_text(Span<utf8> path) {
 	auto source = (Span<utf8>)with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
 
 	if (!source.data) {
 		print(Print_error, "Failed to read scene file '%'\n", path);
-		return false;
+		return 0;
 	}
 
-	List<Token> tokens;
-	tokens.allocator = temporary_allocator;
+	auto got_tokens = parse_tokens(source);
+	if (!got_tokens) {
+		return 0;
+	}
+	List<Token> tokens = got_tokens.get();
 
-	HashMap<Span<utf8>, TokenKind> string_to_token_kind;
-	string_to_token_kind.allocator = temporary_allocator;
-	string_to_token_kind.get_or_insert(u8"null"s) = Token_null;
+	Token *t = tokens.data;
+	Token *end = tokens.end();
 
-	auto current_char_p = source.data;
-	auto next_char_p = current_char_p;
-	auto end = source.end();
-
-	utf32 c = 0;
-	auto next_char = [&] {
-		current_char_p = next_char_p;
-		if (current_char_p >= end) {
-			return false;
+	List<Entity *> added_entities;
+	bool success = false;
+	defer {
+		if (!success) {
+			for (auto entity : added_entities) {
+				destroy_entity(*entity);
+			}
 		}
-		auto got = get_char_and_advance_utf8(&next_char_p);
-		if (got.valid()) {
-			c = got.get();
-			return true;
-		}
-		return false;
 	};
 
-	next_char();
+	auto scene = default_allocator.allocate<Scene>();
 
-	while (current_char_p < end) {
-		while (current_char_p != end && is_whitespace(c)) {
-			next_char();
+	while (t != end) {
+
+		if (t->string != u8"entity"s) {
+			print(Print_error, "Expected 'entity' keyword, but got '%'\n", t->string);
+			return 0;
 		}
-		if (current_char_p == end) {
-			break;
+
+		t += 1;
+
+		if (t == end) {
+			print(Print_error, "Expected entity name in quotes after 'entity' keyword, but got end of file\n");
+			return 0;
+		}
+		if (t->kind != '"') {
+			print(Print_error, "Expected entity name in quotes, but got '%'\n", t->string);
+			return 0;
 		}
 
-		if (is_alpha(c) || c == '_') {
-			Token token;
-			token.string.data = current_char_p;
+		auto successfully_unescaped_name = with(temporary_allocator, unescape_string(t->string));
+		if (!successfully_unescaped_name) {
+			print(Print_error, "Failed to unescape string '%'\n", t->string);
+			return 0;
+		}
+		List<utf8> unescaped_name = successfully_unescaped_name.get();
 
-			while (next_char() && (is_alpha(c) || c == '_' || is_digit(c))) {
+		++t;
+
+		if (t == end) {
+			print(Print_error, "Expected '{' after entity name, but got end of file\n");
+			return 0;
+		}
+		if (t->kind != '{') {
+			print(Print_error, "Expected '{' after entity name, but got '%'\n", t->string);
+			return 0;
+		}
+		++t;
+
+		auto &entity = scene->create_entity(unescaped_name);
+		added_entities.add(&entity);
+
+		auto entity_index = (u32)index_of(scene->entities, &entity).get();
+
+		while (t != end && t->kind != '}') {
+			if (t->kind != Token_identifier) {
+				print(Print_error, "Expected position, rotation, scale or component name, but got '%'\n", t->string);
+				return 0;
 			}
 
-			token.string.size = current_char_p - token.string.data;
-
-			auto found = string_to_token_kind.find(token.string);
-			if (found) {
-				token.kind = *found;
-			} else {
-				token.kind = Token_identifier;
-			}
-
-			tokens.add(token);
-		} else if (is_digit(c) || c == '-') {
-			Token token;
-			token.kind = Token_number;
-			token.string.data = current_char_p;
-
-			while (next_char() && is_digit(c)) {
-			}
-
-			if (current_char_p != end) {
-				if (c == '.') {
-					while (next_char() && is_digit(c)) {
-					}
-				}
-			}
-
-			token.string.size = current_char_p - token.string.data;
-			tokens.add(token);
-		} else {
-			switch (c) {
-				case '"': {
-					Token token;
-					token.kind = '"';
-					token.string.data = current_char_p + 1;
-
-				continue_search:
-					while (next_char() && (c != '"')) {
-					}
-
-					if (current_char_p == end) {
-						print(Print_error, "Unclosed string literal\n");
-						return false;
-					}
-
-					if (current_char_p[-1] == '\\') {
-						goto continue_search;
-					}
-
-					token.string.size = current_char_p - token.string.data;
-
-					next_char();
-
-					tokens.add(token);
-					break;
-				}
-				case ';':
-				case '{':
-				case '}': {
-					Token token;
-					token.kind = c;
-					token.string.data = current_char_p;
-					token.string.size = 1;
-					tokens.add(token);
-					next_char();
-					break;
-				}
-				default: {
-					print(Print_error, "Failed to deserialize scene: invalid character '%'\n", c);
+			auto parse_float = [&] (f32 &result) {
+				if (t == end) {
+					print(Print_error, "Expected a number after position, but got end of file\n");
 					return false;
 				}
-			}
-		}
-	}
-
-	{
-		Token *t = tokens.data;
-		Token *end = tokens.end();
-
-		List<Entity *> added_entities;
-		bool success = false;
-		defer {
-			if (!success) {
-				for (auto entity : added_entities) {
-					destroy_entity(*entity);
-				}
-			}
-		};
-
-		while (t != end) {
-
-			if (t->string != u8"entity"s) {
-				print(Print_error, "Expected 'entity' keyword, but got '%'\n", t->string);
-				return false;
-			}
-
-			t += 1;
-
-			if (t == end) {
-				print(Print_error, "Expected entity name in quotes after 'entity' keyword, but got end of file\n");
-				return false;
-			}
-			if (t->kind != '"') {
-				print(Print_error, "Expected entity name in quotes, but got '%'\n", t->string);
-				return false;
-			}
-
-			auto successfully_unescaped_name = with(temporary_allocator, unescape_string(t->string));
-			if (!successfully_unescaped_name) {
-				print(Print_error, "Failed to unescape string '%'\n", t->string);
-				return false;
-			}
-			List<utf8> unescaped_name = successfully_unescaped_name.get();
-
-			++t;
-
-			if (t == end) {
-				print(Print_error, "Expected '{' after entity name, but got end of file\n");
-				return false;
-			}
-			if (t->kind != '{') {
-				print(Print_error, "Expected '{' after entity name, but got '%'\n", t->string);
-				return false;
-			}
-			++t;
-
-			print(unescaped_name);
-			auto &entity = create_entity(unescaped_name);
-			added_entities.add(&entity);
-
-			auto found_entity_index = index_of(app->entities, &entity);
-			assert(found_entity_index.valid());
-			auto entity_index = (u32)found_entity_index.get();
-
-			while (t != end && t->kind != '}') {
-				if (t->kind != Token_identifier) {
-					print(Print_error, "Expected position, rotation, scale or component name, but got '%'\n", t->string);
+				if (t->kind != Token_number) {
+					print(Print_error, "Expected a number after position, but got '%'\n", t->string);
 					return false;
 				}
+				auto parsed = parse_f32(t->string);
 
-				auto parse_float = [&] (f32 &result) {
-					if (t == end) {
-						print(Print_error, "Expected a number after position, but got end of file\n");
-						return false;
-					}
-					if (t->kind != Token_number) {
-						print(Print_error, "Expected a number after position, but got '%'\n", t->string);
-						return false;
-					}
-					auto parsed = parse_f32(t->string);
+				if (!parsed) {
+					print(Print_error, "Failed to parse a number\n");
+					return false;
+				}
+				t += 1;
 
-					if (!parsed) {
-						print(Print_error, "Failed to parse a number\n");
-						return false;
-					}
-					t += 1;
+				result = parsed.get();
+				return true;
+			};
 
-					result = parsed.get();
-					return true;
-				};
+			auto started_from = t;
 
-				auto started_from = t;
-
-				if (t->string == u8"position"s) {
-					t += 1;
-					if (!parse_float(entity.position.x)) return false;
-					if (!parse_float(entity.position.y)) return false;
-					if (!parse_float(entity.position.z)) return false;
-					if (t->kind == ';') {
-						++t;
-					} else {
-						print(Print_error, "Error while parsing \"%\"'s position. Expected ';' at the end of line instead of %.", t->string);
-						go_to_next_property(started_from, t, end);
-					}
-				} else if (t->string == u8"rotation"s) {
-					t += 1;
-					v3f angles;
-					if (!parse_float(angles.x)) return false;
-					if (!parse_float(angles.y)) return false;
-					if (!parse_float(angles.z)) return false;
-					entity.rotation = quaternion_from_euler(radians(angles));
-					if (t->kind == ';') {
-						++t;
-					} else {
-						print(Print_error, "Error while parsing \"%\"'s rotation. Expected ';' at the end of line instead of %.", t->string);
-						go_to_next_property(started_from, t, end);
-					}
-				} else if (t->string == u8"scale"s) {
-					t += 1;
-					if (!parse_float(entity.scale.x)) return false;
-					if (!parse_float(entity.scale.y)) return false;
-					if (!parse_float(entity.scale.z)) return false;
-					if (t->kind == ';') {
-						++t;
-					} else {
-						print(Print_error, "Error while parsing \"%\"'s scale. Expected ';' at the end of line instead of %.", t->string);
-						go_to_next_property(started_from, t, end);
-					}
+			if (t->string == u8"position"s) {
+				t += 1;
+				if (!parse_float(entity.position.x)) return 0;
+				if (!parse_float(entity.position.y)) return 0;
+				if (!parse_float(entity.position.z)) return 0;
+				if (t->kind == ';') {
+					++t;
 				} else {
-					ComponentInfo *found_info = 0;
-					ComponentUID component_type;
-					for_each(app->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
-						if (info.name == t->string) {
-							found_info = &info;
-							component_type = uid;
-							for_each_break;
-						}
-						for_each_continue;
+					print(Print_error, "Error while parsing \"%\"'s position. Expected ';' at the end of line instead of %.", t->string);
+					go_to_next_property(started_from, t, end);
+				}
+			} else if (t->string == u8"rotation"s) {
+				t += 1;
+				v3f angles;
+				if (!parse_float(angles.x)) return 0;
+				if (!parse_float(angles.y)) return 0;
+				if (!parse_float(angles.z)) return 0;
+				entity.rotation = quaternion_from_euler(radians(angles));
+				if (t->kind == ';') {
+					++t;
+				} else {
+					print(Print_error, "Error while parsing \"%\"'s rotation. Expected ';' at the end of line instead of %.", t->string);
+					go_to_next_property(started_from, t, end);
+				}
+			} else if (t->string == u8"scale"s) {
+				t += 1;
+				if (!parse_float(entity.scale.x)) return 0;
+				if (!parse_float(entity.scale.y)) return 0;
+				if (!parse_float(entity.scale.z)) return 0;
+				if (t->kind == ';') {
+					++t;
+				} else {
+					print(Print_error, "Error while parsing \"%\"'s scale. Expected ';' at the end of line instead of %.", t->string);
+					go_to_next_property(started_from, t, end);
+				}
+			} else {
+				ComponentInfo *found_info = 0;
+				Uid component_type_uid;
+				for_each(app->component_infos, [&](Uid uid, ComponentInfo &info) {
+					if (info.name == t->string) {
+						found_info = &info;
+						component_type_uid = uid;
+						for_each_break;
+					}
+					for_each_continue;
+				});
+
+				if (found_info) {
+					auto &info = *found_info;
+					auto &storage = scene->find_or_create_component_storage(component_type_uid, info);
+					auto component_name = info.name;
+
+					t += 1;
+					if (t == end) {
+						print(Print_error, "Expected '{' after component name, but got end of file\n");
+						return 0;
+					}
+					if (t->kind != '{') {
+						print(Print_error, "Expected '{' after component name, but got '%'\n",  t->string);
+						return 0;
+					}
+					t += 1;
+					if (t == end) {
+						print(Print_error, "Unclosed body of % component\n", component_name);
+						return 0;
+					}
+
+					// TODO: similar code is in `add_component(Entity &, u32, Uid)`
+					auto added = storage.add();
+
+					info.construct(added.pointer);
+					((Component *)added.pointer)->_entity = &entity;
+
+					entity.components.add(ComponentIndex{
+						.type_uid = component_type_uid,
+						.storage_index = added.index,
+						.entity_index = entity_index,
 					});
 
-					if (found_info) {
-						auto &info = *found_info;
-						auto &storage = info.storage;
-						auto component_name = info.name;
-
-						t += 1;
-						if (t == end) {
-							print(Print_error, "Expected '{' after component name, but got end of file\n");
-							return false;
-						}
-						if (t->kind != '{') {
-							print(Print_error, "Expected '{' after component name, but got '%'\n",  t->string);
-							return false;
-						}
-						t += 1;
-						if (t == end) {
-							print(Print_error, "Unclosed body of % component\n", component_name);
-							return false;
-						}
-
-						auto added = storage.add();
-
-						info.construct(added.pointer);
-						((Component *)added.pointer)->entity_index = entity_index;
-
-						entity.components.add(ComponentIndex{
-							.type = component_type,
-							.index = added.index,
-							.entity_index = entity_index,
-						});
-
-						if (!info.deserialize_text(t, end, added.pointer)) {
-							return false;
-						}
-						if (info.init) {
-							info.init(added.pointer);
-						}
-					} else {
-						print(Print_error, "Unexpected token '%'. There is no component with this name.\n", t->string);
-						return false;
+					if (!info.deserialize_text(t, end, added.pointer)) {
+						return 0;
 					}
+					if (info.init) {
+						info.init(added.pointer);
+					}
+				} else {
+					print(Print_error, "Unexpected token '%'. There is no component with this name.\n", t->string);
+					return 0;
 				}
 			}
-
-			if (t == end) {
-				print(Print_error, "Unclosed entity block body\n");
-				return false;
-			}
-
-			t += 1;
 		}
 
-		success = true;
+		if (t == end) {
+			print(Print_error, "Unclosed entity block body\n");
+			return 0;
+		}
+
+		t += 1;
 	}
+
+	success = true;
 
 	//for (auto &token : tokens) {
 	//	print("%\n", token.string);
 	//}
 
-	return true;
+	return scene;
 }
 
 bool deserialize_text(f32 &value, Token *&from, Token *end) {
@@ -520,18 +409,20 @@ bool deserialize_text(Mesh *&value, Token *&from, Token *end) {
 	return true;
 }
 
-bool deserialize_scene_binary(Span<u8> data) {
+Scene *deserialize_scene_binary(Span<u8> data) {
+	auto scene = default_allocator.allocate<Scene>();
+
 	auto cursor = data.data;
 	auto end = data.end();
 
 	while(cursor != end) {
-		auto &entity = create_entity();
-		auto entity_index = (u32)index_of(app->entities, &entity).get();
+		auto &entity = scene->create_entity();
+		auto entity_index = (u32)index_of(scene->entities, &entity).get();
 
 		u32 name_size;
 		if (cursor + sizeof(name_size) > end) {
 			print(Print_error, "Failed to deserialize scene: reached data end too soon (name_size)\n");
-			return false;
+			return 0;
 		}
 		name_size = *(u32 *)cursor;
 		cursor += sizeof(name_size);
@@ -539,7 +430,7 @@ bool deserialize_scene_binary(Span<u8> data) {
 
 		if (cursor + name_size > end) {
 			print(Print_error, "Failed to deserialize scene: reached data end too soon (name)\n");
-			return false;
+			return 0;
 		}
 		entity.name.set({(utf8 *)cursor, name_size});
 		cursor += name_size;
@@ -547,7 +438,7 @@ bool deserialize_scene_binary(Span<u8> data) {
 
 		if (cursor + sizeof(entity.position) > end) {
 			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.position)\n");
-			return false;
+			return 0;
 		}
 		entity.position = *(v3f *)cursor;
 		cursor += sizeof(entity.position);
@@ -555,7 +446,7 @@ bool deserialize_scene_binary(Span<u8> data) {
 
 		if (cursor + sizeof(entity.rotation) > end) {
 			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.rotation)\n");
-			return false;
+			return 0;
 		}
 		entity.rotation = *(quaternion *)cursor;
 		cursor += sizeof(entity.rotation);
@@ -563,7 +454,7 @@ bool deserialize_scene_binary(Span<u8> data) {
 
 		if (cursor + sizeof(entity.scale) > end) {
 			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.scale)\n");
-			return false;
+			return 0;
 		}
 		entity.scale = *(v3f *)cursor;
 		cursor += sizeof(entity.scale);
@@ -572,50 +463,50 @@ bool deserialize_scene_binary(Span<u8> data) {
 		u32 component_count;
 		if (cursor + sizeof(component_count) > end) {
 			print(Print_error, "Failed to deserialize scene: reached data end too soon (component_count)\n");
-			return false;
+			return 0;
 		}
 		component_count = *(u32 *)cursor;
 		cursor += sizeof(component_count);
 
 		for (u32 component_index = 0; component_index < component_count; component_index += 1) {
-			u32 component_type;
-			if (cursor + sizeof(component_type) > end) {
-				print(Print_error, "Failed to deserialize scene: reached data end too soon (component_type)\n");
-				return false;
+			Uid component_type_uid;
+			if (cursor + sizeof(component_type_uid) > end) {
+				print(Print_error, "Failed to deserialize scene: reached data end too soon (component_type_uid)\n");
+				return 0;
 			}
-			component_type = *(u32 *)cursor;
-			cursor += sizeof(component_type);
+			component_type_uid = *(Uid *)cursor;
+			cursor += sizeof(component_type_uid);
 
-			if (!app->component_infos.find(component_type)) {
-				print(Print_error, "Failed to deserialize scene: component type is invalid (%)\n", component_type);
-				return false;
+			if (!app->component_infos.find(component_type_uid)) {
+				print(Print_error, "Failed to deserialize scene: component type uid is not present (%)\n", component_type_uid);
+				return 0;
 			}
 
-			auto &info = get_component_info(component_type);
-			auto &storage = info.storage;
+			auto &info = get_component_info(component_type_uid);
+			auto &storage = scene->find_or_create_component_storage(component_type_uid, info);
 
 			auto added = storage.add();
 
+			// TODO: similar code is in `add_component(Entity &, u32, Uid)`
+
 			info.construct(added.pointer);
-			((Component *)added.pointer)->entity_index = entity_index;
+			((Component *)added.pointer)->_entity = &entity;
 
 			entity.components.add(ComponentIndex{
-				.type = component_type,
-				.index = added.index,
+				.type_uid = component_type_uid,
+				.storage_index = added.index,
 				.entity_index = entity_index,
 			});
 
 			if (!info.deserialize_binary(cursor, end, added.pointer)) {
-				return false;
+				return 0;
 			}
 			if (info.init)
 				info.init(added.pointer);
 		}
 	}
 
-
-
-	return true;
+	return scene;
 }
 bool deserialize_binary(f32 &value, u8 *&from, u8 *end) {
 	if (from + sizeof(value) > end) {

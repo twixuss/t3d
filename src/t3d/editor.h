@@ -3,6 +3,7 @@
 #include <t3d/assets.h>
 #include <t3d/editor/window.h>
 #include <t3d/editor/input.h>
+#include <t3d/scene.h>
 #include <tl/font.h>
 
 struct GuiKey {
@@ -106,4 +107,7 @@ struct EditorData {
 	List<utf8> input_string;
 
 	Assets assets;
+
+	// All editor specific entities go here
+	Scene *scene;
 };

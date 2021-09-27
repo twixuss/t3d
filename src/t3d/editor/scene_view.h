@@ -211,7 +211,7 @@ struct SceneView : EditorWindow {
 
 SceneView *create_scene_view() {
 	auto result = create_editor_window<SceneView>(EditorWindow_scene_view);
-	result->camera_entity = &create_entity("scene_camera_%", result->id);
+	result->camera_entity = &editor->scene->create_entity(tformat("scene_camera_%", result->id));
 	result->camera_entity->flags |= Entity_editor_camera;
 	result->camera = &add_component<Camera>(*result->camera_entity);
 	result->camera->add_post_effect<Dither>();

@@ -14,13 +14,22 @@
 #include <tl/process.h>
 #include <tl/cpu.h>
 #include <tl/ram.h>
+#include <tl/time.h>
 
 AppData *app;
 EditorData *editor;
 
+Uid create_uid() {
+	return { next(app->uid_generator) };
+}
+
 void allocate_app() {
 	allocate(app);
 	app->allocator = default_allocator;
+	app->uid_generator.v = 0;
+	while (app->uid_generator.v == 0) {
+		_rdrand64_step(&app->uid_generator.v);
+	}
 }
 
 void set_module_shared(void *module) {
@@ -33,49 +42,120 @@ void initialize_module() {
 	current_printer = console_printer;
 }
 
-void update_component_info(ComponentDesc const &desc) {
-	scoped_allocator(default_allocator);
+Optional<List<Token>> parse_tokens(Span<utf8> source) {
+	List<Token> tokens;
 
-	auto found_uid = app->component_name_to_uid.find(desc.name);
+	HashMap<Span<utf8>, TokenKind> string_to_token_kind;
+	string_to_token_kind.allocator = temporary_allocator;
+	string_to_token_kind.get_or_insert(u8"null"s)   = Token_null;
 
-	ComponentInfo *info;
+	auto current_char_p = source.data;
+	auto next_char_p = current_char_p;
+	auto end = source.end();
 
-	if (found_uid) {
-		ComponentUID uid = *found_uid;
-		print("Re-registered component '%' with uid '%'\n", desc.name, uid);
-
-		auto found_info = app->component_infos.find(uid);
-		assert(found_info);
-		info = found_info;
-
-		assert(info->name == desc.name);
-
-		if (desc.size != info->storage.bytes_per_entry || desc.alignment != info->storage.entry_alignment) {
-			info->storage.reallocate(desc.size, desc.alignment);
+	utf32 c = 0;
+	auto next_char = [&] {
+		current_char_p = next_char_p;
+		if (current_char_p >= end) {
+			return false;
 		}
-	} else {
-		ComponentUID uid = atomic_increment(&app->component_uid_counter);
-		print("Registered new component '%' with uid '%'\n", desc.name, uid);
+		auto got = get_char_and_advance_utf8(&next_char_p);
+		if (got.valid()) {
+			c = got.get();
+			return true;
+		}
+		return false;
+	};
 
-		*desc.uid = uid;
+	next_char();
 
-		info = &app->component_infos.get_or_insert(uid);
+	while (current_char_p < end) {
+		while (current_char_p != end && is_whitespace(c)) {
+			next_char();
+		}
+		if (current_char_p == end) {
+			break;
+		}
 
-		info->name.set(desc.name);
+		if (is_alpha(c) || c == '_') {
+			Token token;
+			token.string.data = current_char_p;
 
-		app->component_name_to_uid.get_or_insert(info->name) = uid;
+			while (next_char() && (is_alpha(c) || c == '_' || is_digit(c))) {
+			}
+
+			token.string.size = current_char_p - token.string.data;
+
+			auto found = string_to_token_kind.find(token.string);
+			if (found) {
+				token.kind = *found;
+			} else {
+				token.kind = Token_identifier;
+			}
+
+			tokens.add(token);
+		} else if (is_digit(c) || c == '-') {
+			Token token;
+			token.kind = Token_number;
+			token.string.data = current_char_p;
+
+			while (next_char() && is_digit(c)) {
+			}
+
+			if (current_char_p != end) {
+				if (c == '.') {
+					while (next_char() && is_digit(c)) {
+					}
+				}
+			}
+
+			token.string.size = current_char_p - token.string.data;
+			tokens.add(token);
+		} else {
+			switch (c) {
+				case '"': {
+					Token token;
+					token.kind = '"';
+					token.string.data = current_char_p + 1;
+
+				continue_search:
+					while (next_char() && (c != '"')) {
+					}
+
+					if (current_char_p == end) {
+						print(Print_error, "Unclosed string literal\n");
+						return {};
+					}
+
+					if (current_char_p[-1] == '\\') {
+						goto continue_search;
+					}
+
+					token.string.size = current_char_p - token.string.data;
+
+					next_char();
+
+					tokens.add(token);
+					break;
+				}
+				case ';':
+				case '{':
+				case '}': {
+					Token token;
+					token.kind = c;
+					token.string.data = current_char_p;
+					token.string.size = 1;
+					tokens.add(token);
+					next_char();
+					break;
+				}
+				default: {
+					print(Print_error, "Parsing failed: invalid character '%'\n", c);
+					return {};
+				}
+			}
+		}
 	}
 
-	info->storage.bytes_per_entry = desc.size;
-	info->storage.entry_alignment = desc.alignment;
-
-	info->serialize          = desc.serialize         ;
-	info->construct          = desc.construct         ;
-	info->deserialize_binary = desc.deserialize_binary;
-	info->deserialize_text   = desc.deserialize_text  ;
-	info->draw_properties    = desc.draw_properties   ;
-	info->free               = desc.free              ;
-	info->init               = desc.init              ;
-	info->start              = desc.start             ;
-	info->update             = desc.update            ;
+	return tokens;
 }

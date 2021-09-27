@@ -2,6 +2,7 @@
 #include <t3d/common.h>
 #include <t3d/component.h>
 #include <t3d/mesh.h>
+#include <t3d/scene.h>
 
 struct DataHeader {
 	u64 asset_offset;
@@ -15,7 +16,7 @@ void serialize_binary(StringBuilder &builder, v3f value);
 void serialize_binary(StringBuilder &builder, Texture2D *value);
 void serialize_binary(StringBuilder &builder, Mesh *value);
 
-List<u8> serialize_scene_binary();
+List<u8> serialize_scene_binary(Scene *scene, HashMap<Uid, Uid> component_type_uid_remap);
 
 void escape_string(StringBuilder &builder, Span<utf8> string);
 Optional<List<utf8>> unescape_string(Span<utf8> literal);
@@ -25,16 +26,16 @@ void serialize_text(StringBuilder &builder, v3f value);
 void serialize_text(StringBuilder &builder, Texture2D *value);
 void serialize_text(StringBuilder &builder, Mesh *value);
 
-List<u8> serialize_scene_text();
+List<u8> serialize_scene_text(Scene *scene);
 
-bool deserialize_scene_text(Span<utf8> path);
+Scene *deserialize_scene_text(Span<utf8> path);
 
 bool deserialize_text(f32 &value, Token *&from, Token *end);
 bool deserialize_text(v3f &value, Token *&from, Token *end);
 bool deserialize_text(Texture2D *&value, Token *&from, Token *end);
 bool deserialize_text(Mesh *&value, Token *&from, Token *end);
 
-bool deserialize_scene_binary(Span<u8> data);
+Scene *deserialize_scene_binary(Span<u8> data);
 
 bool deserialize_binary(f32 &value, u8 *&from, u8 *end);
 bool deserialize_binary(v3f &value, u8 *&from, u8 *end);

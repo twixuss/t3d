@@ -19,6 +19,7 @@
     <ClCompile Include="src\t3d\blit.cpp" />
     <ClCompile Include="src\t3d\gui.cpp" />
     <ClCompile Include="src\t3d\serialize.cpp" />
+    <ClCompile Include="src\t3d\scene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="dep\tl\tl.natvis" />
@@ -60,6 +61,7 @@
     <ClInclude Include="src\t3d\draw_property.h" />
     <ClInclude Include="src\t3d\editor.h" />
     <ClInclude Include="src\t3d\input.h" />
+    <ClInclude Include="src\t3d\scene.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="components">

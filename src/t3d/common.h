@@ -39,7 +39,7 @@ inline Optional<f32> parse_f32(Span<utf8> string) {
 	u64 whole_part = 0;
 	auto c = string.data;
 	auto end = string.end();
-	
+
 	bool negative = false;
 	if (*c == '-') {
 		negative = true;
@@ -118,119 +118,22 @@ struct Token {
 	Span<utf8> string;
 };
 
-inline Optional<List<Token>> parse_tokens(Span<utf8> source) {
-	List<Token> tokens;
+Optional<List<Token>> parse_tokens(Span<utf8> source);
 
-	HashMap<Span<utf8>, TokenKind> string_to_token_kind;
-	string_to_token_kind.allocator = temporary_allocator;
-	string_to_token_kind.get_or_insert(u8"null"s)   = Token_null;
+struct Uid {
+	u64 value;
+};
 
-	auto current_char_p = source.data;
-	auto next_char_p = current_char_p;
-	auto end = source.end();
-
-	utf32 c = 0;
-	auto next_char = [&] {
-		current_char_p = next_char_p;
-		if (current_char_p >= end) {
-			return false;
-		}
-		auto got = get_char_and_advance_utf8(&next_char_p);
-		if (got.valid()) {
-			c = got.get();
-			return true;
-		}
-		return false;
-	};
-
-	next_char();
-
-	while (current_char_p < end) {
-		while (current_char_p != end && is_whitespace(c)) {
-			next_char();
-		}
-		if (current_char_p == end) {
-			break;
-		}
-
-		if (is_alpha(c) || c == '_') {
-			Token token;
-			token.string.data = current_char_p;
-
-			while (next_char() && (is_alpha(c) || c == '_' || is_digit(c))) {
-			}
-
-			token.string.size = current_char_p - token.string.data;
-
-			auto found = string_to_token_kind.find(token.string);
-			if (found) {
-				token.kind = *found;
-			} else {
-				token.kind = Token_identifier;
-			}
-
-			tokens.add(token);
-		} else if (is_digit(c) || c == '-') {
-			Token token;
-			token.kind = Token_number;
-			token.string.data = current_char_p;
-
-			while (next_char() && is_digit(c)) {
-			}
-
-			if (current_char_p != end) {
-				if (c == '.') {
-					while (next_char() && is_digit(c)) {
-					}
-				}
-			}
-
-			token.string.size = current_char_p - token.string.data;
-			tokens.add(token);
-		} else {
-			switch (c) {
-				case '"': {
-					Token token;
-					token.kind = '"';
-					token.string.data = current_char_p + 1;
-
-				continue_search:
-					while (next_char() && (c != '"')) {
-					}
-
-					if (current_char_p == end) {
-						print(Print_error, "Unclosed string literal\n");
-						return {};
-					}
-
-					if (current_char_p[-1] == '\\') {
-						goto continue_search;
-					}
-
-					token.string.size = current_char_p - token.string.data;
-
-					next_char();
-
-					tokens.add(token);
-					break;
-				}
-				case '{':
-				case '}': {
-					Token token;
-					token.kind = c;
-					token.string.data = current_char_p;
-					token.string.size = 1;
-					tokens.add(token);
-					next_char();
-					break;
-				}
-				default: {
-					print(Print_error, "Parsing failed: invalid character '%'\n", c);
-					return {};
-				}
-			}
-		}
-	}
-
-	return tokens;
+inline umm append(StringBuilder &builder, Uid uid) {
+	return append(builder, FormatInt{.value = uid.value, .radix = 16, .leading_zeros = 16});
 }
+
+inline bool operator==(Uid const &a, Uid const &b) { return a.value == b.value; }
+inline bool operator!=(Uid const &a, Uid const &b) { return a.value != b.value; }
+
+template <>
+inline umm get_hash(Uid a) {
+	return a.value;
+}
+
+Uid create_uid();

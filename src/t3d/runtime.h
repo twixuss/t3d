@@ -146,24 +146,10 @@ float sample_shadow_map(sampler2DShadow shadow_map, float3 light_space, float bi
 
 #include <algorithm>
 
-void register_built_in_components() {
-	update_component_info(get_component_desc_Camera());
-	update_component_info(get_component_desc_Light());
-	update_component_info(get_component_desc_MeshRenderer());
-
-}
-
 //
 // Called once on program start
 //
-void runtime_init(Window &window) {
-	register_built_in_components();
-
-#ifndef RUNTIME_REGISTER_COMPONENTS
-#define RUNTIME_REGISTER_COMPONENTS
-#endif
-	RUNTIME_REGISTER_COMPONENTS;
-
+void runtime_init() {
 	//std::sort(component_infos.begin(), component_infos.end(), [](ComponentInfo &a, ComponentInfo &b) {
 	//	if (a.execution_priority != b.execution_priority) {
 	//		return a.execution_priority < b.execution_priority;
@@ -184,7 +170,7 @@ void runtime_init(Window &window) {
 	//}
 
 	app->tg = tg::init(tg::GraphicsApi_opengl, {
-		.window = window.handle,
+		.window = app->window->handle,
 		.debug = BUILD_DEBUG,
 	});
 	assert_always(app->tg);
@@ -572,8 +558,6 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		app->default_light_mask = app->tg->create_texture_2d(size, size, pixels.data, tg::Format_rgba_u8n);
 		app->default_light_mask->name = as_list(u8"default_light_mask"s);
 	}
-
-	app->sky_box_texture = app->assets.get_texture_cube(u8"sky.cubemap"s);
 }
 
 //
@@ -584,9 +568,10 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 // Called once after runtime_init()
 //
 void runtime_start() {
-	for_each(app->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+	for_each(app->current_scene->component_storages, [&](Uid uid, ComponentStorage &storage) {
+		auto &info = app->component_infos.find(uid).get();
 		if (info.start) {
-			info.storage.for_each([&](void *data) {
+			storage.for_each([&](void *data) {
 				info.start(data);
 			});
 		}
@@ -594,10 +579,10 @@ void runtime_start() {
 }
 
 void runtime_update() {
-
-	for_each(app->component_infos, [&](ComponentUID uid, ComponentInfo &info) {
+	for_each(app->current_scene->component_storages, [&](Uid uid, ComponentStorage &storage) {
+		auto &info = app->component_infos.find(uid).get();
 		if (info.update) {
-			info.storage.for_each([&](void *data) {
+			storage.for_each([&](void *data) {
 				info.update(data);
 			});
 		}
@@ -620,9 +605,11 @@ void runtime_render() {
 		app->tg->disable_blend();
 		app->tg->set_topology(tg::Topology_triangle_list);
 
-		for_each_component<Light>([&] (Light &light) {
+		auto scene = app->current_scene;
+
+		scene->for_each_component<Light>([&] (Light &light) {
 			timed_block("Light"s);
-			auto &light_entity = app->entities.at(light.entity_index);
+			auto &light_entity = light.entity();
 
 			app->tg->set_render_target(light.shadow_map);
 			app->tg->set_viewport(shadow_map_resolution, shadow_map_resolution);
@@ -632,8 +619,8 @@ void runtime_render() {
 
 			light.world_to_light_matrix = m4::perspective_right_handed(1, light.fov, 0.1f, 100.0f) * (m4)-light_entity.rotation * m4::translation(-light_entity.position);
 
-			for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
-				auto &mesh_entity = app->entities.at(mesh_renderer.entity_index);
+			scene->for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
+				auto &mesh_entity = mesh_renderer.entity();
 
 				app->tg->update_shader_constants(app->entity_constants, {
 					.local_to_camera_matrix = light.world_to_light_matrix * m4::translation(mesh_entity.position) * (m4)mesh_entity.rotation * m4::scale(mesh_entity.scale),
@@ -677,15 +664,18 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 	});
 	app->tg->disable_blend();
 
+	auto scene = app->current_scene;
+
 	u32 light_index = 0;
-	for_each_component<Light>([&] (Light &light) {
+
+	scene->for_each_component<Light>([&] (Light &light) {
 		timed_block("Light"s);
 
 		defer {
 			++light_index;
 		};
 
-		auto &light_entity = app->entities.at(light.entity_index);
+		auto &light_entity = light.entity();
 
 		app->tg->update_shader_constants(app->light_constants, {
 			.world_to_light_matrix = light.world_to_light_matrix,
@@ -700,9 +690,9 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 
 		app->tg->set_texture(light.mask ? light.mask : app->default_light_mask, LIGHT_TEXTURE_SLOT);
 		app->tg->set_sampler(tg::Filtering_linear_mipmap, LIGHT_TEXTURE_SLOT);
-		for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
+		scene->for_each_component<MeshRenderer>([&] (MeshRenderer &mesh_renderer) {
 			timed_block("MeshRenderer"s);
-			auto &mesh_entity = app->entities.at(mesh_renderer.entity_index);
+			auto &mesh_entity = mesh_renderer.entity();
 
 			auto material = mesh_renderer.material;
 			if (!material) {

@@ -3,4 +3,5 @@ temp/
 *.pdb
 bin/
 build/
-data/obj/
+user/
+after_build_log.txt

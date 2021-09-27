@@ -24,6 +24,7 @@ struct ButtonTheme {
 	f32 hover_stay_speed = 20;
 	f32 press_speed = 20;
 	f32 click_speed = 10;
+	u32 font_size = 12;
 };
 
 inline constexpr ButtonTheme default_button_theme;
@@ -32,30 +33,31 @@ struct TextFieldTheme {
 	v4f color = background_color;
 	v4f hovered_color = {.15f, .15f, .15f, 1};
 	v4f edit_color = {.2f, .2f, .1f, 1};
+	u32 font_size = 12;
 };
 
 inline constexpr TextFieldTheme default_text_field_theme;
 
+u32 const font_size = 12;
+
 void gui_panel(v4f color);
 void gui_image(tg::Texture2D *texture);
-
-u32 const font_size = 12;
 
 struct DrawTextParams {
 	v2s position = {};
 };
 
 void label(Span<PlacedChar> placed_chars, SizedFont *font, DrawTextParams params = {});
-void label(Span<utf8> string, DrawTextParams params = {});
-inline void label(utf8 const *string, DrawTextParams params = {}) { label(as_span(string), params); }
-inline void label(Span<char>  string, DrawTextParams params = {}) { label((Span<utf8>)string, params); }
-inline void label(char const *string, DrawTextParams params = {}) { label((Span<utf8>)as_span(string), params); }
+void label(Span<utf8> string, u32 font_size, DrawTextParams params = {});
+inline void label(utf8 const *string, u32 font_size, DrawTextParams params = {}) { label(as_span(string), font_size, params); }
+inline void label(Span<char>  string, u32 font_size, DrawTextParams params = {}) { label((Span<utf8>)string, font_size, params); }
+inline void label(char const *string, u32 font_size, DrawTextParams params = {}) { label((Span<utf8>)as_span(string), font_size, params); }
 
 bool button_base(umm id, ButtonTheme const &theme, std::source_location location);
 inline bool button(Span<utf8> text, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
 	auto result = button_base(id, theme, location);
 
-	label(text);
+	label(text, theme.font_size);
 
 	return result;
 }
@@ -349,7 +351,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 
 
 		if (state.string.size) {
-			auto font = get_font_at_size(app->font_collection, font_size);
+			auto font = get_font_at_size(app->font_collection, theme.font_size);
 			ensure_all_chars_present(state.string, font);
 			auto placed_chars = with(temporary_allocator, place_text(state.string, font));
 
@@ -436,7 +438,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 			state.caret_blink_time -= 1;
 		}
 	} else {
-		label((List<utf8>)to_string(value));
+		label((List<utf8>)to_string(value), font_size);
 	}
 
 	return value_changed;
@@ -663,7 +665,7 @@ inline void header(Span<utf8> text) {
 	tg::Viewport line_viewport = app->current_viewport;
 	line_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
-	push_current_viewport(line_viewport) label(text);
+	push_current_viewport(line_viewport) label(text, font_size);
 	editor->current_property_y += line_height + 2;
 }
 
@@ -700,7 +702,7 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 
 		push_current_viewport(value_viewport) {
 			gui_panel({.05, .05, .05, 1});
-			label(path);
+			label(path, font_size);
 
 			bool result = (editor->key_state[256 + 0].state & KeyState_up) && in_bounds(app->current_mouse_position, app->current_scissor);
 
@@ -726,3 +728,7 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_l
 
 	editor->current_property_y += line_height + 2;
 }
+
+void gui_begin_frame();
+
+void gui_draw();

@@ -92,13 +92,16 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		for (auto desc : descs) {
 			update_component_info(desc);
 		}
+
 		print("Loading scene ...\n");
-		assert_always(deserialize_scene_binary(Span(data_buffer.data + data_header->scene_offset, data_header->scene_size)));
+		app->current_scene = deserialize_scene_binary(Span(data_buffer.data + data_header->scene_offset, data_header->scene_size));
+		assert_always(app->current_scene);
+		app->scenes.add(app->current_scene);
 
 		print("Starting runtime ...\n");
 		runtime_start();
 
-		for_each_component<Camera>([&](Camera &camera) {
+		app->current_scene->for_each_component<Camera>([&](Camera &camera) {
 			main_camera = &camera;
 			for_each_break;
 		});

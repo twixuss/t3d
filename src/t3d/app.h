@@ -4,9 +4,11 @@
 #include <t3d/material.h>
 #include <t3d/components/camera.h>
 #include <t3d/assets.h>
+#include <t3d/scene.h>
 #include <tl/time.h>
 #include <tl/window.h>
 #include <tl/font.h>
+#include <tl/random.h>
 
 struct GlobalConstants {
 	m4 camera_rotation_projection_matrix;
@@ -72,11 +74,14 @@ struct TextShaderConstants {
 
 
 struct AppData {
-	Allocator                            allocator;
-	HashMap<ComponentUID, ComponentInfo> component_infos;
-	HashMap<Span<utf8>, ComponentUID>    component_name_to_uid;
-	MaskedBlockList<Entity, 256>         entities;
-	ComponentUID                         component_uid_counter;
+	Allocator                   allocator;
+	HashMap<Uid, ComponentInfo> component_infos;
+	HashMap<Span<utf8>, Uid>    component_name_to_uid;
+
+	xorshift64 uid_generator;
+
+	List<Scene *> scenes;
+	Scene *current_scene;
 
 	bool is_editor;
 
@@ -87,6 +92,7 @@ struct AppData {
 	u32 frame_index;
 
 	Window *window;
+	bool did_resize;
 
 	tg::State *tg;
 

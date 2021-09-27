@@ -4,7 +4,6 @@
 #include "current.h"
 
 struct SplitView : EditorWindow {
-	bool need_bar_repaint;
 	bool is_sizing;
 	bool horizontal;
 	f32 split_t = 0.5f;
@@ -32,8 +31,6 @@ struct SplitView : EditorWindow {
 		resize_children();
 	}
 	void resize_children() {
-		need_bar_repaint = true;
-
 		// add 1 to account for half of the split bar
 		auto size1 = part1->get_min_size() + 1;
 		auto size2 = part2->get_min_size() + 1;
@@ -119,23 +116,19 @@ struct SplitView : EditorWindow {
 		push_current_viewport(part1->viewport) part1->render();
 		push_current_viewport(part2->viewport) part2->render();
 
-
-		if (need_bar_repaint) {
-			need_bar_repaint = false;
-			tg::Viewport v;
-			if (horizontal) {
-				v.min.x = part1->viewport.min.x;
-				v.min.y = part1->viewport.max.y;
-				v.max.x = part2->viewport.max.x;
-				v.max.y = part2->viewport.min.y;
-			} else {
-				v.min.x = part1->viewport.max.x;
-				v.min.y = part1->viewport.min.y;
-				v.max.x = part2->viewport.min.x;
-				v.max.y = part2->viewport.max.y;
-			}
-			push_current_viewport(v) gui_panel(background_color);
+		tg::Viewport v;
+		if (horizontal) {
+			v.min.x = part1->viewport.min.x;
+			v.min.y = part1->viewport.max.y;
+			v.max.x = part2->viewport.max.x;
+			v.max.y = part2->viewport.min.y;
+		} else {
+			v.min.x = part1->viewport.max.x;
+			v.min.y = part1->viewport.min.y;
+			v.max.x = part2->viewport.min.x;
+			v.max.y = part2->viewport.max.y;
 		}
+		push_current_viewport(v) gui_panel(background_color);
 	}
 
 	void debug_print() {

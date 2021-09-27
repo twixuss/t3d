@@ -1,2 +1,2 @@
 #include "rotator.h"
-REGISTER_COMPONENT(Rotator);
+REGISTER_COMPONENT(Rotator)

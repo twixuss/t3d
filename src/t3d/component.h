@@ -8,11 +8,10 @@
 
 using namespace tl;
 
-using ComponentUID = u32;
-
 struct ComponentIndex {
-	ComponentUID type;
-	u32 index;
+	Uid type_uid;
+	struct Scene *scene;
+	u32 storage_index;
 	u32 entity_index;
 
 	bool operator==(ComponentIndex const &that) const {
@@ -23,8 +22,8 @@ struct ComponentIndex {
 struct Entity;
 
 struct Component {
-	u32 entity_index = -1;
-	Entity &entity() const;
+	Entity *_entity;
+	Entity &entity() { return *_entity; }
 
 	//
 	// These functions are not called and only needed to check if derived component overrides them
@@ -58,84 +57,12 @@ struct ComponentStorage {
 		u32 index;
 	};
 
-	ComponentStorage() {
-		blocks.allocator = allocator;
-	}
+	ComponentStorage();
+	Added add();
+	void remove_at(umm index);
+	void *get(umm index);
+	void reallocate(u32 new_size, u32 new_alignment);
 
-	Added add() {
-		Added result;
-
-		for (u32 block_index = 0; block_index < blocks.size; block_index += 1) {
-			auto block = blocks[block_index];
-			if (block->unfull_mask_count == 0)
-				continue;
-
-			// Search for free space in current block
-			for (u32 mask_index = 0; mask_index < masks_per_block; mask_index += 1) {
-				auto &mask = block->masks[mask_index];
-
-				if (mask == ~0)
-					continue;
-
-				auto bit_index = find_lowest_zero_bit(mask);
-				auto value_index = (mask_index * bits_in_mask) + bit_index;
-
-				mask |= (Mask)1 << bit_index;
-
-				if (mask == ~0)
-					block->unfull_mask_count -= 1;
-
-				result.pointer = (u8 *)block->values + value_index * bytes_per_entry;
-				result.index = block_index * values_per_block + value_index;
-				return result;
-			}
-		}
-
-		auto block = allocator.allocate<Block>();
-		block->values = allocator.allocate_uninitialized(bytes_per_entry * values_per_block, entry_alignment);
-
-		block->masks[0] = 1;
-
-		result.index = blocks.size * values_per_block;
-		result.pointer = block->values;
-
-		blocks.add(block);
-
-		return result;
-	}
-
-	void remove_at(umm index) {
-		auto block_index = index / values_per_block;
-		auto value_index = index % values_per_block;
-
-		auto mask_index = value_index / bits_in_mask;
-		auto bit_index  = value_index % bits_in_mask;
-
-		auto &block = blocks[block_index];
-
-		auto mask = block->masks[mask_index];
-		bounds_check(mask & ((Mask)1 << bit_index), "attempt to remove non-existant component");
-		if (mask == ~0) {
-			block->unfull_mask_count += 1;
-		}
-		mask &= ~((Mask)1 << bit_index);
-		block->masks[mask_index] = mask;
-	}
-
-	void *get(umm index) {
-		auto block_index = index / values_per_block;
-		auto value_index = index % values_per_block;
-
-		auto mask_index = value_index / bits_in_mask;
-		auto bit_index  = value_index % bits_in_mask;
-
-		auto &block = blocks[block_index];
-
-		auto mask = block->masks[mask_index];
-		bounds_check(mask & ((Mask)1 << bit_index), "attempt to get non-existant component");
-
-		return (u8 *)block->values + value_index * bytes_per_entry;
-	}
 	template <class Fn>
 	void for_each(Fn &&fn) {
 		using FnRet = decltype(fn((void*)0));
@@ -168,13 +95,9 @@ struct ComponentStorage {
 			}
 		}
 	}
-	void reallocate(u32 new_size, u32 new_alignment) {
-		for (auto block : blocks) {
-			allocator.free(block->values);
-			block->values = allocator.allocate_uninitialized(new_size * values_per_block, new_alignment);
-		}
-	}
 };
+
+void free(ComponentStorage &storage);
 
 using ComponentSerialize         = void(*)(StringBuilder &builder, void *component, bool binary);
 using ComponentDeserializeText   = bool(*)(Token *&from, Token *end, void *component);
@@ -199,7 +122,6 @@ struct ComponentDesc {
 	Span<utf8> name;
 	u32 size;
 	u32 alignment;
-	ComponentUID *uid;
 };
 
 struct ComponentInfo {
@@ -213,21 +135,13 @@ struct ComponentInfo {
 	ComponentUpdate update;
 	ComponentFree free;
 	List<utf8> name;
-	ComponentStorage storage;
+	u32 size;
+	u32 alignment;
 };
 
-ComponentInfo &get_component_info(ComponentUID uid);
-void free_component_storages();
-ComponentInfo &component_infos_get_or_insert(ComponentUID uid);
-ComponentUID get_new_component_uid();
-
-template <class Component, class Fn>
-void for_each_component(Fn &&fn) {
-	ComponentInfo &info = get_component_info(Component::uid);
-	info.storage.for_each([&](void *component) {
-		return fn(*(Component *)component);
-	});
-}
+ComponentInfo &get_component_info(Uid uid);
+ComponentInfo &component_infos_get_or_insert(Uid uid);
+Uid component_name_to_uid(Span<utf8> name);
 
 template <class Component>
 void adapt_component_serializer(StringBuilder &builder, void *component, bool binary) {
@@ -349,7 +263,7 @@ else if (from->string == u8#name##s) { \
 struct ComponentT; \
 template <> \
 struct ComponentBase<ComponentT> : Component { \
-	inline static ComponentUID uid; \
+	inline static Span<utf8> _t3d_component_name = u8#ComponentT##s; \
 	FIELDS(DECLARE_FIELD) \
 	void serialize(StringBuilder &builder, bool binary) { \
 		FIELDS(SERIALIZE_FIELD) \
@@ -377,26 +291,20 @@ struct ComponentBase<ComponentT> : Component { \
 	} \
 	DRAW_PROPERTIES \
 };  \
-ComponentDesc get_component_desc_##ComponentT(); \
+extern "C" __declspec(dllexport) ComponentDesc t3dcd##ComponentT(); \
 struct ComponentT : ComponentBase<ComponentT>
 
 #define REGISTER_COMPONENT(ComponentT) \
-ComponentDesc get_component_desc_##ComponentT() { \
+extern "C" __declspec(dllexport) ComponentDesc t3dcd##ComponentT() { \
 	ComponentDesc desc = {}; \
- \
 	desc.name = u8#ComponentT##s; \
- \
 	desc.size      = sizeof(ComponentT); \
 	desc.alignment = alignof(ComponentT); \
- \
-	desc.uid = &ComponentT::uid;\
- \
 	desc.serialize          = adapt_component_serializer<ComponentT>; \
 	desc.deserialize_text   = adapt_component_deserializer_text<ComponentT>; \
 	desc.deserialize_binary = adapt_component_deserializer_binary<ComponentT>; \
 	desc.draw_properties    = adapt_component_property_drawer<ComponentT>; \
 	desc.construct          = adapt_component_construct<ComponentT>; \
- \
 	if constexpr (is_statically_overridden(init, ComponentT, ::Component)) { \
 		desc.init = [](void *component) { ((ComponentT *)component)->init(); }; \
 	} \
