@@ -17,8 +17,8 @@ DECLARE_COMPONENT(Light) {
 		auto depth = app->tg->create_texture_2d(shadow_map_resolution, shadow_map_resolution, 0, tg::Format_depth);
 		shadow_map = app->tg->create_render_target(0, depth);
 	}
-	void component_free() {
-		//tg::free(shadow_map);
+	void free() {
+		//app->tg->free(shadow_map);
 	}
 };
 

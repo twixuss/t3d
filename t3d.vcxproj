@@ -27,6 +27,7 @@
     <ClCompile Include="src\t3d\components\light.cpp" />
     <ClCompile Include="src\t3d\components\mesh_renderer.cpp" />
     <ClCompile Include="src\t3d\draw_property.cpp" />
+    <ClCompile Include="src\t3d\editor.cpp" />
     <ClCompile Include="src\t3d\editor\current.cpp" />
     <ClCompile Include="src\t3d\editor\input.cpp" />
     <ClCompile Include="src\t3d\editor\window.cpp" />
@@ -185,6 +186,7 @@
       <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -207,6 +209,7 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <PreprocessToFile>false</PreprocessToFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -231,6 +234,7 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -253,6 +257,7 @@ $(SolutionDir)temp/bin/after_build.exe</Command>
       <AdditionalOptions>/Ob3 /constexpr:steps1073741824 %(AdditionalOptions)</AdditionalOptions>
       <PreprocessToFile>false</PreprocessToFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

@@ -45,15 +45,15 @@ struct SceneView : EditorWindow {
 
 		auto old_camera_entity = app->current_camera_entity;
 		auto old_camera        = app->current_camera;
-		auto old_viewport      = app->current_viewport;
+		auto old_viewport      = editor->current_viewport;
 		defer {
 			app->current_camera_entity = old_camera_entity;
 			app->current_camera        = old_camera;
-			app->current_viewport      = old_viewport;
+			editor->current_viewport   = old_viewport;
 		};
 		app->current_camera_entity = camera_entity;
-		app->current_camera = camera;
-		app->current_viewport = viewport;
+		app->current_camera        = camera;
+		editor->current_viewport   = viewport;
 
 		if (movement_state == Movement_none) {
 			if (mouse_down(1)) movement_state = Movement_flying;
@@ -157,30 +157,32 @@ struct SceneView : EditorWindow {
 			scale_icon     = app->tg->load_texture_2d(u8"../data/icons/scale.png"s    , {.generate_mipmaps = true, .flip_y = true});
 		}
 
-		auto translate_viewport = app->current_viewport;
+		auto translate_viewport = editor->current_viewport;
 		translate_viewport.min.x += 2;
-		translate_viewport.min.y = app->current_viewport.max.y - 2 - button_size;
+		translate_viewport.min.y = editor->current_viewport.max.y - 2 - button_size;
 		translate_viewport.max.x = translate_viewport.min.x + button_size;
 		translate_viewport.max.y = translate_viewport.min.y + button_size;
-		if (button(translate_viewport, translate_icon, (umm)this)) manipulator_kind = Manipulate_position;
+		push_viewport(translate_viewport) if (button(translate_icon, (umm)this)) manipulator_kind = Manipulate_position;
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, rotate_icon, (umm)this)) manipulator_kind = Manipulate_rotation;
+		push_viewport(translate_viewport) if (button(rotate_icon, (umm)this)) manipulator_kind = Manipulate_rotation;
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, scale_icon, (umm)this)) manipulator_kind = Manipulate_scale;
+		push_viewport(translate_viewport) if (button(scale_icon, (umm)this)) manipulator_kind = Manipulate_scale;
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, u8"Camera"s, (umm)this)) selection.set(camera_entity);
+		push_viewport(translate_viewport) if (button(u8"Camera"s, (umm)this)) selection.set(camera_entity);
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, u8"Reload scripts"s, (umm)this)) {
+		push_viewport(translate_viewport) if (button(u8"Reload scripts"s, (umm)this)) {
 			reload_all_scripts(true);
 		}
 		translate_viewport.min.x += button_size + 2;
 		translate_viewport.max.x += button_size + 2;
-		if (button(translate_viewport, u8"Build"s, (umm)this)) {
-			build_executable();
+		push_viewport(translate_viewport) {
+			if (button(u8"Build"s, (umm)this)) {
+				build_executable();
+			}
 		}
 	}
 	void select_entity() {

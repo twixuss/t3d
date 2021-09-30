@@ -154,7 +154,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 	if (!got_tokens) {
 		return 0;
 	}
-	List<Token> tokens = got_tokens.get();
+	List<Token> tokens = got_tokens.value();
 
 	Token *t = tokens.data;
 	Token *end = tokens.end();
@@ -194,7 +194,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 			print(Print_error, "Failed to unescape string '%'\n", t->string);
 			return 0;
 		}
-		List<utf8> unescaped_name = successfully_unescaped_name.get();
+		List<utf8> unescaped_name = successfully_unescaped_name.value();
 
 		++t;
 
@@ -211,7 +211,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 		auto &entity = scene->create_entity(unescaped_name);
 		added_entities.add(&entity);
 
-		auto entity_index = (u32)index_of(scene->entities, &entity).get();
+		auto entity_index = (u32)index_of(scene->entities, &entity).value();
 
 		while (t != end && t->kind != '}') {
 			if (t->kind != Token_identifier) {
@@ -236,7 +236,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				}
 				t += 1;
 
-				result = parsed.get();
+				result = parsed.value();
 				return true;
 			};
 
@@ -360,7 +360,7 @@ bool deserialize_text(f32 &value, Token *&from, Token *end) {
 	}
 	from += 1;
 
-	value = parsed.get();
+	value = parsed.value();
 	return true;
 }
 
@@ -383,7 +383,7 @@ bool deserialize_text(Texture2D *&value, Token *&from, Token *end) {
 		return false;
 	}
 
-	value = app->assets.get_texture_2d(successful_path.get());
+	value = app->assets.get_texture_2d(successful_path.value());
 
 	from += 1;
 
@@ -402,7 +402,7 @@ bool deserialize_text(Mesh *&value, Token *&from, Token *end) {
 		return false;
 	}
 
-	value = app->assets.get_mesh(successful_path.get());
+	value = app->assets.get_mesh(successful_path.value());
 
 	from += 1;
 
@@ -417,7 +417,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 	while(cursor != end) {
 		auto &entity = scene->create_entity();
-		auto entity_index = (u32)index_of(scene->entities, &entity).get();
+		auto entity_index = (u32)index_of(scene->entities, &entity).value();
 
 		u32 name_size;
 		if (cursor + sizeof(name_size) > end) {

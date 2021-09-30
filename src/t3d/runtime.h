@@ -632,11 +632,11 @@ void runtime_render() {
 }
 
 //
-// Render scene from `camera`'s perspective into backbuffer with current viewport
+// Render scene from `camera`'s perspective into `camera.destination_target` with current viewport
 //
 void render_camera(Camera &camera, Entity &camera_entity) {
 
-	m4 camera_projection_matrix = m4::perspective_right_handed((f32)app->current_viewport.size().x / app->current_viewport.size().y, camera.fov, camera.near_plane, camera.far_plane);
+	m4 camera_projection_matrix = m4::perspective_right_handed((f32)camera.source_target->color->size.x / camera.source_target->color->size.y, camera.fov, camera.near_plane, camera.far_plane);
 	m4 camera_translation_matrix = m4::translation(-camera_entity.position);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-camera_entity.rotation);
 	//m4 camera_rotation_matrix = m4::rotation_r_yxz(-to_euler_angles(camera_entity.rotation));
@@ -746,15 +746,6 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 			effect.render(camera.source_target, camera.destination_target);
 			swap(camera.source_target, camera.destination_target);
 		}
-
-		app->tg->set_render_target(app->tg->back_buffer);
-		app->tg->set_rasterizer({
-			.depth_test = false,
-			.depth_write = false,
-		});
-
-		app->tg->set_viewport(app->current_viewport);
-		blit(camera.source_target->color);
 	}
 
 }

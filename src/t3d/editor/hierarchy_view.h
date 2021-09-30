@@ -1,8 +1,8 @@
 #pragma once
 #include <t3d/entity.h>
-#include "window.h"
-#include "../gui.h"
-#include "../selection.h"
+#include <t3d/editor/window.h>
+#include <t3d/gui.h>
+#include <t3d/selection.h>
 
 struct HierarchyView : EditorWindow {
 	v2u get_min_size() {
@@ -15,32 +15,37 @@ struct HierarchyView : EditorWindow {
 		gui_panel(middle_color);
 
 		s32 const button_height = 16;
-		s32 const button_padding = 2;
-		v2s next_pos = v2s{viewport.min.x, viewport.max.y} + v2s{button_padding, -(button_padding + button_height)};
+		tg::Viewport button_viewport;
+		button_viewport.min.x = viewport.min.x;
+		button_viewport.min.y = viewport.max.y - button_height;
+		button_viewport.max.x = viewport.max.x;
+		button_viewport.max.y = viewport.max.y;
 
 		for_each(app->current_scene->entities, [&](Entity &entity) {
 			if (is_editor_entity(entity)) {
 				return;
 			}
 
-			tg::Viewport button_viewport;
-			button_viewport.min = next_pos;
-			button_viewport.max = button_viewport.min + v2s{viewport.size().x - button_padding * 2, button_height};
+			push_button_theme {
+				editor->button_theme.top_padding = 2;
+				editor->button_theme.left_padding = 2;
+				editor->button_theme.right_padding = 2;
+				if (selection.kind == Selection_entity && &entity == selection.entity) {
+					editor->button_theme.color             *= selection_color;
+					editor->button_theme.hover_enter_color *= selection_color;
+					editor->button_theme.hover_stay_color  *= selection_color;
+					editor->button_theme.press_color       *= selection_color;
+				}
 
-
-			ButtonTheme theme = default_button_theme;
-			if (selection.kind == Selection_entity && &entity == selection.entity) {
-				theme.color             *= selection_color;
-				theme.hover_enter_color *= selection_color;
-				theme.hover_stay_color  *= selection_color;
-				theme.press_color       *= selection_color;
+				push_viewport(button_viewport) {
+					if (button(entity.name, (umm)&entity)) {
+						selection.set(&entity);
+					}
+				}
 			}
 
-			if (button(button_viewport, entity.name, (umm)&entity, theme)) {
-				selection.set(&entity);
-			}
-
-			next_pos.y -= button_height + button_padding;
+			button_viewport.min.y -= button_height;
+			button_viewport.max.y -= button_height;
 		});
 
 		if (mouse_click(0)) {

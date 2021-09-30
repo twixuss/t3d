@@ -70,6 +70,7 @@ struct BlitTextureColorConstants {
 struct TextShaderConstants {
 	v2f inv_half_viewport_size;
 	v2f offset;
+	v4f color;
 };
 
 
@@ -92,7 +93,7 @@ struct AppData {
 	u32 frame_index;
 
 	Window *window;
-	bool did_resize;
+	bool did_resize = true;
 
 	tg::State *tg;
 
@@ -134,8 +135,6 @@ struct AppData {
 	Entity *current_camera_entity;
 	Camera *current_camera;
 	v2s current_mouse_position;
-	tg::Viewport current_viewport;
-	tg::Viewport current_scissor;
 	Cursor current_cursor;
 
 	Assets assets;
@@ -145,17 +144,4 @@ inline void update_time() {
 	app->frame_time = min(app->max_frame_time, reset(app->frame_timer));
 	app->time += app->frame_time;
 	app->frame_index += 1;
-}
-
-inline v3f world_to_camera(v3f point) {
-	return app->current_camera->world_to_camera(point);
-}
-inline v3f world_to_viewport(v4f point) {
-	return map(app->current_camera->world_to_camera(point), {-1,-1,-1}, {1,1,1}, {0,0,0}, V3f((v2f)app->current_viewport.size(), 1));
-}
-inline v3f world_to_viewport(v3f point) {
-	return world_to_viewport(V4f(point, 1));
-}
-inline v2s get_mouse_position_in_current_viewport() {
-	return v2s{app->window->mouse_position.x, (s32)app->window->client_size.y - app->window->mouse_position.y} - app->current_viewport.min;
 }

@@ -122,6 +122,11 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		app->current_viewport = aabb_min_max({}, (v2s)window.client_size);
 		app->tg->set_viewport(window.client_size);
 		render_camera(*main_camera, main_camera->entity());
+
+		app->tg->set_render_target(app->tg->back_buffer);
+		app->tg->set_viewport(app->current_viewport);
+		blit(main_camera->source_target->color);
+
 		app->tg->present();
 
 		update_time();

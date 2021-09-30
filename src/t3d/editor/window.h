@@ -37,45 +37,25 @@ struct EditorWindow {
 	Span<utf8> name;
 
 	v2u (*_get_min_size)(void *_this);
-	v2u get_min_size() {
-		return _get_min_size(this);
-	}
+	v2u get_min_size();
 
 	void (*_resize)(void *_this, tg::Viewport viewport);
-	void resize(tg::Viewport viewport) {
-		this->viewport = viewport;
-		return _resize(this, viewport);
-	}
+	void resize(tg::Viewport viewport);
 
 	void (*_render)(void *_this);
-	void render() {
-		push_current_viewport(viewport) {
-			return _render(this);
-		};
-	}
+	void render();
 
 	void (*_free)(void *_this);
-	void free() {
-		return _free(this);
-	}
+	void free();
 
 	void (*_debug_print)(void *_this);
-	void debug_print() {
-		return _debug_print(this);
-	}
+	void debug_print();
 
 	void (*_serialize)(void *_this, StringBuilder &builder);
-	void serialize(StringBuilder &builder) {
-		append_bytes(builder, kind);
-		append_bytes(builder, id);
-		append_bytes(builder, parent ? parent->id : (u32)-1);
-		return _serialize(this, builder);
-	}
+	void serialize(StringBuilder &builder);
 
 	bool (*_deserialize)(void *_this, Stream &stream);
-	bool deserialize(Stream &stream) {
-		return _deserialize(this, stream);
-	}
+	bool deserialize(Stream &stream);
 };
 
 template <class T> void editor_window_resize(void *data, tg::Viewport viewport) {

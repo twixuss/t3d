@@ -28,6 +28,7 @@ void init_font() {
 layout(binding=0,std140) uniform _ {
 	vec2 inv_half_viewport_size;
 	vec2 text_position;
+	vec4 text_color;
 };
 
 layout(binding=0) uniform sampler2D main_texture;
@@ -48,9 +49,8 @@ layout(location = 0, index = 0) out vec4 fragment_text_color;
 layout(location = 0, index = 1) out vec4 fragment_text_mask;
 
 void main() {
-	vec4 color = vec4(1);
-	fragment_text_color = color;
-	fragment_text_mask = color.a * texture(main_texture, vertex_uv);
+	fragment_text_color = text_color;
+	fragment_text_mask = text_color.a * texture(main_texture, vertex_uv);
 }
 
 #endif

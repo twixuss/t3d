@@ -28,7 +28,6 @@ bool key_held  (u8 key, InputQueryParams params = {});
 
 bool mouse_down_no_lock (u8 button, InputQueryParams params = {});
 bool mouse_up_no_lock   (u8 button, InputQueryParams params = {});
-bool mouse_click_no_lock(u8 button, InputQueryParams params = {});
 bool mouse_held_no_lock (u8 button, InputQueryParams params = {});
 bool mouse_drag_no_lock      (u8 button, InputQueryParams params = {});
 bool mouse_begin_drag_no_lock(u8 button, InputQueryParams params = {});

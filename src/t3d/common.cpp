@@ -37,7 +37,7 @@ void set_module_shared(void *module) {
 	*(EditorData **)GetProcAddress((HMODULE)module, "editor") = editor;
 }
 
-void initialize_module() {
+void initialize_thread() {
 	init_allocator();
 	current_printer = console_printer;
 }
@@ -60,8 +60,8 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 			return false;
 		}
 		auto got = get_char_and_advance_utf8(&next_char_p);
-		if (got.valid()) {
-			c = got.get();
+		if (got) {
+			c = got.value();
 			return true;
 		}
 		return false;
@@ -158,4 +158,9 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 	}
 
 	return tokens;
+}
+
+void t3d_assert(char const *cause, char const *expression, char const *file, int line) {
+	print("%: '%' in %:%", cause, expression, file, line);
+	debug_break();
 }

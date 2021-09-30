@@ -52,7 +52,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 	if (!got_tokens) {
 		return 0;
 	}
-	auto &tokens = got_tokens.get();
+	auto &tokens = got_tokens.value();
 	auto t = tokens.data;
 
 	tg::TextureCubePaths paths = {};

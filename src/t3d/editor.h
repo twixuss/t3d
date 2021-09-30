@@ -19,6 +19,15 @@ inline umm get_hash(GuiKey key) {
 	return key.id * (umm)954277 + key.location.column() * (umm)152753 + key.location.line() * (umm)57238693 + (umm)key.location.file_name();
 }
 
+struct PanelState {
+	v4f previous_color = {-1337};
+	aabb<v2s> viewport;
+};
+struct LabelState {
+	v4f previous_color = {-1337};
+	aabb<v2s> viewport;
+	List<utf8> text;
+};
 struct ButtonState {
 	f32 hover_enter_t;
 	f32 hover_stay_t;
@@ -65,9 +74,43 @@ struct GuiDraw {
 			v2s position;
 			List<PlacedChar> placed_chars;
 			SizedFont *font;
+			v4f color;
 		} label;
 	};
 };
+
+struct ButtonTheme {
+	v4f color = foreground_color;
+	v4f hover_enter_color = foreground_color * highlight_color * 1.5f;
+	v4f hover_stay_color = foreground_color * highlight_color;
+	v4f press_color = {.1f, .1f, .1f, 1};
+	v4f click_color = {.5f, .5f, 1, 1};
+	f32 hover_enter_speed = 10;
+	f32 hover_stay_speed = 20;
+	f32 press_speed = 20;
+	f32 click_speed = 10;
+	u32 font_size = 12;
+	s32 right_padding  = 0;
+	s32 left_padding   = 0;
+	s32 top_padding    = 0;
+	s32 bottom_padding = 0;
+	s32 content_padding = 2;
+};
+
+struct TextFieldTheme {
+	v4f color = background_color;
+	v4f hovered_color = {.15f, .15f, .15f, 1};
+	v4f edit_color = {.2f, .2f, .1f, 1};
+	u32 font_size = 0;
+};
+
+struct LabelTheme {
+	v4f color = {1,1,1,1};
+};
+
+inline constexpr ButtonTheme default_button_theme;
+inline constexpr TextFieldTheme default_text_field_theme;
+inline constexpr LabelTheme default_label_theme;
 
 struct EditorData {
 	HashMap<EditorWindowId, EditorWindow *> editor_windows;
@@ -82,6 +125,15 @@ struct EditorData {
 	HashMap<GuiKey, FieldState<f32>>        float_field_states;
 	HashMap<GuiKey, FieldState<List<utf8>>> text_field_states;
 	HashMap<GuiKey, ScrollBarState>         scroll_bar_states;
+	HashMap<GuiKey, PanelState>             panel_states;
+	HashMap<GuiKey, LabelState>             label_states;
+
+	ButtonTheme    button_theme     = default_button_theme    ;
+	TextFieldTheme text_field_theme = default_text_field_theme;
+	LabelTheme     label_theme      = default_label_theme     ;
+
+	tg::Viewport current_viewport;
+	tg::Viewport current_scissor;
 
 	s32 current_property_y;
 
@@ -108,6 +160,57 @@ struct EditorData {
 
 	Assets assets;
 
-	// All editor specific entities go here
 	Scene *scene;
+
+	v2s get_mouse_position_in_current_viewport();
 };
+
+struct LabelThemePusher {
+	LabelTheme old;
+	LabelThemePusher() { old = editor->label_theme; }
+	~LabelThemePusher() { editor->label_theme = old; }
+	explicit operator bool() { return true; }
+};
+#define push_label_theme tl_push(LabelThemePusher)
+
+struct ButtonThemePusher {
+	ButtonTheme old;
+	ButtonThemePusher() { old = editor->button_theme; }
+	~ButtonThemePusher() { editor->button_theme = old; }
+	explicit operator bool() { return true; }
+};
+#define push_button_theme tl_push(ButtonThemePusher)
+
+inline void update_current_scissor() {
+	editor->current_scissor = intersection(editor->current_viewport, editor->current_scissor);
+}
+
+struct ViewportPusher {
+	tg::Viewport old_viewport;
+	tg::Viewport old_scissor;
+	bool has_area;
+	ViewportPusher(tg::Viewport new_viewport) {
+		old_viewport = editor->current_viewport;
+		old_scissor  = editor->current_scissor;
+
+		editor->current_viewport = new_viewport;
+		update_current_scissor();
+		/*
+		editor->current_scissor = intersection(new_viewport, editor->current_scissor);
+		has_area = volume(editor->current_scissor) > 0;
+
+		if (has_area) {
+			app->tg->set_viewport(new_viewport);
+			app->tg->set_scissor(editor->current_scissor);
+		}
+		*/
+	}
+	~ViewportPusher() {
+		editor->current_viewport = old_viewport;
+		editor->current_scissor = old_scissor;
+		//app->tg->set_viewport(old_viewport);
+		//app->tg->set_scissor(old_scissor);
+	}
+	explicit operator bool() { return has_area; }
+};
+#define push_viewport(new_viewport) tl_push(ViewportPusher, new_viewport)

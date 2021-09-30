@@ -207,7 +207,7 @@ if (binary) { \
 
 
 #define DRAW_FIELD(type, name, default) \
-draw_property(u8#name##s, name, __COUNTER__); \
+draw_property(u8#name##s, name); \
 
 
 #define DRAW_PROPERTIES \

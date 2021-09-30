@@ -51,7 +51,7 @@ struct TabView : EditorWindow {
 
 		auto bar_viewport = viewport;
 		bar_viewport.min.y = bar_viewport.max.y - tab_height;
-		push_current_viewport(bar_viewport) {
+		push_viewport(bar_viewport) {
 			gui_panel(background_color);
 
 			if (editor->drag_and_drop_kind == DragAndDrop_tab) {
@@ -85,22 +85,21 @@ struct TabView : EditorWindow {
 				tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
 				tab_start_x += tab_viewport.size().x + 2;
 
-				push_current_viewport(tab_viewport) {
+				push_viewport(tab_viewport) {
 
-					auto theme = default_button_theme;
-					theme.color = middle_color;
-					theme.press_color = default_button_theme.press_color / default_button_theme.color * theme.color;
-					if (tab_index != selected_tab) {
-						theme.color             = background_color / default_button_theme.color * default_button_theme.color;
-						theme.hover_enter_color = background_color / default_button_theme.color * default_button_theme.hover_enter_color;
-						theme.hover_stay_color  = background_color / default_button_theme.color * default_button_theme.hover_stay_color;
-						theme.press_color       = background_color / default_button_theme.color * default_button_theme.press_color;
+					push_button_theme {
+						editor->button_theme.color = middle_color;
+						editor->button_theme.press_color = default_button_theme.press_color / default_button_theme.color * editor->button_theme.color;
+						if (tab_index != selected_tab) {
+							editor->button_theme.color             = background_color / default_button_theme.color * default_button_theme.color;
+							editor->button_theme.hover_enter_color = background_color / default_button_theme.color * default_button_theme.hover_enter_color;
+							editor->button_theme.hover_stay_color  = background_color / default_button_theme.color * default_button_theme.hover_stay_color;
+							editor->button_theme.press_color       = background_color / default_button_theme.color * default_button_theme.press_color;
+						}
+						if (button(tab.window->name, (umm)this + tab_index)) {
+							selected_tab = tab_index;
+						}
 					}
-					if (button(tab.window->name, (umm)this + tab_index, theme)) {
-						selected_tab = tab_index;
-					}
-					//gui_panel({.1,.1,.1,1});
-					//draw_text(placed_chars, font, {.position = {2, 0}});
 
 					if (begin_drag_and_drop(DragAndDrop_tab)) {
 						DragDropTabInfo data;
@@ -148,7 +147,6 @@ struct TabView : EditorWindow {
 						case 3: direction = 0; break;
 					}
 				}
-				print("%\n", direction);
 
 				v4f color = {.1,1,.1,.2};
 				tg::Viewport v = base_viewport;
@@ -164,7 +162,7 @@ struct TabView : EditorWindow {
 
 				if (data.tab_view == this && tabs.size == 1) {
 				} else {
-					push_current_viewport(v) {
+					push_viewport(v) {
 						gui_panel({.1,1,.1,.2});
 
 						if (accept_drag_and_drop(DragAndDrop_tab)) {

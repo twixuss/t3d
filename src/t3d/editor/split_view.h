@@ -113,22 +113,8 @@ struct SplitView : EditorWindow {
 			resize_children();
 		}
 
-		push_current_viewport(part1->viewport) part1->render();
-		push_current_viewport(part2->viewport) part2->render();
-
-		tg::Viewport v;
-		if (horizontal) {
-			v.min.x = part1->viewport.min.x;
-			v.min.y = part1->viewport.max.y;
-			v.max.x = part2->viewport.max.x;
-			v.max.y = part2->viewport.min.y;
-		} else {
-			v.min.x = part1->viewport.max.x;
-			v.min.y = part1->viewport.min.y;
-			v.max.x = part2->viewport.min.x;
-			v.max.y = part2->viewport.max.y;
-		}
-		push_current_viewport(v) gui_panel(background_color);
+		push_viewport(part1->viewport) part1->render();
+		push_viewport(part2->viewport) part2->render();
 	}
 
 	void debug_print() {

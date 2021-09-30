@@ -14,74 +14,38 @@ inline tg::Viewport pad(tg::Viewport viewport) {
 	return viewport;
 }
 
-struct ButtonTheme {
-	v4f color = foreground_color;
-	v4f hover_enter_color = foreground_color * highlight_color * 1.5f;
-	v4f hover_stay_color = foreground_color * highlight_color;
-	v4f press_color = {.1f, .1f, .1f, 1};
-	v4f click_color = {.5f, .5f, 1, 1};
-	f32 hover_enter_speed = 10;
-	f32 hover_stay_speed = 20;
-	f32 press_speed = 20;
-	f32 click_speed = 10;
-	u32 font_size = 12;
-};
-
-inline constexpr ButtonTheme default_button_theme;
-
-struct TextFieldTheme {
-	v4f color = background_color;
-	v4f hovered_color = {.15f, .15f, .15f, 1};
-	v4f edit_color = {.2f, .2f, .1f, 1};
-	u32 font_size = 12;
-};
-
-inline constexpr TextFieldTheme default_text_field_theme;
-
 u32 const font_size = 12;
 
 void gui_panel(v4f color);
 void gui_image(tg::Texture2D *texture);
 
+enum Align {
+	Align_top_left,
+	Align_top,
+	Align_top_right,
+	Align_left,
+	Align_center,
+	Align_right,
+	Align_bottom_left,
+	Align_bottom,
+	Align_bottom_right,
+};
 struct DrawTextParams {
 	v2s position = {};
+	Align align = Align_top_left;
 };
 
-void label(Span<PlacedChar> placed_chars, SizedFont *font, DrawTextParams params = {});
+u32 get_font_size(u32 font_size);
+
+void label(v2s position, List<PlacedChar> placed_chars, SizedFont *font, v4f color);
 void label(Span<utf8> string, u32 font_size, DrawTextParams params = {});
-inline void label(utf8 const *string, u32 font_size, DrawTextParams params = {}) { label(as_span(string), font_size, params); }
-inline void label(Span<char>  string, u32 font_size, DrawTextParams params = {}) { label((Span<utf8>)string, font_size, params); }
-inline void label(char const *string, u32 font_size, DrawTextParams params = {}) { label((Span<utf8>)as_span(string), font_size, params); }
+inline void label(utf8 const *string, u32 font_size, DrawTextParams params = {}) { return label(as_span(string), font_size, params); }
+inline void label(Span<char>  string, u32 font_size, DrawTextParams params = {}) { return label((Span<utf8>)string, font_size, params); }
+inline void label(char const *string, u32 font_size, DrawTextParams params = {}) { return label((Span<utf8>)as_span(string), font_size, params); }
 
-bool button_base(umm id, ButtonTheme const &theme, std::source_location location);
-inline bool button(Span<utf8> text, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
-	auto result = button_base(id, theme, location);
-
-	label(text, theme.font_size);
-
-	return result;
-}
-
-inline bool button(tg::Texture2D *texture, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
-	auto result = button_base(id, theme, location);
-
-	gui_image(texture);
-
-	return result;
-}
-
-inline bool button(tg::Viewport button_viewport, Span<utf8> text, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
-	push_current_viewport(button_viewport) {
-		return button(text, id, theme, location);
-	}
-	return false;
-}
-inline bool button(tg::Viewport button_viewport, tg::Texture2D *texture, umm id = 0, ButtonTheme const &theme = default_button_theme, std::source_location location = std::source_location::current()) {
-	push_current_viewport(button_viewport) {
-		return button(texture, id, theme, location);
-	}
-	return false;
-}
+bool button(umm id = 0, std::source_location location = std::source_location::current());
+bool button(Span<utf8> text, umm id = 0, std::source_location location = std::source_location::current());
+bool button(tg::Texture2D *texture, umm id = 0, std::source_location location = std::source_location::current());
 
 template <class Init, class Edit, class Drag>
 struct InputFieldCallbacks {
@@ -91,8 +55,11 @@ struct InputFieldCallbacks {
 };
 
 template <class InputFieldCallbacks>
-bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &theme) {
+bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id, std::source_location location) {
 	begin_input_user(true);
+
+	auto &theme = editor->text_field_theme;
+	auto font_size = get_font_size(theme.font_size);
 
 	bool value_changed = false;
 	bool stop_edit = false;
@@ -100,7 +67,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	bool set_caret_from_mouse = false;
 	if (state.editing) {
 		if ((editor->key_state[256 + 0].state & KeyState_down)) {
-			if (in_bounds(app->current_mouse_position, app->current_scissor)) {
+			if (in_bounds(app->current_mouse_position, editor->current_scissor)) {
 				set_caret_from_mouse = true;
 			} else {
 				apply_input = true;
@@ -111,9 +78,6 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 		if ((editor->key_state[256 + 1].state & KeyState_down)) {
 			apply_input = true;
 			stop_edit = true;
-		}
-		if (mouse_click(0)) {
-			print("click\n");
 		}
 		if (key_down(Key_escape)) {
 			stop_edit = true;
@@ -338,28 +302,28 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 	v4f color = theme.color;
 	if (state.editing) {
 		color = theme.edit_color;
-	} else if (in_bounds(app->current_mouse_position, app->current_scissor)) {
+	} else if (in_bounds(app->current_mouse_position, editor->current_scissor)) {
 		color = theme.hovered_color;
 	}
 
 	gui_panel(color);
 
 	if (state.editing) {
-		tg::Viewport caret_viewport = app->current_viewport;
-		caret_viewport.min.x = app->current_viewport.min.x;
+		tg::Viewport caret_viewport = editor->current_viewport;
+		caret_viewport.min.x = editor->current_viewport.min.x;
 		caret_viewport.max.x = caret_viewport.min.x + 1;
 
 
 		if (state.string.size) {
-			auto font = get_font_at_size(app->font_collection, theme.font_size);
+			auto font = get_font_at_size(app->font_collection, font_size);
 			ensure_all_chars_present(state.string, font);
-			auto placed_chars = with(temporary_allocator, place_text(state.string, font));
+			auto placed_chars = with(temporary_allocator, get_text_info(state.string, font, {.place_chars=true}).placed_chars);
 
 			if (set_caret_from_mouse) {
 				u32 new_caret_position = placed_chars.size;
 
 				for (u32 char_index = 0; char_index < placed_chars.size; char_index += 1) {
-					if (placed_chars[char_index].position.center().x - state.text_offset > (app->current_mouse_position.x - app->current_viewport.min.x)) {
+					if (placed_chars[char_index].position.center().x - state.text_offset > (app->current_mouse_position.x - editor->current_viewport.min.x)) {
 						new_caret_position = char_index;
 						break;
 					}
@@ -376,32 +340,29 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 			if (caret_x == 0)
 				state.text_offset = 0;
 
-			if (placed_chars.back().position.max.x > app->current_viewport.size().x) {
-				state.text_offset = max(state.text_offset, caret_x - (s32)(app->current_viewport.size().x * 3 / 4));
-				state.text_offset = min(state.text_offset, caret_x - (s32)(app->current_viewport.size().x * 1 / 4));
-				state.text_offset = min(state.text_offset, (s32)placed_chars.back().position.max.x - app->current_viewport.size().x + 1);
+			if (placed_chars.back().position.max.x > editor->current_viewport.size().x) {
+				state.text_offset = max(state.text_offset, caret_x - (s32)(editor->current_viewport.size().x * 3 / 4));
+				state.text_offset = min(state.text_offset, caret_x - (s32)(editor->current_viewport.size().x * 1 / 4));
+				state.text_offset = min(state.text_offset, (s32)placed_chars.back().position.max.x - editor->current_viewport.size().x + 1);
 				state.text_offset = max(state.text_offset, 0);
-				//state.text_offset = min<s32>(state.text_offset, caret_x - (s32)(app->current_viewport.size().x * 1 / 4));
+				//state.text_offset = min<s32>(state.text_offset, caret_x - (s32)(editor->current_viewport.size().x * 1 / 4));
 
 				//s32 rel_caret_pos = caret_x - state.text_offset;
-				//s32 diff = rel_caret_pos - (s32)(app->current_viewport.size().x * 3 / 4);
+				//s32 diff = rel_caret_pos - (s32)(editor->current_viewport.size().x * 3 / 4);
 				//if (diff < 0) {
 				//	state.text_offset += diff;
 				//}
 				//
 				//rel_caret_pos = caret_x - state.text_offset;
-				//diff = rel_caret_pos - (s32)(app->current_viewport.size().x / 4);
+				//diff = rel_caret_pos - (s32)(editor->current_viewport.size().x / 4);
 				//if (diff > 0) {
 				//	state.text_offset -= diff;
 				//}
 
-
-				print("%\n", state.text_offset);
-
 				//state.text_offset = clamp<s32>(
-				//	(s32)app->current_viewport.size().x / 4 - (s32)caret_x,
+				//	(s32)editor->current_viewport.size().x / 4 - (s32)caret_x,
 				//	0,
-				//	-placed_chars.back().position.max.x + app->current_viewport.size().x - 1
+				//	-placed_chars.back().position.max.x + editor->current_viewport.size().x - 1
 				//);
 			}
 
@@ -415,21 +376,22 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, auto &
 				u32 min_x = placed_chars[sel_min    ].position.min.x;
 				u32 max_x = placed_chars[sel_max - 1].position.max.x;
 
-				tg::Viewport selection_viewport = app->current_viewport;
-				selection_viewport.min.x = app->current_viewport.min.x + min_x;
+				tg::Viewport selection_viewport = editor->current_viewport;
+				selection_viewport.min.x = editor->current_viewport.min.x + min_x;
 				selection_viewport.max.x = selection_viewport.min.x + max_x - min_x;
 
-				push_current_viewport(selection_viewport) gui_panel({0.25f,0.25f,0.5f,1});
+				push_viewport(selection_viewport) gui_panel({0.25f,0.25f,0.5f,1});
 			}
 
-			label(placed_chars, font, {.position = {-state.text_offset, 0}});
+			label((List<utf8>)to_string(value), font_size, {.position = {-state.text_offset, 0}});
+			//label(placed_chars, font, {.position = {-state.text_offset, 0}}, id, location, V4f(1));
 		}
 
 
 
 
 		if (state.caret_blink_time <= 0.5f) {
-			push_current_viewport (caret_viewport) {
+			push_viewport (caret_viewport) {
 				gui_panel({1, 1, 1, 1});
 			}
 		}
@@ -497,10 +459,10 @@ inline Optional<f64> parse_expression(FloatFieldToken *&t, FloatFieldToken *end)
 
 			if (right) {
 				switch (op) {
-					case '+': result += right.get(); break;
-					case '-': result -= right.get(); break;
-					case '*': result *= right.get(); break;
-					case '/': result /= right.get(); break;
+					case '+': result += right.value(); break;
+					case '-': result -= right.value(); break;
+					case '*': result *= right.value(); break;
+					case '/': result /= right.value(); break;
 				}
 			}
 		}
@@ -509,7 +471,7 @@ inline Optional<f64> parse_expression(FloatFieldToken *&t, FloatFieldToken *end)
 	return result;
 }
 
-inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
+inline bool float_field(f32 &value, umm id = 0, std::source_location location = std::source_location::current()) {
 	auto &state = editor->float_field_states.get_or_insert({id, location});
 
 	return input_field(InputFieldCallbacks{
@@ -537,8 +499,8 @@ inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = de
 					return false;
 				}
 				auto got = get_char_and_advance_utf8(&next_char_p);
-				if (got.valid()) {
-					c = got.get();
+				if (got) {
+					c = got.value();
 					return true;
 				}
 				return false;
@@ -594,7 +556,7 @@ inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = de
 					if (!parsed) {
 						return false;
 					}
-					token.value = parsed.get();
+					token.value = parsed.value();
 					tokens.add(token);
 				} else {
 					switch (c) {
@@ -621,7 +583,7 @@ inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = de
 
 				auto parsed = parse_expression(t, end);
 				if (parsed || state.string.size == 0) {
-					value = parsed ? parsed.get() : 0;
+					value = parsed ? parsed.value() : 0;
 					return true;
 				}
 			}
@@ -630,10 +592,10 @@ inline bool float_field(f32 &value, umm id = 0, TextFieldTheme const &theme = de
 		.on_drag = [&](f32 delta){
 			value += delta * (key_held(Key_shift, {.anywhere = true}) ? 0.01f : 0.1f);
 		},
-	}, state, value, theme);
+	}, state, value, id, location);
 }
 
-inline bool text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &theme = default_text_field_theme, std::source_location location = std::source_location::current()) {
+inline bool text_field(List<utf8> &value, umm id = 0, std::source_location location = std::source_location::current()) {
 	auto &state = editor->text_field_states.get_or_insert({id, location});
 
 	return input_field(InputFieldCallbacks{
@@ -647,7 +609,7 @@ inline bool text_field(List<utf8> &value, umm id = 0, TextFieldTheme const &them
 		},
 		.on_drag = [&](f32 delta){
 		},
-	}, state, value, theme);
+	}, state, value, id, location);
 }
 
 
@@ -662,49 +624,49 @@ inline void end_scrollbar(umm id = 0, std::source_location location = std::sourc
 s32 const line_height = 16;
 
 inline void header(Span<utf8> text) {
-	tg::Viewport line_viewport = app->current_viewport;
-	line_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
+	tg::Viewport line_viewport = editor->current_viewport;
+	line_viewport.min.y = editor->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
-	push_current_viewport(line_viewport) label(text, font_size);
+	push_viewport(line_viewport) {
+		label(text, font_size);
+	}
 	editor->current_property_y += line_height + 2;
 }
 
 inline void property_separator() {
 	s32 const separator_height = 2;
-	tg::Viewport line_viewport = app->current_viewport;
-	line_viewport.min.y = app->current_viewport.max.y - separator_height - editor->current_property_y;
+	tg::Viewport line_viewport = editor->current_viewport;
+	line_viewport.min.y = editor->current_viewport.max.y - separator_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + separator_height;
-	push_current_viewport(line_viewport) gui_panel({.05, .05, .05, 1});
+	push_viewport(line_viewport) {
+		gui_panel({.05, .05, .05, 1});
+	}
 	editor->current_property_y += separator_height + 2;
-}
-
-inline u64 get_id(u64 id, std::source_location location) {
-	return ((u64)location.file_name() << 48) + ((u64)location.line() << 32) + ((u64)location.column() << 16) + id;
 }
 
 
 template <class Fn>
-void draw_asset_property(Span<utf8> name, Span<utf8> path, u64 id, std::source_location location, Span<Span<utf8>> file_extensions, Fn &&update) {
-	tg::Viewport line_viewport = app->current_viewport;
-	line_viewport.min.y = app->current_viewport.max.y - line_height - editor->current_property_y;
+void draw_asset_property(Span<utf8> name, Span<utf8> path, umm id, std::source_location location, Span<Span<utf8>> file_extensions, Fn &&update) {
+	tg::Viewport line_viewport = editor->current_viewport;
+	line_viewport.min.y = editor->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
-	push_current_viewport(line_viewport) {
+	push_viewport(line_viewport) {
 		s32 text_width;
 
 		auto font = get_font_at_size(app->font_collection, font_size);
 		ensure_all_chars_present(name, font);
-		auto placed_text = with(temporary_allocator, place_text(name, font));
+		auto placed_text = with(temporary_allocator, get_text_info(name, font, {.place_chars=true}).placed_chars);
 		text_width = placed_text.back().position.max.x;
-		label(placed_text, font);
+		label(name, font_size);
 
-		auto value_viewport = app->current_viewport;
+		auto value_viewport = editor->current_viewport;
 		value_viewport.min.x += text_width + 2;
 
-		push_current_viewport(value_viewport) {
+		push_viewport(value_viewport) {
 			gui_panel({.05, .05, .05, 1});
 			label(path, font_size);
 
-			bool result = (editor->key_state[256 + 0].state & KeyState_up) && in_bounds(app->current_mouse_position, app->current_scissor);
+			bool result = (editor->key_state[256 + 0].state & KeyState_up) && in_bounds(app->current_mouse_position, editor->current_scissor);
 
 			if (result) {
 				int x = 5;

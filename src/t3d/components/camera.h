@@ -27,8 +27,11 @@ DECLARE_COMPONENT(Camera) {
 		post_effects.add(effect);
 		return *(Effect *)effect.data;
 	}
-	v3f world_to_camera(v4f point);
-	v3f world_to_camera(v3f point);
+	v3f world_to_ndc(v4f point);
+	v3f world_to_ndc(v3f point);
+	v3f world_to_window(v4f point);
+	v3f world_to_window(v3f point);
+
 	void init();
 	void free();
 	void resize_targets(v2u size);

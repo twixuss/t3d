@@ -29,6 +29,7 @@ tl::umm get_hash(struct ManipulatorStateKey const &);
 #include <tl/profiler.h>
 #include <tl/cpu.h>
 #include <tl/ram.h>
+#include <tl/opengl.h>
 
 #define NOMINMAX
 #include <Windows.h>
@@ -84,6 +85,7 @@ Span<utf8> project_directory;
 ListList<utf8> all_component_names;
 
 HMODULE scripts_dll;
+void (*scripts_dll_initialize_thread)();
 
 void update_component_info(ComponentDesc const &desc) {
 	scoped_allocator(default_allocator);
@@ -144,18 +146,13 @@ m4 local_to_world_normal(quaternion rotation, v3f scale) {
 void render_scene(SceneView *view) {
 	timed_function();
 
-	//print("%\n", to_euler_angles(quaternion_from_euler(0, time, time)));
-	//selected_entity->qrotation = quaternion_from_euler(to_euler_angles(quaternion_from_euler(0, time, time)));
-
 	auto &camera = *view->camera;
 	auto &camera_entity = *view->camera_entity;
 
 	render_camera(camera, camera_entity);
 
-	app->tg->disable_blend();
-
-	//app->tg->clear(app->tg->back_buffer, tg::ClearFlags_depth, {}, 1);
-
+	app->tg->set_render_target(camera.source_target);
+	app->tg->clear(camera.source_target, tg::ClearFlags_depth, {}, 1);
 	app->tg->set_rasterizer({
 		.depth_test = true,
 		.depth_write = true,
@@ -328,6 +325,8 @@ void render_scene(SceneView *view) {
 			debug_line(points[3], points[7]);
 		}
 	});
+
+	gui_image(camera.source_target->color);
 
 	debug_draw_lines();
 }
@@ -729,8 +728,9 @@ void reload_all_scripts(bool recompile) {
 	}
 
 	scripts_dll = LoadLibraryW(with(temporary_allocator, (wchar *)to_pathchars(scripts_dll_path, true).data));
+	scripts_dll_initialize_thread = ((void (*)())GetProcAddress(scripts_dll, "initialize_thread"));
+	scripts_dll_initialize_thread();
 
-	((void (*)())GetProcAddress(scripts_dll, "initialize_module"))();
 	set_module_shared(scripts_dll);
 
 	//
@@ -761,7 +761,7 @@ void reload_all_scripts(bool recompile) {
 		// Deserialize components that were rebuilt
 		//
 		auto string = as_utf8(to_string(builder));
-		auto tokens = parse_tokens(string).get();
+		auto tokens = parse_tokens(string).value();
 		auto t = tokens.data;
 		for (auto &component : components_to_update) {
 			auto found_info = app->component_infos.find(component.type_uid);
@@ -784,33 +784,42 @@ struct Task {
 
 };
 
+bool started(Task task) {
+	return task.state != 0;
+}
+bool finished(Task task) {
+	return task.state->finished;
+}
+
 void wait(Task task) {
 	loop_until([&]{ return task.state->finished; });
 }
 
 Printer log_printer;
 
-template <class Fn>
-Task async(Fn &&fn) {
+template <class Fn, class ...Args>
+Task async(Fn &&fn, Args &&...args) {
 	Task task;
 	task.state = task.allocator.allocate<Task::State>();
-	create_thread([task_state = task.state, fn = std::forward<Fn>(fn)] {
+	create_thread([task_state = task.state, fn = std::forward<Fn>(fn), ...args = std::forward<Args>(args)] {
 		current_printer = log_printer;
-		fn();
+		fn(args...);
 		task_state->finished = true;
 	});
 	return task;
 }
 
-void load_project(Span<utf8> directory) {
+void set_project_directory(Span<utf8> directory) {
 	project_directory = directory;
 	project_name = parse_path(directory).name;
-
 	app->assets.directory = format(u8"%assets/"s, project_directory);
+}
 
+void compile_project() {
 	recompile_all_scripts();
 	reload_all_scripts(false);
-
+}
+void load_project() {
 	auto create_default_scene = [&]() {
 		auto scene = default_allocator.allocate<Scene>();
 
@@ -927,10 +936,12 @@ void split_test(Span<char> a, Span<char> b) {
 	print("split_by_any(\"%\", \"%\") = %\n", a, b, split_by_any(a, b));
 }
 
+List<utf8> recent_list_path;
+
 void init_recent_projects() {
 	recent_projects.allocator = default_allocator;
+	recent_list_path = format(u8"%user/recent_projects", editor_directory);
 
-	auto recent_list_path = tformat(u8"%user/recent_projects", editor_directory);
 	Span<u8> recent_list;
 	if (!file_exists(recent_list_path)) {
 		create_directory(parent_directory(recent_list_path));
@@ -983,7 +994,31 @@ void init_recent_projects() {
 	}
 }
 
+void serialize_recent_projects() {
+	scoped_allocator(temporary_allocator);
+	StringBuilder builder;
+
+	for (auto &p : recent_projects) {
+		append_bytes(builder, (u32)p.path.size);
+		append_bytes(builder, p.path);
+		append_bytes(builder, p.date);
+	}
+
+	write_entire_file(recent_list_path, as_bytes(to_string(builder)));
+}
+
 List<utf8> project_directory_text_field;
+Task compile_project_task;
+bool show_editor;
+enum ProjectSelectionState {
+	ProjectSelection_recent_list,
+	ProjectSelection_new,
+};
+ProjectSelectionState project_selection_state;
+
+void directory_field(List<utf8> &path, umm id = 0, std::source_location location = std::source_location::current()) {
+	text_field(path, id, location);
+}
 
 void draw_project_selection() {
 	if (!initted_recent_projects) {
@@ -991,31 +1026,126 @@ void draw_project_selection() {
 		init_recent_projects();
 	}
 
-	app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, middle_color, 1);
+	label(u8"Test label\nPrivet\nHello"s, 24);
 
-	tg::Viewport v;
-	v2s size = {480, 24};
-	v2s offset = {0, recent_projects.size * 32 / 2};
-	v.min = app->current_viewport.center() - size / 2 + offset;
-	v.max = app->current_viewport.center() + size / 2 + offset;
-	push_current_viewport(v) {
-		auto theme = default_text_field_theme;
-		theme.font_size = 16;
-		text_field(project_directory_text_field, 0, theme);
+	if (started(compile_project_task)) {
+		push_label_theme {
+			editor->label_theme.color.w = map<f32>(pow2(map<f32>(tl::sin(app->time*tau), -1, 1, 0, 1)), 1, 0, 0.25, 1);
+			label(u8"Loading...", 64, {.align = Align_center});
+		}
+
+		if (finished(compile_project_task)) {
+			show_editor = true;
+		}
+	} else {
+		s32 const margin = 16;
+		s32 const spacing = 40;
+		s32 const font_size = 14;
+		v2s const size = {640, 32};
+		v2s const offset = {0, recent_projects.size * 32 / 2};
+		switch (project_selection_state) {
+			case ProjectSelection_new: {
+				{
+					tg::Viewport v;
+					v.min = editor->current_viewport.center() - size / 2 + offset;
+					v.max = editor->current_viewport.center() + size / 2 + offset;
+					v.min.x -= margin;
+					v.max.y += margin;
+
+					v.min.y -= 3 * spacing + margin;
+					v.max.x += margin;
+
+					push_viewport(v) {
+						gui_panel(middle_color);
+					}
+				}
+
+				tg::Viewport v;
+				v.min = editor->current_viewport.center() - size / 2 + offset;
+				v.max = editor->current_viewport.center() + size / 2 + offset;
+				push_viewport(v) {
+					if (button(u8"Back"s)) {
+						project_selection_state = ProjectSelection_recent_list;
+					}
+				}
+
+				v.min.y -= spacing;
+				v.max.y -= spacing;
+
+				push_viewport(v) {
+					directory_field(project_directory_text_field);
+				}
+
+				break;
+			}
+			case ProjectSelection_recent_list: {
+				{
+					tg::Viewport v;
+					v.min = editor->current_viewport.center() - size / 2 + offset;
+					v.max = editor->current_viewport.center() + size / 2 + offset;
+					v.min.x -= margin;
+					v.max.y += margin;
+
+					v.min.y -= recent_projects.size * spacing + margin;
+					v.max.x += margin;
+
+					push_viewport(v) {
+						gui_panel(middle_color);
+					}
+				}
+
+				tg::Viewport v;
+				v.min = editor->current_viewport.center() - size / 2 + offset;
+				v.max = editor->current_viewport.center() + size / 2 + offset;
+				push_viewport(v) {
+					if (button(u8"Create new"s)) {
+						project_selection_state = ProjectSelection_new;
+					}
+				}
+
+				push_button_theme {
+					editor->button_theme.font_size = font_size;
+
+					u32 id = 0;
+					RecentProject *selected_project = 0;
+					for (auto &p : recent_projects) {
+						v.min.y -= spacing;
+						v.max.y -= spacing;
+
+						push_viewport(v) {
+							if (button(id)) {
+								assert(p.path.back() == '\\' || p.path.back() == '/');
+								set_project_directory(p.path);
+								compile_project_task = async(compile_project);
+
+								selected_project = &p;
+							}
+
+							label(parse_path(p.path).name, 20, {.align = Align_center});
+							push_label_theme {
+								editor->label_theme.color.w = 0.5f;
+								label(p.path, font_size, {.align = Align_left});
+								label(to_string(p.date), font_size, {.align = Align_right});
+							}
+						}
+
+						++id;
+					}
+
+					if (selected_project) {
+						selected_project->date = get_date();
+						recent_projects.move_at(selected_project, 0);
+						serialize_recent_projects();
+					}
+				}
+				break;
+			}
+		}
 	}
 
-	u32 id = 0;
-	for (auto p : recent_projects) {
-		v.min.y -= 32;
-		v.max.y -= 32;
-
-		auto theme = default_button_theme;
-		theme.font_size = 16;
-		if (button(v, tformat(u8"% - %", p.path, p.date), id, theme)) {
-			assert(p.path.back() == '\\' || p.path.back() == '/');
-			load_project(p.path);
-		}
-		++id;
+	if (show_editor) {
+		scripts_dll_initialize_thread();
+		load_project();
 	}
 }
 
@@ -1043,8 +1173,6 @@ void draw_editor() {
 
 	runtime_render();
 
-	//app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, foreground_color, 1);
-
 	{
 		timed_block("editor->main_window->render()"s);
 		editor->main_window->render();
@@ -1058,7 +1186,7 @@ void draw_editor() {
 				thumbnail_viewport.min = thumbnail_viewport.max = app->current_mouse_position;
 				thumbnail_viewport.max.x += 128;
 				thumbnail_viewport.min.y -= 128;
-				push_current_viewport(thumbnail_viewport) {
+				push_viewport(thumbnail_viewport) {
 					gui_image(texture);
 				}
 			}
@@ -1078,10 +1206,11 @@ void draw_editor() {
 			tab_viewport.min.y -= TabView::tab_height;
 			tab_viewport.max.x = tab_viewport.min.x + placed_chars.back().position.max.x + 4;
 
-			push_current_viewport(tab_viewport) {
+			push_viewport(tab_viewport) {
 				gui_panel({.1,.1,.1,1});
 
-				label(placed_chars, font, {.position = {2, 0}});
+				label(tab.window->name, font_size, {.position = {2, 0}});
+				//label(placed_chars, font, {.position = {2, 0}}, 0, std::source_location::current(), V4f(1));
 			}
 			break;
 		}
@@ -1233,7 +1362,7 @@ void run() {
 
 		runtime_init();
 
-		app->tg->set_scissor(aabb_min_max({}, (v2s)window.client_size));
+		app->tg->set_scissor(window.client_size);
 
 		init_font();
 
@@ -1262,20 +1391,23 @@ void run() {
 
 	};
 	info.on_draw = [](Window &window) {
+		app->tg->draw_call_count = 0;
+		app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color, background_color, {});
+
 		static v2u old_window_size;
 		app->did_resize = false;
 		if (any_true(old_window_size != app->window->client_size)) {
 			old_window_size = app->window->client_size;
-			app->tg->resize_render_targets(app->window->client_size);
+			app->tg->on_window_resize(app->window->client_size);
 			app->did_resize = true;
 		}
 
-		app->current_viewport = app->current_scissor = {
+		editor->current_viewport = editor->current_scissor = {
 			.min = {},
 			.max = (v2s)app->window->client_size,
 		};
-		app->tg->set_viewport(app->current_viewport);
-		app->tg->set_scissor(app->current_scissor);
+		app->tg->set_viewport(editor->current_viewport);
+		app->tg->set_scissor(editor->current_scissor);
 
 		app->current_mouse_position = {app->window->mouse_position.x, (s32)app->window->client_size.y - app->window->mouse_position.y};
 
@@ -1294,7 +1426,7 @@ void run() {
 
 		gui_begin_frame();
 
-		if (project_directory.size) {
+		if (show_editor) {
 			draw_editor();
 		} else {
 			draw_project_selection();
@@ -1323,7 +1455,9 @@ void run() {
 
 		editor->input_string.clear();
 
+		app->tg->set_render_target(app->tg->back_buffer);
 		gui_draw();
+
 
 		{
 			timed_block("present"s);
@@ -1333,7 +1467,7 @@ void run() {
 		update_time();
 
 		++fps_counter;
-		set_title(app->window, tformat(u8"frame_time: % ms, fps: %", app->frame_time * 1000, fps_counter_result));
+		set_title(app->window, tformat(u8"frame_time: % ms, fps: %, draw calls: %", FormatFloat{.value = app->frame_time * 1000, .precision = 1}, fps_counter_result, app->tg->draw_call_count));
 
 		set_cursor(*app->window, app->current_cursor);
 

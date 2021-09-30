@@ -1,39 +1,108 @@
 #include "gui.h"
 #include <t3d/app.h>
 
+static void add_gui_draw(GuiDraw draw) {
+	draw.viewport = editor->current_viewport;
+	draw.scissor = editor->current_scissor;
+	editor->gui_draws.add(draw);
+}
+
 void gui_panel(v4f color) {
-	editor->gui_draws.add({.kind = GuiDraw_rect_colored, .viewport = app->current_viewport, .scissor = app->current_scissor, .rect_colored = {.color = color}});
+	add_gui_draw({.kind = GuiDraw_rect_colored, .rect_colored = {.color = color}});
 }
 
 void gui_image(tg::Texture2D *texture) {
-	editor->gui_draws.add({.kind = GuiDraw_rect_textured, .viewport = app->current_viewport, .scissor = app->current_scissor, .rect_textured = {.texture = texture}});
+	add_gui_draw({.kind = GuiDraw_rect_textured, .rect_textured = {.texture = texture}});
 }
 
-void label(Span<PlacedChar> placed_chars, SizedFont *font, DrawTextParams params) {
-	if (placed_chars.size == 0)
-		return;
-
-	editor->gui_draws.add({.kind = GuiDraw_label, .viewport = app->current_viewport, .scissor = app->current_scissor, .label = {.position = params.position, .placed_chars = with(temporary_allocator, as_list(placed_chars)), .font = font}});
+u32 get_font_size(u32 font_size) {
+	if (!font_size)
+		return editor->current_viewport.size().y;
+	return font_size;
 }
+
+void label(v2s position, List<PlacedChar> placed_chars, SizedFont *font, v4f color) {
+	add_gui_draw({
+		.kind = GuiDraw_label,
+		.label = {
+			.position = position,
+			.placed_chars = placed_chars,
+			.font = font,
+			.color = color,
+		},
+	});
+}
+
 void label(Span<utf8> string, u32 font_size, DrawTextParams params) {
 	if (string.size == 0)
 		return;
 
-	auto font = get_font_at_size(app->font_collection, font_size);
+	if (!font_size)
+		font_size = editor->current_viewport.size().y;
+
+	auto &theme = editor->label_theme;
+
+	auto font = with(temporary_allocator, get_font_at_size(app->font_collection, font_size));
 	ensure_all_chars_present(string, font);
 
-	label(with(temporary_allocator, place_text(string, font)), font, params);
+	auto info = get_text_info(string, font, {.place_chars=true,.bounds=true});
+	v2s offset = {
+		editor->current_viewport.size().x - info.bounds.size().x,
+		editor->current_viewport.size().y - font_size * info.line_count,
+	};
+	switch (params.align) {
+		case Align_top_left:
+			break;
+		case Align_top:
+			params.position.x += offset.x / 2;
+			break;
+		case Align_top_right:
+			params.position.x += offset.x;
+			break;
+
+		case Align_left:
+			params.position.y += offset.y / 2;
+			break;
+		case Align_center:
+			params.position.x += offset.x / 2;
+			params.position.y += offset.y / 2;
+			break;
+		case Align_right:
+			params.position.x += offset.x;
+			params.position.y += offset.y / 2;
+			break;
+
+		case Align_bottom_left:
+			params.position.y += offset.y;
+			break;
+		case Align_bottom:
+			params.position.x += offset.x / 2;
+			params.position.y += offset.y;
+			break;
+		case Align_bottom_right:
+			params.position.x += offset.x;
+			params.position.y += offset.y;
+			break;
+		default: invalid_code_path("not implemented");
+	}
+
+	label(params.position, info.placed_chars, font, theme.color);
 }
 
-bool button_base(umm id, ButtonTheme const &theme, std::source_location location) {
+//
+// NOTE: changes `editor->current_viewport` and does not reset it
+//
+static bool button_base(umm id, std::source_location location) {
 	auto &state = editor->button_states.get_or_insert({id, location});
 
-	bool result = mouse_click(0);
-	if (result) {
+	auto &theme = editor->button_theme;
+
+	bool clicked = mouse_click(0);
+	if (clicked) {
 		state.click_t = 1;
 	}
 
-	bool currently_hovered = in_bounds(app->current_mouse_position, app->current_scissor);
+	bool currently_hovered = in_bounds(app->current_mouse_position, editor->current_scissor);
 	if (currently_hovered && !state.previously_hovered) {
 		state.hover_enter_t = 1;
 	}
@@ -47,14 +116,43 @@ bool button_base(umm id, ButtonTheme const &theme, std::source_location location
 	color = lerp(color, theme.press_color,       V4f(state.press_t));
 	color = lerp(color, theme.click_color,       V4f(state.click_t));
 
-	gui_panel(color);
-
 	state.click_t       = lerp<f32>(state.click_t,       0, app->frame_time * theme.click_speed);
 	state.hover_enter_t = lerp<f32>(state.hover_enter_t, 0, app->frame_time * theme.hover_enter_speed);
 
 	state.previously_hovered = currently_hovered;
 
+	editor->current_viewport.min.x += theme.left_padding;
+	editor->current_viewport.min.y += theme.bottom_padding;
+	editor->current_viewport.max.x -= theme.right_padding;
+	editor->current_viewport.max.y -= theme.top_padding;
 
+	gui_panel(color);
+
+	return clicked;
+}
+bool button(umm id, std::source_location location) {
+	auto old = editor->current_viewport;
+	defer { editor->current_viewport = old; };
+	auto result = button_base(id, location);
+	return result;
+}
+bool button(Span<utf8> text, umm id, std::source_location location) {
+	auto old = editor->current_viewport;
+	defer { editor->current_viewport = old; };
+
+	auto result = button_base(id, location);
+
+	label(text, editor->button_theme.font_size, {.position = {2,2}});
+
+	return result;
+}
+
+bool button(tg::Texture2D *texture, umm id, std::source_location location) {
+	auto old = editor->current_viewport;
+	defer { editor->current_viewport = old; };
+
+	auto result = button_base(id, location);
+	gui_image(texture);
 	return result;
 }
 
@@ -65,6 +163,9 @@ void gui_begin_frame() {
 
 void gui_draw() {
 	for (auto &draw : editor->gui_draws) {
+		if (volume(draw.scissor) <= 0)
+			continue;
+
 		app->tg->set_viewport(draw.viewport);
 		app->tg->set_scissor(draw.scissor);
 		switch (draw.kind) {
@@ -96,10 +197,10 @@ void gui_draw() {
 
 				for (auto &c : placed_text) {
 					Span<Vertex> quad = {
-						{{c.position.min.x, c.position.min.y}, {c.uv.min.x, c.uv.min.y}},
-						{{c.position.max.x, c.position.min.y}, {c.uv.max.x, c.uv.min.y}},
-						{{c.position.max.x, c.position.max.y}, {c.uv.max.x, c.uv.max.y}},
-						{{c.position.min.x, c.position.max.y}, {c.uv.min.x, c.uv.max.y}},
+						{{(f32)c.position.min.x, (f32)c.position.min.y}, {(f32)c.uv.min.x, (f32)c.uv.min.y}},
+						{{(f32)c.position.max.x, (f32)c.position.min.y}, {(f32)c.uv.max.x, (f32)c.uv.min.y}},
+						{{(f32)c.position.max.x, (f32)c.position.max.y}, {(f32)c.uv.max.x, (f32)c.uv.max.y}},
+						{{(f32)c.position.min.x, (f32)c.position.max.y}, {(f32)c.uv.min.x, (f32)c.uv.max.y}},
 					};
 					vertices += {
 						quad[1], quad[0], quad[2],
@@ -123,6 +224,7 @@ void gui_draw() {
 				app->tg->update_shader_constants(app->text_shader_constants, {
 					.inv_half_viewport_size = v2f{2,-2} / (v2f)draw.viewport.size(),
 					.offset = (v2f)label.position,
+					.color = label.color,
 				});
 				app->tg->set_vertex_buffer(app->text_vertex_buffer);
 				app->tg->set_sampler(tg::Filtering_nearest, 0);

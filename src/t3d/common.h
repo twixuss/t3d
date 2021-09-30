@@ -1,5 +1,6 @@
 #pragma once
-#define TL_TEMP_STORAGE_LIMIT 1024*1024*1024
+void t3d_assert(char const *, char const *, char const *, int);
+#define ASSERTION_FAILURE(cause, expression, ...) t3d_assert(cause, expression, __FILE__, __LINE__)
 #define TL_OPENGL_LOG_LEVEL 3
 namespace tgraphics { struct Texture2D; }
 namespace tg = tgraphics;
@@ -100,7 +101,7 @@ extern "C" TL_DLL_EXPORT struct EditorData *editor;
 
 void allocate_app();
 
-extern "C" TL_DLL_EXPORT void initialize_module();
+extern "C" TL_DLL_EXPORT void initialize_thread();
 
 void set_module_shared(void *module);
 

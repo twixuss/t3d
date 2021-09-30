@@ -23,7 +23,7 @@ Entity &get_entity_from_index(Scene *scene, u32 index) {
 	return scene->entities.at(index);
 }
 u32 get_entity_index(Entity &entity) {
-	return index_of(entity.scene->entities, &entity).get();
+	return index_of(entity.scene->entities, &entity).value();
 }
 
 void remove_component(Entity &entity, ComponentIndex *component) {

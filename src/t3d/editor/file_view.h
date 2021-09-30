@@ -62,7 +62,7 @@ struct FileView : EditorWindow {
 			button_viewport.min.x += tab * button_height;
 			button_viewport.max = v2s{viewport.max.x - button_padding, button_viewport.min.y + button_height};
 
-			push_current_viewport(button_viewport) {
+			push_viewport(button_viewport) {
 				if (button(entry.name, (umm)&entry)) {
 					auto found = app->assets.textures_2d_by_path.find(entry.path);
 
