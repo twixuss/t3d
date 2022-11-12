@@ -34,7 +34,7 @@ void label(v2s position, List<PlacedChar> placed_chars, SizedFont *font, v4f col
 }
 
 void label(Span<utf8> string, u32 font_size, DrawTextParams params) {
-	if (string.size == 0)
+	if (string.count == 0)
 		return;
 
 	if (!font_size)
@@ -185,7 +185,7 @@ void gui_draw() {
 				auto font = label.font;
 				auto placed_text = label.placed_chars;
 
-				assert(placed_text.size);
+				assert(placed_text.count);
 
 				struct Vertex {
 					v2f position;
@@ -202,10 +202,10 @@ void gui_draw() {
 						{{(f32)c.position.max.x, (f32)c.position.max.y}, {(f32)c.uv.max.x, (f32)c.uv.max.y}},
 						{{(f32)c.position.min.x, (f32)c.position.max.y}, {(f32)c.uv.min.x, (f32)c.uv.max.y}},
 					};
-					vertices += {
+					vertices.add({
 						quad[1], quad[0], quad[2],
 						quad[2], quad[0], quad[3],
-					};
+					});
 				}
 
 				if (app->text_vertex_buffer) {
@@ -229,7 +229,7 @@ void gui_draw() {
 				app->tg->set_vertex_buffer(app->text_vertex_buffer);
 				app->tg->set_sampler(tg::Filtering_nearest, 0);
 				app->tg->set_texture(font->texture, 0);
-				app->tg->draw(vertices.size);
+				app->tg->draw(vertices.count);
 				break;
 			}
 			default: invalid_code_path("not implemented"); break;

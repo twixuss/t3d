@@ -2,7 +2,7 @@
 #include <t3d/entity.h>
 
 struct Scene {
-	MaskedBlockList<Entity, 256> entities;
+	StaticMaskedBlockList<Entity, 256> entities;
 	HashMap<Uid, ComponentStorage> component_storages;
 
 	Scene() {

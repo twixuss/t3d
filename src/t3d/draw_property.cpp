@@ -2,7 +2,7 @@
 #include "gui.h"
 
 void draw_property(Span<utf8> name, f32 &value, std::source_location location) {
-	tg::Viewport line_viewport = editor->current_viewport;
+	tg::Rect line_viewport = editor->current_viewport;
 	line_viewport.min.y = editor->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 
@@ -67,7 +67,7 @@ void draw_property(Span<utf8> name, quaternion &value, std::source_location loca
 void draw_property(Span<utf8> name, List<utf8> &value, std::source_location location) {
 	header(name);
 
-	tg::Viewport line_viewport = editor->current_viewport;
+	tg::Rect line_viewport = editor->current_viewport;
 	line_viewport.min.y = line_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 

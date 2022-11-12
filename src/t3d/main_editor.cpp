@@ -1,5 +1,6 @@
 #include <t3d/common.h>
 #include <source_location>
+#include <tl/main.h>
 #include <tl/common.h>
 #include <tl/bin2cpp.h>
 tl::umm get_hash(struct ManipulatorStateKey const &);
@@ -98,7 +99,7 @@ void update_component_info(ComponentDesc const &desc) {
 
 	if (found_uid) {
 		uid = found_uid.get_unchecked();
-		print("Re-registered component '%' with uid '%'\n", desc.name, uid);
+		print("Re-registered component '{}' with uid '{}'\n", desc.name, uid);
 
 		auto found_info = app->component_infos.find(uid);
 		assert(found_info);
@@ -113,7 +114,7 @@ void update_component_info(ComponentDesc const &desc) {
 		}
 	} else {
 		uid = create_uid();
-		print("Registered new component '%' with uid '%'\n", desc.name, uid);
+		print("Registered new component '{}' with uid '{}'\n", desc.name, uid);
 
 		info = &app->component_infos.get_or_insert(uid);
 
@@ -334,7 +335,7 @@ void render_scene(SceneView *view) {
 void add_files_recursive(ListList<utf8> &result, Span<pathchar> directory) {
 	auto items = get_items_in_directory(directory);
 	for (auto &item : items) {
-		auto path16 = concatenate(directory, '/', item.name);
+		auto path16 = concatenate(directory, u'/', item.name);
 		if (item.kind == FileItem_directory) {
 			add_files_recursive(result, path16);
 		} else {
@@ -354,7 +355,7 @@ bool invoke_msvc(Span<utf8> arguments, Fn &&what_to_do_while_compiling) {
 	auto prev_allocator = current_allocator;
 	scoped_allocator(temporary_allocator);
 
-	create_directory(format(u8"%build/"s, editor_directory));
+	create_directory(format(u8"{}build/"s, editor_directory));
 
 	constexpr auto cl_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30037\\bin\\Hostx64\\x64\\cl.exe"s;
 
@@ -363,25 +364,25 @@ bool invoke_msvc(Span<utf8> arguments, Fn &&what_to_do_while_compiling) {
 @echo off
 call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
 cl )");
-	append_format(bat_builder, "/Fd\"%temp/%.pdb\" ", editor_directory, query_performance_counter());
+	append_format(bat_builder, "/Fd\"{}temp/{}.pdb\" ", editor_directory, query_performance_counter());
 
 	append(bat_builder, arguments);
-	//append_format(bat_builder, " | \"%bin/stdin_duplicator.exe\" \"stdout\" \"%build/build_log.txt\"", editor_directory, editor_directory);
+	//append_format(bat_builder, " | \"{}bin/stdin_duplicator.exe\" \"stdout\" \"{}build/build_log.txt\"", editor_directory, editor_directory);
 
-	auto bat_path = format(u8"%build/build.bat"s, editor_directory);
+	auto bat_path = format(u8"{}build/build.bat"s, editor_directory);
 
 	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
 
 	auto process = start_process(bat_path);
 
 	if (!is_valid(process)) {
-		print(Print_error, "Cannot execute file '%'\n", bat_path);
+		print(Print_error, "Cannot execute file '{}'\n", bat_path);
 		return false;
 	}
 
 	defer { free(process); };
 
-	print("cl %\n", arguments);
+	print("cl {}\n", arguments);
 
 	{
 		scoped_allocator(prev_allocator);
@@ -401,7 +402,7 @@ cl )");
 		append(log_builder, string);
 		print(string);
 	}
-	write_entire_file(format("%build/build_log.txt", editor_directory), as_bytes(to_string(log_builder)));
+	write_entire_file(format("{}build/build_log.txt", editor_directory), as_bytes(to_string(log_builder)));
 
 	wait(process);
 	auto exit_code = get_exit_code(process);
@@ -463,7 +464,7 @@ ListList<ascii> get_exported_functions_in_dll(Span<utf8> dll_path) {
 
             for (DWORD i = 0; i < ied->NumberOfNames; i++) {
 				auto span = as_span((ascii *)ImageRvaToVa(loaded_image.FileHeader, loaded_image.MappedAddress, name_rvas[i], NULL));
-				span.size += 1; // include null terminator for future GetProcAddress calls
+				span.count += 1; // include null terminator for future GetProcAddress calls
 				result.add(span);
             }
         }
@@ -487,9 +488,9 @@ Span<ascii> lib_dirs[] = {
 };
 
 void clear_build_directory() {
-	auto items = get_items_in_directory(to_pathchars(format(u8"%build"s, editor_directory), true));
+	auto items = get_items_in_directory(to_pathchars(format(u8"{}build"s, editor_directory), true));
 	for (auto item : items) {
-		delete_file(to_pathchars(format(u8"%build/%"s, editor_directory, item.name)));
+		delete_file(to_pathchars(format(u8"{}build/{}"s, editor_directory, item.name)));
 	}
 }
 
@@ -503,7 +504,7 @@ void append_editor_cpp_or_obj_files(StringBuilder &builder) {
 			continue;
 		}
 
-		auto obj_path = tformat("%data/obj/%.obj", editor_directory, name);
+		auto obj_path = tformat("{}data/obj/{}.obj", editor_directory, name);
 		if (file_exists(obj_path)) {
 			append(builder, obj_path);
 			append(builder, ' ');
@@ -525,17 +526,17 @@ void build_executable() {
 		asset_paths.make_absolute();
 
 		for (auto full_path : asset_paths) {
-			auto path = full_path.subspan(app->assets.directory.size + 1, full_path.size - app->assets.directory.size - 1);
-			print("asset %\n", path);
-			append_bytes(asset_builder, (u32)path.size);
+			auto path = full_path.subspan(app->assets.directory.count + 1, full_path.count - app->assets.directory.count - 1);
+			print("asset {}\n", path);
+			append_bytes(asset_builder, (u32)path.count);
 			append_bytes(asset_builder, path);
 
 			auto data = read_entire_file(to_pathchars(full_path));
-			append_bytes(asset_builder, (u32)data.size);
+			append_bytes(asset_builder, (u32)data.count);
 			append_bytes(asset_builder, as_span(data));
 		}
 
-		auto data_path = format(u8"%build/data.bin", project_directory);
+		auto data_path = format(u8"{}build/data.bin", project_directory);
 		create_directory(parse_path(data_path).directory);
 		auto data_file = open_file(data_path, {.write = true});
 		defer { close(data_file); };
@@ -546,7 +547,7 @@ void build_executable() {
 
 		auto asset_data = as_bytes(to_string(asset_builder));
 		header.asset_offset = get_cursor(data_file);
-		header.asset_size = asset_data.size;
+		header.asset_size = asset_data.count;
 		write(data_file, asset_data);
 
 
@@ -558,7 +559,7 @@ void build_executable() {
 
 		auto scene_data = serialize_scene_binary(app->current_scene, uid_remap);
 		header.scene_offset = get_cursor(data_file);
-		header.scene_size = scene_data.size;
+		header.scene_size = scene_data.count;
 		write(data_file, scene_data);
 
 		set_cursor(data_file, 0, File_begin);
@@ -588,7 +589,7 @@ void update_component_info(ComponentDesc const &desc) {
 
 	assert(!app->component_infos.find(uid));
 
-	print("Registered new component '%' with uid '%'\n", desc.name, uid);
+	print("Registered new component '{}' with uid '{}'\n", desc.name, uid);
 
 	auto &info = app->component_infos.get_or_insert(uid);
 
@@ -613,16 +614,16 @@ void update_component_info(ComponentDesc const &desc) {
 
 
 		for (auto component_name : all_component_names) {
-			append_format(builder, u8"extern \"C\" ComponentDesc t3dcd%();\n", component_name);
+			append_format(builder, u8"extern \"C\" ComponentDesc t3dcd{}();\n", component_name);
 		}
 		append(builder, u8"extern \"C\" void t3d_get_component_descs(List<ComponentDesc> &descs) {\n");
 		for (auto component_name : all_component_names) {
-			append_format(builder, u8"	descs.add(t3dcd%());\n", component_name);
+			append_format(builder, u8"	descs.add(t3dcd{}());\n", component_name);
 		}
 		append(builder, u8"}"s);
 
 
-		create_directory(format("%build", editor_directory));
+		create_directory(format("{}build", editor_directory));
 		write_entire_file(to_pathchars(component_descs_getter_path), as_bytes(to_string(builder)));
 	}
 
@@ -630,23 +631,23 @@ void update_component_info(ComponentDesc const &desc) {
 
 	append_editor_cpp_or_obj_files(builder);
 
-	append_format(builder, "% ", component_descs_getter_path);
+	append_format(builder, "{} ", component_descs_getter_path);
 
-	append_format(builder, u8"%src/t3d/main_runtime.cpp "s, editor_directory);
+	append_format(builder, u8"{}src/t3d/main_runtime.cpp "s, editor_directory);
 
 	for (auto cpp_file : project_cpp_files) {
-		append_format(builder, "% ", cpp_file);
+		append_format(builder, "{} ", cpp_file);
 	}
 
 	for (auto inc : include_dirs) {
-		append_format(builder, "/I\"%%\" ", editor_directory, inc);
+		append_format(builder, "/I\"{}{}\" ", editor_directory, inc);
 	}
 
-	create_directory(format(u8"%build", project_directory));
-	append_format(builder, u8"/Zi /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:%build/%.exe "s, project_directory, project_name);
+	create_directory(format(u8"{}build", project_directory));
+	append_format(builder, u8"/Zi /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:{}build/{}.exe "s, project_directory, project_name);
 
 	for (auto lib : lib_dirs) {
-		append_format(builder, "/LIBPATH:\"%..\\%\" ", editor_bin_directory, lib);
+		append_format(builder, "/LIBPATH:\"{}..\\{}\" ", editor_bin_directory, lib);
 	}
 
 	if (!invoke_msvc((List<utf8>)to_string(builder), build_assets)) {
@@ -658,7 +659,7 @@ void update_component_info(ComponentDesc const &desc) {
 Span<utf8> scripts_dll_path;
 
 void recompile_all_scripts() {
-	scripts_dll_path = format(u8"%build/scripts%.dll"s, editor_directory, query_performance_counter());
+	scripts_dll_path = format(u8"{}build/scripts{}.dll"s, editor_directory, query_performance_counter());
 
 	update_scripts_paths();
 
@@ -669,20 +670,20 @@ void recompile_all_scripts() {
 		StringBuilder builder;
 
 		for (auto cpp_file : project_cpp_files) {
-			append_format(builder, "% ", cpp_file);
+			append_format(builder, "{} ", cpp_file);
 		}
 
 		append_editor_cpp_or_obj_files(builder);
 
 		for (auto inc : include_dirs) {
-			append_format(builder, "/I\"%%\" ", editor_directory, inc);
+			append_format(builder, "/I\"{}{}\" ", editor_directory, inc);
 		}
 
-		append_format(builder, "/LD /Zi /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:\"%\" ", scripts_dll_path);
+		append_format(builder, "/LD /Zi /MTd /std:c++latest /D\"BUILD_DEBUG=0\" /link /out:\"{}\" ", scripts_dll_path);
 
 
 		for (auto lib : lib_dirs) {
-			append_format(builder, "/LIBPATH:\"%..\\%\" ", editor_bin_directory, lib);
+			append_format(builder, "/LIBPATH:\"{}..\\{}\" ", editor_bin_directory, lib);
 		}
 		assert(invoke_msvc(as_utf8(to_string(builder))));
 	}
@@ -745,7 +746,7 @@ void reload_all_scripts(bool recompile) {
 	for (auto func_name : exported_funcs) {
 		auto prefix = u8"t3dcd"s;
 		if (starts_with(func_name, prefix)) {
-			all_component_names.add(as_utf8(func_name.subspan(prefix.size, func_name.size - 1 - prefix.size)));
+			all_component_names.add(as_utf8(func_name.subspan(prefix.count, func_name.count - 1 - prefix.count)));
 			using GetComponentDesc = ComponentDesc (*)();
 			descs.add(((GetComponentDesc)GetProcAddress(scripts_dll, func_name.data))());
 		}
@@ -801,18 +802,27 @@ template <class Fn, class ...Args>
 Task async(Fn &&fn, Args &&...args) {
 	Task task;
 	task.state = task.allocator.allocate<Task::State>();
-	create_thread([task_state = task.state, fn = std::forward<Fn>(fn), ...args = std::forward<Args>(args)] {
+
+	// TODOOOOOOOOO: FIXMEEEEEEEEEEE:
+	// I've removed this functionality from tl
+#if 0
+	create_thread([task_state = task.state, fn = std::forward<Fn>(fn), ...args = std::forward<Args>(args)] () {
 		current_printer = log_printer;
 		fn(args...);
 		task_state->finished = true;
 	});
+#else
+	fn(args...);
+	task.state->finished = true;
+#endif
+
 	return task;
 }
 
 void set_project_directory(Span<utf8> directory) {
 	project_directory = directory;
 	project_name = parse_path(directory).name;
-	app->assets.directory = format(u8"%assets/"s, project_directory);
+	app->assets.directory = format(u8"{}assets/"s, project_directory);
 }
 
 void compile_project() {
@@ -933,14 +943,14 @@ List<Span<T>> split_by_any(Span<T> what, Span<T> by) {
 }
 
 void split_test(Span<char> a, Span<char> b) {
-	print("split_by_any(\"%\", \"%\") = %\n", a, b, split_by_any(a, b));
+	print("split_by_any(\"{}\", \"{}\") = {}\n", a, b, split_by_any(a, b));
 }
 
 List<utf8> recent_list_path;
 
 void init_recent_projects() {
 	recent_projects.allocator = default_allocator;
-	recent_list_path = format(u8"%user/recent_projects", editor_directory);
+	recent_list_path = format(u8"{}user/recent_projects", editor_directory);
 
 	Span<u8> recent_list;
 	if (!file_exists(recent_list_path)) {
@@ -948,9 +958,9 @@ void init_recent_projects() {
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
 
-		auto default_path = with(temporary_allocator, replace(as_span(format(u8"%example/", editor_directory)), u8'\\', u8'/'));
+		auto default_path = with(temporary_allocator, replace(as_span(format(u8"{}example/", editor_directory)), u8'\\', u8'/'));
 
-		append_bytes(builder, (u32)default_path.size);
+		append_bytes(builder, (u32)default_path.count);
 		append_bytes(builder, default_path);
 
 		append_bytes(builder, get_date());
@@ -969,14 +979,14 @@ void init_recent_projects() {
 
 		u32 path_size;
 		if (cursor + sizeof(u32) > end) {
-			print(Print_error, "Recent projects list file is corrupted ('%' is past the end of buffer)", "path_size");
+			print(Print_error, "Recent projects list file is corrupted ('{}' is past the end of buffer)", "path_size");
 			return;
 		}
 		path_size = *(u32 *)cursor;
 		cursor += sizeof(u32);
 
 		if (cursor + path_size > end) {
-			print(Print_error, "Recent projects list file is corrupted ('%' is past the end of buffer)", "path");
+			print(Print_error, "Recent projects list file is corrupted ('{}' is past the end of buffer)", "path");
 			return;
 		}
 		rp.path.set(Span((utf8 *)cursor, path_size));
@@ -984,7 +994,7 @@ void init_recent_projects() {
 
 
 		if (cursor + sizeof(Date) > end) {
-			print(Print_error, "Recent projects list file is corrupted ('%' is past the end of buffer)", "date");
+			print(Print_error, "Recent projects list file is corrupted ('{}' is past the end of buffer)", "date");
 			return;
 		}
 		rp.date = *(Date *)cursor;
@@ -999,7 +1009,7 @@ void serialize_recent_projects() {
 	StringBuilder builder;
 
 	for (auto &p : recent_projects) {
-		append_bytes(builder, (u32)p.path.size);
+		append_bytes(builder, (u32)p.path.count);
 		append_bytes(builder, p.path);
 		append_bytes(builder, p.date);
 	}
@@ -1042,11 +1052,11 @@ void draw_project_selection() {
 		s32 const spacing = 40;
 		s32 const font_size = 14;
 		v2s const size = {640, 32};
-		v2s const offset = {0, recent_projects.size * 32 / 2};
+		v2s const offset = {0, recent_projects.count * 32 / 2};
 		switch (project_selection_state) {
 			case ProjectSelection_new: {
 				{
-					tg::Viewport v;
+					tg::Rect v;
 					v.min = editor->current_viewport.center() - size / 2 + offset;
 					v.max = editor->current_viewport.center() + size / 2 + offset;
 					v.min.x -= margin;
@@ -1060,7 +1070,7 @@ void draw_project_selection() {
 					}
 				}
 
-				tg::Viewport v;
+				tg::Rect v;
 				v.min = editor->current_viewport.center() - size / 2 + offset;
 				v.max = editor->current_viewport.center() + size / 2 + offset;
 				push_viewport(v) {
@@ -1080,13 +1090,13 @@ void draw_project_selection() {
 			}
 			case ProjectSelection_recent_list: {
 				{
-					tg::Viewport v;
+					tg::Rect v;
 					v.min = editor->current_viewport.center() - size / 2 + offset;
 					v.max = editor->current_viewport.center() + size / 2 + offset;
 					v.min.x -= margin;
 					v.max.y += margin;
 
-					v.min.y -= recent_projects.size * spacing + margin;
+					v.min.y -= recent_projects.count * spacing + margin;
 					v.max.x += margin;
 
 					push_viewport(v) {
@@ -1094,7 +1104,7 @@ void draw_project_selection() {
 					}
 				}
 
-				tg::Viewport v;
+				tg::Rect v;
 				v.min = editor->current_viewport.center() - size / 2 + offset;
 				v.max = editor->current_viewport.center() + size / 2 + offset;
 				push_viewport(v) {
@@ -1156,9 +1166,9 @@ void draw_editor() {
 
 	if (key_down(Key_f2, {.anywhere = true})) {
 		for_each(app->current_scene->entities, [](Entity &e) {
-			print("name: %, index: %, flags: %, position: %, rotation: %\n", e.name, get_entity_index(e), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
+			print("name: {}, index: {}, flags: {}, position: {}, rotation: {}\n", e.name, get_entity_index(e), e.flags, e.position, degrees(to_euler_angles(e.rotation)));
 			for (auto &c : e.components) {
-				print("\tparent: %, type: % (%), index: %\n", c.entity_index, c.type_uid, get_component_info(c.type_uid).name, c.storage_index);
+				print("\tparent: {}, type: {} ({}), index: {}\n", c.entity_index, c.type_uid, get_component_info(c.type_uid).name, c.storage_index);
 			}
 		});
 	}
@@ -1200,7 +1210,7 @@ void draw_editor() {
 			ensure_all_chars_present(tab.window->name, font);
 			auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
 
-			tg::Viewport tab_viewport;
+			tg::Rect tab_viewport;
 			tab_viewport.min = tab_viewport.max = app->current_mouse_position;
 
 			tab_viewport.min.y -= TabView::tab_height;
@@ -1272,9 +1282,9 @@ void draw_editor() {
 			if (tab_index < from->selected_tab) {
 				--from->selected_tab;
 			}
-			from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
+			from->selected_tab = min(from->selected_tab, from->tabs.count - 1);
 
-			if (from->tabs.size == 0) {
+			if (from->tabs.count == 0) {
 				remove_tab_view();
 			}
 		} else {
@@ -1282,7 +1292,7 @@ void draw_editor() {
 			bool swap_parts = direction >= 2;
 
 			TabView *new_tab_view;
-			if (from->tabs.size == 1) {
+			if (from->tabs.count == 1) {
 				new_tab_view = from;
 
 				auto from_parent = (SplitView *)from->parent;
@@ -1298,8 +1308,8 @@ void draw_editor() {
 					--from->selected_tab;
 				}
 				from->tabs.erase_at(tab_index);
-				from->selected_tab = min(from->selected_tab, from->tabs.size - 1);
-				if (from->tabs.size == 0) {
+				from->selected_tab = min(from->selected_tab, from->tabs.count - 1);
+				if (from->tabs.count == 0) {
 					remove_tab_view();
 				}
 				new_tab_view = create_tab_view(tab.window);
@@ -1321,7 +1331,7 @@ void draw_editor() {
 				editor->main_window = create_split_view(left, right, {.split_t = 0.5f, .horizontal = horizontal});
 			}
 
-			tg::Viewport window_viewport = {};
+			tg::Rect window_viewport = {};
 			window_viewport.max = (v2s)max(editor->main_window->get_min_size(), app->window->client_size);
 			editor->main_window->resize(window_viewport);
 			resize(*app->window, (v2u)window_viewport.max);
@@ -1350,7 +1360,7 @@ void run() {
 	editor->scene = default_allocator.allocate<Scene>();
 
 	app->is_editor = true;
-	editor->assets.directory = format(u8"%data/"s, editor_directory);
+	editor->assets.directory = format(u8"{}data/"s, editor_directory);
 	construct(manipulator_draw_requests);
 	construct(manipulator_states);
 	construct(debug_lines);
@@ -1390,7 +1400,7 @@ void run() {
 		handle_plane_z_mesh = editor->assets.get_mesh(u8"handle.glb:PlaneZ"s);
 
 	};
-	info.on_draw = [](Window &window) {
+	info.on_update = [](Window &window) {
 		app->tg->draw_call_count = 0;
 		app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color, background_color, {});
 
@@ -1412,14 +1422,14 @@ void run() {
 		app->current_mouse_position = {app->window->mouse_position.x, (s32)app->window->client_size.y - app->window->mouse_position.y};
 
 		if (key_down(Key_f1, {.anywhere = true})) {
-			Profiler::enabled = true;
-			Profiler::reset();
+			// TODO: :PROFILER: Profiler::enabled = true;
+			// TODO: :PROFILER: Profiler::reset();
 		}
 		defer {
-			if (Profiler::enabled) {
-				Profiler::enabled = false;
-				write_entire_file(tl_file_string("update.tmd"s), Profiler::output_for_timed());
-			}
+			// TODO: :PROFILER: if (Profiler::enabled) {
+			// TODO: :PROFILER: 	Profiler::enabled = false;
+			// TODO: :PROFILER: 	write_entire_file(tl_file_string("update.tmd"s), Profiler::output_for_timed());
+			// TODO: :PROFILER: }
 		};
 
 		app->current_cursor = Cursor_default;
@@ -1467,7 +1477,7 @@ void run() {
 		update_time();
 
 		++fps_counter;
-		set_title(app->window, tformat(u8"frame_time: % ms, fps: %, draw calls: %", FormatFloat{.value = app->frame_time * 1000, .precision = 1}, fps_counter_result, app->tg->draw_call_count));
+		set_title(app->window, tformat(u8"frame_time: {} ms, fps: {}, draw calls: {}", FormatFloat{.value = app->frame_time * 1000, .precision = 1}, fps_counter_result, app->tg->draw_call_count));
 
 		set_cursor(*app->window, app->current_cursor);
 
@@ -1512,8 +1522,8 @@ void run() {
 
 	app->frame_timer = create_precise_timer();
 
-	Profiler::enabled = false;
-	Profiler::reset();
+	// TODO: :PROFILER: Profiler::enabled = false;
+	// TODO: :PROFILER: Profiler::reset();
 
 	while (update(app->window)) {
 	}
@@ -1534,8 +1544,8 @@ void run() {
 }
 
 s32 tl_main(Span<Span<utf8>> arguments) {
-	Profiler::init();
-	defer { Profiler::deinit(); };
+	// TODO: :PROFILER: Profiler::init();
+	// TODO: :PROFILER: defer { Profiler::deinit(); };
 
 #define TRACK_ALLOCATIONS 0
 #if TRACK_ALLOCATIONS
@@ -1556,12 +1566,12 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	}
 
 	editor_bin_directory = parse_path(editor_exe_path).directory;
-	editor_bin_directory.size ++; // include slash
+	editor_bin_directory.count ++; // include slash
 
 	editor_directory = parent_directory(editor_bin_directory);
 
 
-	auto log_file = open_file(tformat("%bin/editor_log.txt"s, editor_directory), {.write = true});
+	auto log_file = open_file(tformat("{}bin/editor_log.txt"s, editor_directory), {.write = true});
 	defer { close(log_file); };
 	log_printer = Printer {
 		[](PrintKind kind, Span<utf8> string, void *data) {
@@ -1574,12 +1584,12 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	current_printer = log_printer;
 
 
-	component_descs_getter_path = format(u8"%build/get_component_descs.cpp", editor_directory);
+	component_descs_getter_path = format(u8"{}build/get_component_descs.cpp", editor_directory);
 
 	//project_name      = u8"example"s;
-	//project_directory = format(u8"%example/"s, editor_directory);
+	//project_directory = format(u8"{}example/"s, editor_directory);
 
-	for_each_file_recursive(tformat(u8"%src/t3d/", editor_directory), [] (Span<utf8> item) {
+	for_each_file_recursive(tformat(u8"{}src/t3d/", editor_directory), [] (Span<utf8> item) {
 		if (ends_with(item, u8".cpp"s)) {
 			editor_cpp_files.add(item);
 		}
@@ -1591,10 +1601,10 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 	auto cpu_info = get_cpu_info();
 	print(R"(CPU:
- - Brand: %
- - Vendor: %
- - Thread count: %
- - Cache line size: %
+ - Brand: {}
+ - Vendor: {}
+ - Thread count: {}
+ - Cache line size: {}
 )", as_span(cpu_info.brand), to_string(cpu_info.vendor), cpu_info.logical_processor_count, cpu_info.cache_line_size);
 
 	print("Cache:\n");
@@ -1604,15 +1614,15 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 			auto &cache = cpu_info.caches_by_level_and_type[level][type_index];
 			if (cache.count == 0 || cache.size == 0)
 				continue;
-			print("L% %: % x %\n", level + 1, to_string((CpuCacheType)type_index), cache.count, format_bytes(cache.size));
+			print("L{} {}: {} x {}\n", level + 1, to_string((CpuCacheType)type_index), cache.count, format_bytes(cache.size));
 		}
 	}
 
-#define f(x) print(" - " #x ": %\n", cpu_info.has_feature(CpuFeature_##x));
+#define f(x) print(" - " #x ": {}\n", cpu_info.has_feature(CpuFeature_##x));
 	tl_all_cpu_features(f)
 #undef f
 
-	print("RAM: %\n", format_bytes(get_ram_size()));
+	print("RAM: {}\n", format_bytes(get_ram_size()));
 
 	run();
 
@@ -1621,10 +1631,10 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 	print("Unfreed allocations:\n");
 	for (auto &[pointer, info] : get_tracked_allocations()) {
-		print("size: %, location: %, call stack:\n", info.size, info.location);
+		print("size: {}, location: {}, call stack:\n", info.size, info.location);
 		auto call_stack = to_string(info.call_stack);
 		for (auto &call : call_stack.call_stack) {
-			print("\t%(%):%\n", call.file, call.line, call.name);
+			print("\t{}({}):{}\n", call.file, call.line, call.name);
 		}
 	}
 #endif

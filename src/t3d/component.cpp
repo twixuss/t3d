@@ -12,7 +12,7 @@ ComponentStorage::ComponentStorage() {
 ComponentStorage::Added ComponentStorage::add() {
 	Added result;
 
-	for (u32 block_index = 0; block_index < blocks.size; block_index += 1) {
+	for (u32 block_index = 0; block_index < blocks.count; block_index += 1) {
 		auto block = blocks[block_index];
 		if (block->unfull_mask_count == 0)
 			continue;
@@ -43,7 +43,7 @@ ComponentStorage::Added ComponentStorage::add() {
 
 	block->masks[0] = 1;
 
-	result.index = blocks.size * values_per_block;
+	result.index = blocks.count * values_per_block;
 	result.pointer = block->values;
 
 	blocks.add(block);

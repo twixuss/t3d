@@ -173,7 +173,7 @@ void main() {
 		v2u next_size = max(floor_to_power_of_2(size - 1), V2u(min_texture_size));
 		u32 target_index = 0;
 		while (1) {
-			if (target_index < downsampled_targets.size) {
+			if (target_index < downsampled_targets.count) {
 				app->tg->resize_texture(downsampled_targets[target_index]->color, next_size);
 			} else {
 				downsampled_targets.add(app->tg->create_render_target(

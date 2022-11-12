@@ -10,7 +10,7 @@ struct PropertyView : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(tg::Viewport viewport) {
+	void resize(tg::Rect viewport) {
 		this->viewport = viewport;
 	}
 	void render() {

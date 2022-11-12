@@ -132,8 +132,8 @@ struct EditorData {
 	TextFieldTheme text_field_theme = default_text_field_theme;
 	LabelTheme     label_theme      = default_label_theme     ;
 
-	tg::Viewport current_viewport;
-	tg::Viewport current_scissor;
+	tg::Rect current_viewport;
+	tg::Rect current_scissor;
 
 	s32 current_property_y;
 
@@ -186,10 +186,10 @@ inline void update_current_scissor() {
 }
 
 struct ViewportPusher {
-	tg::Viewport old_viewport;
-	tg::Viewport old_scissor;
+	tg::Rect old_viewport;
+	tg::Rect old_scissor;
 	bool has_area;
-	ViewportPusher(tg::Viewport new_viewport) {
+	ViewportPusher(tg::Rect new_viewport) {
 		old_viewport = editor->current_viewport;
 		old_scissor  = editor->current_scissor;
 

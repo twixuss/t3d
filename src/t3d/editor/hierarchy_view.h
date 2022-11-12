@@ -8,14 +8,14 @@ struct HierarchyView : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(tg::Viewport viewport) {
+	void resize(tg::Rect viewport) {
 		this->viewport = viewport;
 	}
 	void render() {
 		gui_panel(middle_color);
 
 		s32 const button_height = 16;
-		tg::Viewport button_viewport;
+		tg::Rect button_viewport;
 		button_viewport.min.x = viewport.min.x;
 		button_viewport.min.y = viewport.max.y - button_height;
 		button_viewport.max.x = viewport.max.x;

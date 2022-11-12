@@ -219,7 +219,7 @@ template <class T>
 bool deserialize_text(Token *&from, Token *end, T &value, Span<utf8> name) {
 	from += 1;
 	if (from == end) {
-		print(Print_error, "Unexpected end of file while parsing property '%'\n", name);
+		print(Print_error, "Unexpected end of file while parsing property '{}'\n", name);
 		return false;
 	}
 	if (!::deserialize_text(value, from, end))
@@ -271,14 +271,14 @@ struct ComponentBase<ComponentT> : Component { \
 	bool deserialize_text(Token *&from, Token *end) { \
 		while (from->kind != '}') { \
 			if (from->kind != Token_identifier) { \
-				print(Print_error, "Expected an identifier while parsing " #ComponentT "'s properties, but got '%'\n", from->string); \
+				print(Print_error, "Expected an identifier while parsing " #ComponentT "'s properties, but got '{}'\n", from->string); \
 				return false; \
 			} \
 			auto started_from = from; \
 			if (false) {} \
 			FIELDS(DESERIALIZE_FIELD_TEXT) \
 			else { \
-				print(Print_warning, "Got unknown field while parsing " #ComponentT "'s properties: '%'\n", from->string); \
+				print(Print_warning, "Got unknown field while parsing " #ComponentT "'s properties: '{}'\n", from->string); \
 				go_to_next_property(started_from, from, end); \
 			} \
 		} \

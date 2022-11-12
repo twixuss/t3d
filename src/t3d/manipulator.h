@@ -58,7 +58,7 @@ inline bool operator==(ManipulatorStateKey const &a, ManipulatorStateKey const &
 	return a.id == b.id && a.camera == b.camera && a.location == b.location;
 }
 
-StaticHashMap<ManipulatorStateKey, ManipulatorState, 256> manipulator_states;
+StaticBucketHashMap<ManipulatorStateKey, ManipulatorState, 256> manipulator_states;
 
 inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotation, v3f scale, ManipulateKind kind, u32 id = 0, std::source_location source_location = std::source_location::current()) {
 	begin_input_user();
@@ -290,7 +290,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 					state.start_mouse_position = (v2f)mouse_position;
 					state.accumulated_mouse_delta = {};
 
-					//print("%\n", state.tangent.direction);
+					//print("{}\n", state.tangent.direction);
 				}
 
 				state.accumulated_mouse_delta += app->window->mouse_delta * v2f{1, -1};

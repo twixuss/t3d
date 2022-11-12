@@ -84,7 +84,7 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 			while (next_char() && (is_alpha(c) || c == '_' || is_digit(c))) {
 			}
 
-			token.string.size = current_char_p - token.string.data;
+			token.string.count = current_char_p - token.string.data;
 
 			auto found = string_to_token_kind.find(token.string);
 			if (found) {
@@ -109,7 +109,7 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 				}
 			}
 
-			token.string.size = current_char_p - token.string.data;
+			token.string.count = current_char_p - token.string.data;
 			tokens.add(token);
 		} else {
 			switch (c) {
@@ -131,7 +131,7 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 						goto continue_search;
 					}
 
-					token.string.size = current_char_p - token.string.data;
+					token.string.count = current_char_p - token.string.data;
 
 					next_char();
 
@@ -144,13 +144,13 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 					Token token;
 					token.kind = c;
 					token.string.data = current_char_p;
-					token.string.size = 1;
+					token.string.count = 1;
 					tokens.add(token);
 					next_char();
 					break;
 				}
 				default: {
-					print(Print_error, "Parsing failed: invalid character '%'\n", c);
+					print(Print_error, "Parsing failed: invalid character '{}'\n", c);
 					return {};
 				}
 			}
@@ -161,6 +161,6 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 }
 
 void t3d_assert(char const *cause, char const *expression, char const *file, int line) {
-	print("%: '%' in %:%", cause, expression, file, line);
+	print("{}: '{}' in {}:{}", cause, expression, file, line);
 	debug_break();
 }

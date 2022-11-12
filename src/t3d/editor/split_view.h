@@ -27,7 +27,7 @@ struct SplitView : EditorWindow {
 		}
 		return result;
 	}
-	void resize(tg::Viewport viewport) {
+	void resize(tg::Rect viewport) {
 		resize_children();
 	}
 	void resize_children() {
@@ -41,7 +41,7 @@ struct SplitView : EditorWindow {
 			clamped_split_t = clamp(split_t, (f32)size1.x / viewport.size().x, 1 - (f32)size2.x / viewport.size().x);
 		}
 
-		tg::Viewport viewport1 = viewport;
+		tg::Rect viewport1 = viewport;
 		if (horizontal) {
 			viewport1.max.y = lerp<f32>(viewport1.min.y, viewport1.max.y, clamped_split_t) - 1;
 		} else {
@@ -50,7 +50,7 @@ struct SplitView : EditorWindow {
 
 		part1->resize(viewport1);
 
-		tg::Viewport viewport2 = viewport;
+		tg::Rect viewport2 = viewport;
 		if (horizontal) {
 			viewport2.min.y = viewport1.max.y + 2;
 			viewport2.max.y = viewport.max.y;

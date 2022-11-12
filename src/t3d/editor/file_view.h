@@ -26,7 +26,7 @@ struct FileView : EditorWindow {
 			Entry result;
 			result.is_directory = child.kind == FileItem_directory;
 			if (append_directory) {
-				result.path = concatenate(parent.path, '/', child.name);
+				result.path = concatenate(parent.path, u8'/', to_utf8(child.name));
 			} else {
 				result.path = to_utf8(child.name);
 			}
@@ -43,7 +43,7 @@ struct FileView : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(tg::Viewport viewport) {
+	void resize(tg::Rect viewport) {
 		this->viewport = viewport;
 	}
 	void render() {
@@ -57,7 +57,7 @@ struct FileView : EditorWindow {
 
 	void render_entries(List<Entry> entries) {
 		for (auto &entry : entries) {
-			tg::Viewport button_viewport;
+			tg::Rect button_viewport;
 			button_viewport.min = next_pos;
 			button_viewport.min.x += tab * button_height;
 			button_viewport.max = v2s{viewport.max.x - button_padding, button_viewport.min.y + button_height};
@@ -97,8 +97,8 @@ struct FileView : EditorWindow {
 FileView *create_file_view() {
 	auto result = create_editor_window<FileView>(EditorWindow_file_view);
 	result->root.is_directory = true;
-	result->root.name = as_list(app->assets.directory);
-	result->root.path = as_list(app->assets.directory);
+	result->root.name = to_list(app->assets.directory);
+	result->root.path = to_list(app->assets.directory);
 	result->add_files(result->root, false);
 	result->name = u8"Files"s;
 	return result;

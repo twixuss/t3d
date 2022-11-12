@@ -44,7 +44,7 @@ void load_assets() {
 
 		app->assets.asset_path_to_data.get_or_insert(asset_path) = asset;
 
-		print("Got asset '%'\n", asset_path);
+		print("Got asset '{}'\n", asset_path);
 	}
 }
 

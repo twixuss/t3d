@@ -31,7 +31,7 @@ struct TabView : EditorWindow {
 	v2u get_min_size() {
 		return tabs[selected_tab].window->get_min_size() + v2u{0, (u32)tab_height};
 	}
-	void resize(tg::Viewport viewport) {
+	void resize(tg::Rect viewport) {
 		this->viewport = viewport;
 
 		for (auto &tab : tabs) {
@@ -58,7 +58,7 @@ struct TabView : EditorWindow {
 				highlight_dnd = true;
 
 				if (accept_drag_and_drop(DragAndDrop_tab)) {
-					assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
+					assert(editor->drag_and_drop_data.count == sizeof(DragDropTabInfo));
 					auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
 					if (data.tab_view != this) {
@@ -75,7 +75,7 @@ struct TabView : EditorWindow {
 			s32 tab_start_x = 2;
 
 			auto font = get_font_at_size(app->font_collection, font_size);
-			for (u32 tab_index = 0; tab_index < tabs.size; tab_index += 1) {
+			for (u32 tab_index = 0; tab_index < tabs.count; tab_index += 1) {
 				auto &tab = tabs[tab_index];
 				ensure_all_chars_present(tab.window->name, font);
 				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
@@ -110,7 +110,7 @@ struct TabView : EditorWindow {
 				}
 			}
 			if (highlight_dnd) {
-				assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
+				assert(editor->drag_and_drop_data.count == sizeof(DragDropTabInfo));
 				auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
 				if (data.tab_view != this) {
@@ -149,7 +149,7 @@ struct TabView : EditorWindow {
 				}
 
 				v4f color = {.1,1,.1,.2};
-				tg::Viewport v = base_viewport;
+				tg::Rect v = base_viewport;
 				switch (direction) {
 					case 0: v.min.x = v.center().x; break;
 					case 1: v.min.y = v.center().y; break;
@@ -157,10 +157,10 @@ struct TabView : EditorWindow {
 					case 3: v.max.y = v.center().y; break;
 				}
 
-				assert(editor->drag_and_drop_data.size == sizeof(DragDropTabInfo));
+				assert(editor->drag_and_drop_data.count == sizeof(DragDropTabInfo));
 				auto data = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 
-				if (data.tab_view == this && tabs.size == 1) {
+				if (data.tab_view == this && tabs.count == 1) {
 				} else {
 					push_viewport(v) {
 						gui_panel({.1,1,.1,.2});

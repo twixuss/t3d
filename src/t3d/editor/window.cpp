@@ -4,7 +4,7 @@
 v2u EditorWindow::get_min_size() {
 	return _get_min_size(this);
 }
-void EditorWindow::resize(tg::Viewport viewport) {
+void EditorWindow::resize(tg::Rect viewport) {
 	this->viewport = viewport;
 	return _resize(this, viewport);
 }

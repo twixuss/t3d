@@ -215,7 +215,7 @@ void main() {
 		u32 target_index = 0;
 
 		for (u32 target_index = 0; target_index < 8; ++target_index) {
-			if (target_index < temp_targets.size) {
+			if (target_index < temp_targets.count) {
 				app->tg->resize_texture(temp_targets[target_index].source     ->color, next_size);
 				app->tg->resize_texture(temp_targets[target_index].destination->color, next_size);
 			} else {

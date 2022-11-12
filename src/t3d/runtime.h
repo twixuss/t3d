@@ -528,11 +528,11 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 
 	u32 white_pixel = ~0;
 	app->white_texture = app->tg->create_texture_2d(1, 1, &white_pixel, tg::Format_rgba_u8n);
-	app->white_texture->name = as_list(u8"white"s);
+	app->white_texture->name = to_list(u8"white"s);
 
 	u32 black_pixel = 0xFF000000;
 	app->black_texture = app->tg->create_texture_2d(1, 1, &black_pixel, tg::Format_rgba_u8n);
-	app->black_texture->name = as_list(u8"black"s);
+	app->black_texture->name = to_list(u8"black"s);
 
 	{
 		constexpr s32 size = 256;
@@ -556,7 +556,7 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 		}();
 
 		app->default_light_mask = app->tg->create_texture_2d(size, size, pixels.data, tg::Format_rgba_u8n);
-		app->default_light_mask->name = as_list(u8"default_light_mask"s);
+		app->default_light_mask->name = to_list(u8"default_light_mask"s);
 	}
 }
 

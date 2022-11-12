@@ -33,7 +33,7 @@ struct SceneView : EditorWindow {
 	v2u get_min_size() {
 		return {160, 160};
 	}
-	void resize(tg::Viewport viewport) {
+	void resize(tg::Rect viewport) {
 		this->viewport = viewport;
 		for (auto &effect : camera->post_effects) {
 			effect.resize((v2u)viewport.size());
@@ -213,7 +213,7 @@ struct SceneView : EditorWindow {
 
 SceneView *create_scene_view() {
 	auto result = create_editor_window<SceneView>(EditorWindow_scene_view);
-	result->camera_entity = &editor->scene->create_entity(tformat("scene_camera_%", result->id));
+	result->camera_entity = &editor->scene->create_entity(tformat("scene_camera_{}", result->id));
 	result->camera_entity->flags |= Entity_editor_camera;
 	result->camera = &add_component<Camera>(*result->camera_entity);
 	result->camera->add_post_effect<Dither>();

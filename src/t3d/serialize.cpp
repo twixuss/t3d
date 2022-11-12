@@ -12,7 +12,7 @@ void serialize_binary(StringBuilder &builder, v3f value) {
 
 void serialize_binary(StringBuilder &builder, Texture2D *value) {
 	if (value) {
-		append_bytes(builder, (u32)value->name.size);
+		append_bytes(builder, (u32)value->name.count);
 		append_bytes(builder, value->name);
 	} else {
 		append_bytes(builder, (u32)0);
@@ -21,7 +21,7 @@ void serialize_binary(StringBuilder &builder, Texture2D *value) {
 
 void serialize_binary(StringBuilder &builder, Mesh *value) {
 	if (value) {
-		append_bytes(builder, (u32)value->name.size);
+		append_bytes(builder, (u32)value->name.count);
 		append_bytes(builder, value->name);
 	} else {
 		append_bytes(builder, (u32)0);
@@ -37,13 +37,13 @@ List<u8> serialize_scene_binary(Scene *scene, HashMap<Uid, Uid> component_type_u
 			return;
 		}
 
-		append_bytes(builder, (u32)entity.name.size);
+		append_bytes(builder, (u32)entity.name.count);
 		append_bytes(builder, entity.name);
 		append_bytes(builder, entity.position);
 		append_bytes(builder, entity.rotation);
 		append_bytes(builder, entity.scale);
 
-		append_bytes(builder, (u32)entity.components.size);
+		append_bytes(builder, (u32)entity.components.count);
 		for (auto &component : entity.components) {
 			append_bytes(builder, component_type_uid_remap.find(component.type_uid).get());
 			auto &info = get_component_info(component.type_uid);
@@ -66,10 +66,10 @@ void escape_string(StringBuilder &builder, Span<utf8> string) {
 
 Optional<List<utf8>> unescape_string(Span<utf8> literal) {
 	List<utf8> unescaped_name;
-	unescaped_name.reserve(literal.size);
-	for (umm i = 0; i < literal.size; ++i) {
+	unescaped_name.reserve(literal.count);
+	for (umm i = 0; i < literal.count; ++i) {
 		auto c = literal.data[i];
-		if (c == '\\' && (i + 1 < literal.size) && (literal.data[i + 1] == '"' || literal.data[i + 1] == '\\')) {
+		if (c == '\\' && (i + 1 < literal.count) && (literal.data[i + 1] == '"' || literal.data[i + 1] == '\\')) {
 			continue;
 		}
 		unescaped_name.add(c);
@@ -123,7 +123,7 @@ List<u8> serialize_scene_text(Scene *scene) {
 		append(builder, ";\n");
 
 		auto angles = degrees(to_euler_angles(entity.rotation));
-		append_format(builder, "\trotation % % %;\n\tscale ", angles.x, angles.y, angles.z);
+		append_format(builder, "\trotation {} {} {};\n\tscale ", angles.x, angles.y, angles.z);
 
 		serialize_text(builder, entity.scale);
 		append(builder, ";\n");
@@ -146,7 +146,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 	auto source = (Span<utf8>)with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
 
 	if (!source.data) {
-		print(Print_error, "Failed to read scene file '%'\n", path);
+		print(Print_error, "Failed to read scene file '{}'\n", path);
 		return 0;
 	}
 
@@ -174,7 +174,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 	while (t != end) {
 
 		if (t->string != u8"entity"s) {
-			print(Print_error, "Expected 'entity' keyword, but got '%'\n", t->string);
+			print(Print_error, "Expected 'entity' keyword, but got '{}'\n", t->string);
 			return 0;
 		}
 
@@ -185,13 +185,13 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 			return 0;
 		}
 		if (t->kind != '"') {
-			print(Print_error, "Expected entity name in quotes, but got '%'\n", t->string);
+			print(Print_error, "Expected entity name in quotes, but got '{}'\n", t->string);
 			return 0;
 		}
 
 		auto successfully_unescaped_name = with(temporary_allocator, unescape_string(t->string));
 		if (!successfully_unescaped_name) {
-			print(Print_error, "Failed to unescape string '%'\n", t->string);
+			print(Print_error, "Failed to unescape string '{}'\n", t->string);
 			return 0;
 		}
 		List<utf8> unescaped_name = successfully_unescaped_name.value();
@@ -203,7 +203,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 			return 0;
 		}
 		if (t->kind != '{') {
-			print(Print_error, "Expected '{' after entity name, but got '%'\n", t->string);
+			print(Print_error, "Expected '{' after entity name, but got '{}'\n", t->string);
 			return 0;
 		}
 		++t;
@@ -215,7 +215,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 
 		while (t != end && t->kind != '}') {
 			if (t->kind != Token_identifier) {
-				print(Print_error, "Expected position, rotation, scale or component name, but got '%'\n", t->string);
+				print(Print_error, "Expected position, rotation, scale or component name, but got '{}'\n", t->string);
 				return 0;
 			}
 
@@ -225,7 +225,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 					return false;
 				}
 				if (t->kind != Token_number) {
-					print(Print_error, "Expected a number after position, but got '%'\n", t->string);
+					print(Print_error, "Expected a number after position, but got '{}'\n", t->string);
 					return false;
 				}
 				auto parsed = parse_f32(t->string);
@@ -250,7 +250,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				if (t->kind == ';') {
 					++t;
 				} else {
-					print(Print_error, "Error while parsing \"%\"'s position. Expected ';' at the end of line instead of %.", t->string);
+					print(Print_error, "Error while parsing \"{}\"'s position. Expected ';' at the end of line instead of {}.", t->string);
 					go_to_next_property(started_from, t, end);
 				}
 			} else if (t->string == u8"rotation"s) {
@@ -263,7 +263,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				if (t->kind == ';') {
 					++t;
 				} else {
-					print(Print_error, "Error while parsing \"%\"'s rotation. Expected ';' at the end of line instead of %.", t->string);
+					print(Print_error, "Error while parsing \"{}\"'s rotation. Expected ';' at the end of line instead of {}.", t->string);
 					go_to_next_property(started_from, t, end);
 				}
 			} else if (t->string == u8"scale"s) {
@@ -274,7 +274,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				if (t->kind == ';') {
 					++t;
 				} else {
-					print(Print_error, "Error while parsing \"%\"'s scale. Expected ';' at the end of line instead of %.", t->string);
+					print(Print_error, "Error while parsing \"{}\"'s scale. Expected ';' at the end of line instead of {}.", t->string);
 					go_to_next_property(started_from, t, end);
 				}
 			} else {
@@ -300,12 +300,12 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 						return 0;
 					}
 					if (t->kind != '{') {
-						print(Print_error, "Expected '{' after component name, but got '%'\n",  t->string);
+						print(Print_error, "Expected '{' after component name, but got '{}'\n",  t->string);
 						return 0;
 					}
 					t += 1;
 					if (t == end) {
-						print(Print_error, "Unclosed body of % component\n", component_name);
+						print(Print_error, "Unclosed body of {} component\n", component_name);
 						return 0;
 					}
 
@@ -328,7 +328,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 						info.init(added.pointer);
 					}
 				} else {
-					print(Print_error, "Unexpected token '%'. There is no component with this name.\n", t->string);
+					print(Print_error, "Unexpected token '{}'. There is no component with this name.\n", t->string);
 					return 0;
 				}
 			}
@@ -345,7 +345,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 	success = true;
 
 	//for (auto &token : tokens) {
-	//	print("%\n", token.string);
+	//	print("{}\n", token.string);
 	//}
 
 	return scene;
@@ -478,7 +478,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 			cursor += sizeof(component_type_uid);
 
 			if (!app->component_infos.find(component_type_uid)) {
-				print(Print_error, "Failed to deserialize scene: component type uid is not present (%)\n", component_type_uid);
+				print(Print_error, "Failed to deserialize scene: component type uid is not present ({})\n", component_type_uid);
 				return 0;
 			}
 

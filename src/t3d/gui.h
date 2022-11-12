@@ -8,7 +8,7 @@
 #include <t3d/app.h>
 #include <t3d/editor.h>
 
-inline tg::Viewport pad(tg::Viewport viewport) {
+inline tg::Rect pad(tg::Rect viewport) {
 	viewport.min += 2;
 	viewport.max -= 2;
 	return viewport;
@@ -32,7 +32,7 @@ enum Align {
 };
 struct DrawTextParams {
 	v2s position = {};
-	Align align = Align_top_left;
+	Align align = Align_left;
 };
 
 u32 get_font_size(u32 font_size);
@@ -59,7 +59,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 	begin_input_user(true);
 
 	auto &theme = editor->text_field_theme;
-	auto font_size = get_font_size(theme.font_size);
+	auto font_size = 12;//get_font_size(theme.font_size);
 
 	bool value_changed = false;
 	bool stop_edit = false;
@@ -105,7 +105,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 		callbacks.on_init();
 		state.caret_blink_time = 0;
 		state.selection_start = 0;
-		state.caret_position = state.string.size;
+		state.caret_position = state.string.count;
 	}
 
 	if (state.editing) {
@@ -127,7 +127,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 			}
 		}
 		if (editor->key_state[Key_right_arrow].state & KeyState_repeated) {
-			if (state.caret_position != state.string.size) {
+			if (state.caret_position != state.string.count) {
 				if (state.selection_start == state.caret_position) {
 					state.caret_position += 1;
 				} else {
@@ -150,7 +150,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 			}
 		}
 		if (key_down(Key_end)) {
-			state.caret_position = state.string.size;
+			state.caret_position = state.string.count;
 			if (!key_held(Key_shift)) {
 				state.selection_start = state.caret_position;
 			}
@@ -175,7 +175,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 				}
 				case 1: { // Control + A
 					state.selection_start = 0;
-					state.caret_position = state.string.size;
+					state.caret_position = state.string.count;
 					break;
 				}
 				case 3: { // Control + C
@@ -183,7 +183,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 					minmax(state.caret_position, state.selection_start, sel_min, sel_max);
 					if (sel_max == sel_min) {
 						sel_min = 0;
-						sel_max = state.string.size;
+						sel_max = state.string.count;
 					}
 					if (sel_max != sel_min) {
 						set_clipboard(app->window, Clipboard_text, Span<utf8>{state.string.data + sel_min, sel_max - sel_min});
@@ -197,12 +197,12 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 					u32 new_caret_position;
 					if (state.caret_position == state.selection_start) {
 						state.string.insert_at(clipboard, state.caret_position);
-						new_caret_position = state.caret_position + clipboard.size;
+						new_caret_position = state.caret_position + clipboard.count;
 					} else {
 						u32 sel_min, sel_max;
 						minmax(state.caret_position, state.selection_start, sel_min, sel_max);
 						state.string.replace({state.string.data + sel_min, sel_max - sel_min}, clipboard);
-						new_caret_position = sel_min + clipboard.size;
+						new_caret_position = sel_min + clipboard.count;
 					}
 					state.caret_position = state.selection_start = new_caret_position;
 					break;
@@ -258,14 +258,14 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 			if (state.caret_position == state.selection_start) {
 				if (erase == Erase_backspace) {
 					// Remove one character to the left of the caret
-					if (state.string.size && state.caret_position) {
+					if (state.string.count && state.caret_position) {
 						state.selection_start = state.caret_position -= 1;
 						state.string.erase_at(state.caret_position);
 						state.caret_blink_time = 0;
 					}
 				} else  {
 					// Remove one character to the right of the caret
-					if (state.string.size && state.caret_position != state.string.size) {
+					if (state.string.count && state.caret_position != state.string.count) {
 						state.string.erase_at(state.caret_position);
 						state.caret_blink_time = 0;
 					}
@@ -309,20 +309,20 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 	gui_panel(color);
 
 	if (state.editing) {
-		tg::Viewport caret_viewport = editor->current_viewport;
+		tg::Rect caret_viewport = editor->current_viewport;
 		caret_viewport.min.x = editor->current_viewport.min.x;
 		caret_viewport.max.x = caret_viewport.min.x + 1;
 
 
-		if (state.string.size) {
+		if (state.string.count) {
 			auto font = get_font_at_size(app->font_collection, font_size);
 			ensure_all_chars_present(state.string, font);
 			auto placed_chars = with(temporary_allocator, get_text_info(state.string, font, {.place_chars=true}).placed_chars);
 
 			if (set_caret_from_mouse) {
-				u32 new_caret_position = placed_chars.size;
+				u32 new_caret_position = placed_chars.count;
 
-				for (u32 char_index = 0; char_index < placed_chars.size; char_index += 1) {
+				for (u32 char_index = 0; char_index < placed_chars.count; char_index += 1) {
 					if (placed_chars[char_index].position.center().x - state.text_offset > (app->current_mouse_position.x - editor->current_viewport.min.x)) {
 						new_caret_position = char_index;
 						break;
@@ -376,7 +376,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 				u32 min_x = placed_chars[sel_min    ].position.min.x;
 				u32 max_x = placed_chars[sel_max - 1].position.max.x;
 
-				tg::Viewport selection_viewport = editor->current_viewport;
+				tg::Rect selection_viewport = editor->current_viewport;
 				selection_viewport.min.x = editor->current_viewport.min.x + min_x;
 				selection_viewport.max.x = selection_viewport.min.x + max_x - min_x;
 
@@ -480,7 +480,7 @@ inline bool float_field(f32 &value, umm id = 0, std::source_location location = 
 			state.original_value = value;
 		},
 		.on_edit = [&] {
-			if (!state.string.size) {
+			if (!state.string.count) {
 				value = 0;
 				return true;
 			}
@@ -519,7 +519,7 @@ inline bool float_field(f32 &value, umm id = 0, std::source_location location = 
 						// Skip to end of identifier
 					}
 
-					token_string.size = current_char_p - token_string.data;
+					token_string.count = current_char_p - token_string.data;
 
 					if (token_string == u8"pi"s) {
 						token.value = pi;
@@ -551,7 +551,7 @@ inline bool float_field(f32 &value, umm id = 0, std::source_location location = 
 						}
 					}
 
-					token_string.size = current_char_p - token_string.data;
+					token_string.count = current_char_p - token_string.data;
 					auto parsed = parse_f32(token_string);
 					if (!parsed) {
 						return false;
@@ -582,7 +582,7 @@ inline bool float_field(f32 &value, umm id = 0, std::source_location location = 
 				auto end = tokens.end();
 
 				auto parsed = parse_expression(t, end);
-				if (parsed || state.string.size == 0) {
+				if (parsed || state.string.count == 0) {
 					value = parsed ? parsed.value() : 0;
 					return true;
 				}
@@ -624,7 +624,7 @@ inline void end_scrollbar(umm id = 0, std::source_location location = std::sourc
 s32 const line_height = 16;
 
 inline void header(Span<utf8> text) {
-	tg::Viewport line_viewport = editor->current_viewport;
+	tg::Rect line_viewport = editor->current_viewport;
 	line_viewport.min.y = editor->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 	push_viewport(line_viewport) {
@@ -635,7 +635,7 @@ inline void header(Span<utf8> text) {
 
 inline void property_separator() {
 	s32 const separator_height = 2;
-	tg::Viewport line_viewport = editor->current_viewport;
+	tg::Rect line_viewport = editor->current_viewport;
 	line_viewport.min.y = editor->current_viewport.max.y - separator_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + separator_height;
 	push_viewport(line_viewport) {
@@ -647,7 +647,7 @@ inline void property_separator() {
 
 template <class Fn>
 void draw_asset_property(Span<utf8> name, Span<utf8> path, umm id, std::source_location location, Span<Span<utf8>> file_extensions, Fn &&update) {
-	tg::Viewport line_viewport = editor->current_viewport;
+	tg::Rect line_viewport = editor->current_viewport;
 	line_viewport.min.y = editor->current_viewport.max.y - line_height - editor->current_property_y;
 	line_viewport.max.y = line_viewport.min.y + line_height;
 	push_viewport(line_viewport) {

@@ -1,7 +1,8 @@
 #define TL_IMPL
-#define TL_MAIN
 #include <tl/common.h>
 #include <tl/file.h>
+#include <tl/console.h>
+#include <tl/main.h>
 
 using namespace tl;
 
@@ -15,12 +16,12 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	};
 
 	Span<utf8> exe_dir = arguments[0];
-	while (exe_dir.size && !(exe_dir.back() == '\\' || exe_dir.back() == '/')) {
-		exe_dir.size --;
+	while (exe_dir.count && !(exe_dir.back() == '\\' || exe_dir.back() == '/')) {
+		exe_dir.count --;
 	}
 
 	ListList<utf8> editor_cpp_files;
-	for_each_file_recursive(tformat(u8"%../../src/t3d/", exe_dir), [&] (Span<utf8> item) {
+	for_each_file_recursive(tformat(u8"{}../../src/t3d/", exe_dir), [&] (Span<utf8> item) {
 		if (ends_with(item, u8".cpp"s)/* && parse_path(parent_directory(item)).name != u8"components"s*/) {
 			editor_cpp_files.add(item);
 		}
@@ -30,13 +31,13 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	create_directory(concatenate(exe_dir, u8"../../data/obj"s));
 
 	for (auto path : editor_cpp_files) {
-		if (!path.size) continue;
+		if (!path.count) continue;
 		if (path.back()== '\r')
-			path.size--;
+			path.count--;
 
-		auto source = format(u8"%../t3d/%.obj"s, exe_dir, parse_path(path).name);
-		auto destination = format(u8"%../../data/obj/%.obj"s, exe_dir, parse_path(path).name);
-		print("Copying '%' -> '%'. success = %\n", source, destination, copy_file(source, destination));
+		auto source = format(u8"{}../t3d/{}.obj"s, exe_dir, parse_path(path).name);
+		auto destination = format(u8"{}../../data/obj/{}.obj"s, exe_dir, parse_path(path).name);
+		print("Copying '{}' -> '{}'. success = {}\n", source, destination, copy_file(source, destination));
 	}
 
 	return 0;

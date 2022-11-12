@@ -33,14 +33,14 @@ struct EditorWindow {
 	EditorWindowId id;
 	EditorWindow *parent;
 	EditorWindowKind kind;
-	tg::Viewport viewport;
+	tg::Rect viewport;
 	Span<utf8> name;
 
 	v2u (*_get_min_size)(void *_this);
 	v2u get_min_size();
 
-	void (*_resize)(void *_this, tg::Viewport viewport);
-	void resize(tg::Viewport viewport);
+	void (*_resize)(void *_this, tg::Rect viewport);
+	void resize(tg::Rect viewport);
 
 	void (*_render)(void *_this);
 	void render();
@@ -58,7 +58,7 @@ struct EditorWindow {
 	bool deserialize(Stream &stream);
 };
 
-template <class T> void editor_window_resize(void *data, tg::Viewport viewport) {
+template <class T> void editor_window_resize(void *data, tg::Rect viewport) {
 	if constexpr (&T::resize != &EditorWindow::resize) {
 		return ((T *)data)->resize(viewport);
 	}
@@ -96,7 +96,7 @@ void pop_debug_print_editor_window_tab();
 template <class T>
 void editor_window_debug_print(void *data) {
 	debug_print_editor_window_tabs();
-	print("% %, parent=%\n", ((T *)data)->name, data, ((EditorWindow *)data)->parent);
+	print("{} {}, parent={}\n", ((T *)data)->name, data, ((EditorWindow *)data)->parent);
 	if constexpr (&T::debug_print != &EditorWindow::debug_print) {
 		push_debug_print_editor_window_tab();
 		((T *)data)->debug_print();
@@ -143,7 +143,7 @@ Span<utf8> editor_window_names[] {
 
 using EditorWindowInit        = void(*)(void *);
 using EditorWindowGetMinSize  = v2u(*)(void *);
-using EditorWindowResize      = void(*)(void *, tg::Viewport);
+using EditorWindowResize      = void(*)(void *, tg::Rect);
 using EditorWindowRender      = void(*)(void *);
 using EditorWindowFree        = void(*)(void *);
 using EditorWindowDebugPrint  = void(*)(void *);
@@ -168,7 +168,7 @@ void editor_window_init(Window &_this) {}
 
 template <class Window> void adapt_editor_window_init(void *_this) { return editor_window_init<Window>(*(Window *)_this); }
 template <class Window> v2u  adapt_editor_window_get_min_size(void *_this) { return ((Window *)_this)->get_min_size(); }
-template <class Window> void adapt_editor_window_resize(void *_this, tg::Viewport viewport) { return ((Window *)_this)->resize(viewport); }
+template <class Window> void adapt_editor_window_resize(void *_this, tg::Rect viewport) { return ((Window *)_this)->resize(viewport); }
 template <class Window> void adapt_editor_window_render(void *_this) { return ((Window *)_this)->render(); }
 template <class Window> void adapt_editor_window_free(void *_this) { return ((Window *)_this)->free(); }
 template <class Window> void adapt_editor_window_debug_print(void *_this) { return ((Window *)_this)->debug_print(); }

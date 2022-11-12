@@ -9,10 +9,10 @@ struct Assets {
 	HashMap<Span<utf8>, Texture2D *> textures_2d_by_path;
 	HashMap<Span<utf8>, TextureCube *> textures_cubes_by_path;
 
-	MaskedBlockList<Mesh, 256> meshes;
+	StaticMaskedBlockList<Mesh, 256> meshes;
 	HashMap<Span<utf8>, Mesh *> meshes_by_name;
 
-	MaskedBlockList<Scene3D, 256> scenes3d;
+	StaticMaskedBlockList<Scene3D, 256> scenes3d;
 	HashMap<Span<utf8>, Scene3D *> scenes3d_by_name;
 	HashMap<Scene3D::Node *, Mesh *> meshes_by_node;
 
@@ -39,7 +39,7 @@ struct Assets {
 					scene = scenes3d.add().pointer;
 					auto parsed = parse_glb_from_memory(scene_data);
 					//if (!parsed) {
-					//	print(Print_error, "Failed to parse scene file '%'\n", scene_path);
+					//	print(Print_error, "Failed to parse scene file '{}'\n", scene_path);
 					//	return 0;
 					//}
 					//*scene = parsed.value;
@@ -51,7 +51,7 @@ struct Assets {
 
 				auto node = scene->get_node(submesh_name);
 				if (!node) {
-					print(Print_error, "Failed to get node '%' from scene '%'\n", submesh_name, scene_path);
+					print(Print_error, "Failed to get node '{}' from scene '{}'\n", submesh_name, scene_path);
 					return 0;
 				}
 
@@ -63,7 +63,7 @@ struct Assets {
 				mesh = create_mesh(*node->mesh);
 
 
-				mesh->name.reserve(scene_path.size + 1 + submesh_name.size);
+				mesh->name.reserve(scene_path.count + 1 + submesh_name.count);
 				mesh->name.add(scene_path);
 				mesh->name.add(':');
 				mesh->name.add(submesh_name);
@@ -74,8 +74,8 @@ struct Assets {
 				auto parse_result = parse_glb_from_memory(scene_data);
 				defer { free(parse_result); };
 
-				if (parse_result.meshes.size == 0) {
-					print(Print_error, "Failed to load mesh '%' because there is no submeshes in the file\n", path);
+				if (parse_result.meshes.count == 0) {
+					print(Print_error, "Failed to load mesh '{}' because there is no submeshes in the file\n", path);
 					return 0;
 				}
 

@@ -128,7 +128,7 @@ struct AppData {
 	tg::TypedShaderConstants<TextShaderConstants> text_shader_constants;
 
 
-	MaskedBlockList<Material, 256> materials;
+	StaticMaskedBlockList<Material, 256> materials;
 
 	Material surface_material;
 

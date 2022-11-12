@@ -2,6 +2,7 @@
 void t3d_assert(char const *, char const *, char const *, int);
 #define ASSERTION_FAILURE(cause, expression, ...) t3d_assert(cause, expression, __FILE__, __LINE__)
 #define TL_OPENGL_LOG_LEVEL 3
+#define TL_ENABLE_PROFILER 0 // TODO: fix profiler
 namespace tgraphics { struct Texture2D; }
 namespace tg = tgraphics;
 #define TL_FONT_TEXTURE_HANDLE tg::Texture2D *
@@ -34,7 +35,7 @@ using Texture2D   = tg::Texture2D;
 using TextureCube = tg::TextureCube;
 
 inline Optional<f32> parse_f32(Span<utf8> string) {
-	if (!string.size)
+	if (!string.count)
 		return {};
 
 	u64 whole_part = 0;
@@ -126,7 +127,7 @@ struct Uid {
 };
 
 inline umm append(StringBuilder &builder, Uid uid) {
-	return append(builder, FormatInt{.value = uid.value, .radix = 16, .leading_zeros = 16});
+	return append(builder, FormatInt{.value = uid.value, .radix = 16, .leading_zero_count = 16});
 }
 
 inline bool operator==(Uid const &a, Uid const &b) { return a.value == b.value; }

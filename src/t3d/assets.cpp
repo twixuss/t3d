@@ -6,13 +6,13 @@ Span<u8> Assets::get_asset_data(Span<utf8> local_path) {
 		auto full_path = tconcatenate(directory, local_path);
 		auto buffer = with(temporary_allocator, read_entire_file(to_pathchars(full_path, true)));
 		if (!buffer.data) {
-			print(Print_error, "Asset not found '%'.\n", full_path);
+			print(Print_error, "Asset not found '{}'.\n", full_path);
 			return {};
 		}
 		return buffer;
 	} else {
 		auto found = asset_path_to_data.find(local_path);
-		assert_always(found, "Asset '%' was not found", local_path);
+		assert_always(found, "Asset '{}' was not found", local_path);
 		return *found;
 	}
 }
@@ -23,7 +23,7 @@ Texture2D *Assets::get_texture_2d(Span<utf8> path) {
 		return *found;
 	}
 
-	print(Print_info, "Loading texture %.\n", path);
+	print(Print_info, "Loading texture {}.\n", path);
 	auto result = app->tg->load_texture_2d(get_asset_data(path), {.generate_mipmaps = true});
 
 	if (!result) {
@@ -40,7 +40,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 		return *found;
 	}
 
-	print(Print_info, "Loading cubemap %.\n", path);
+	print(Print_info, "Loading cubemap {}.\n", path);
 
 	auto cubemap_desc = as_utf8(get_asset_data(path));
 	if (!cubemap_desc.data) {
@@ -59,7 +59,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 
 	while (t < tokens.end()) {
 		if (t->kind != Token_identifier) {
-			print(Print_error, "Parsing failed. Expected identifier instead of '%'.\n", t->string);
+			print(Print_error, "Parsing failed. Expected identifier instead of '{}'.\n", t->string);
 			return 0;
 		}
 		auto side = t->string;
@@ -69,7 +69,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 			return 0;
 		}
 		if (t->kind != '"') {
-			print(Print_error, "Parsing failed. Expected string instead of '%'.\n", t->string);
+			print(Print_error, "Parsing failed. Expected string instead of '{}'.\n", t->string);
 			return 0;
 		}
 		auto path = t->string;
@@ -82,7 +82,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 		else if (side == u8"front"s ) paths.front  = path;
 		else if (side == u8"back"s  ) paths.back   = path;
 		else {
-			print(Print_error, "Parsing failed. Expected left/right/top/bottom/front/back instead of '%'.\n", t->string);
+			print(Print_error, "Parsing failed. Expected left/right/top/bottom/front/back instead of '{}'.\n", t->string);
 			return 0;
 		}
 	}
@@ -142,9 +142,9 @@ Mesh *Assets::create_mesh(tl::CommonMesh &mesh) {
 
 	result.index_buffer = app->tg->create_index_buffer(as_bytes(mesh.indices), sizeof(u32));
 
-	result.index_count = mesh.indices.size;
+	result.index_count = mesh.indices.count;
 
-	result.positions.reserve(mesh.vertices.size);
+	result.positions.reserve(mesh.vertices.count);
 	for (auto &vertex : mesh.vertices) {
 		result.positions.add(vertex.position);
 	}
