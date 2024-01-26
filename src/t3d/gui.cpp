@@ -42,10 +42,10 @@ void label(Span<utf8> string, u32 font_size, DrawTextParams params) {
 
 	auto &theme = editor->label_theme;
 
-	auto font = with(temporary_allocator, get_font_at_size(app->font_collection, font_size));
+	auto font = with(temporary_allocator, get_font_at_size(app->font, font_size));
 	ensure_all_chars_present(string, font);
 
-	auto info = get_text_info(string, font, {.place_chars=true,.bounds=true});
+	auto info = calculate_text(string, font, {.place_chars=true,.bounds=true});
 	v2s offset = {
 		editor->current_viewport.size().x - info.bounds.size().x,
 		editor->current_viewport.size().y - font_size * info.line_count,

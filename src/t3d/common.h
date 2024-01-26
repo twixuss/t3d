@@ -1,6 +1,7 @@
 #pragma once
 void t3d_assert(char const *, char const *, char const *, int);
 #define ASSERTION_FAILURE(cause, expression, ...) t3d_assert(cause, expression, __FILE__, __LINE__)
+#define TL_TEMPORARY_STORAGE_CAPACITY (16*MiB)
 #define TL_OPENGL_LOG_LEVEL 3
 #define TL_ENABLE_PROFILER 0 // TODO: fix profiler
 namespace tgraphics { struct Texture2D; }
@@ -103,6 +104,7 @@ extern "C" TL_DLL_EXPORT struct EditorData *editor;
 void allocate_app();
 
 extern "C" TL_DLL_EXPORT void initialize_thread();
+extern "C" TL_DLL_EXPORT void end_frame();
 
 void set_module_shared(void *module);
 
@@ -134,7 +136,7 @@ inline bool operator==(Uid const &a, Uid const &b) { return a.value == b.value; 
 inline bool operator!=(Uid const &a, Uid const &b) { return a.value != b.value; }
 
 template <>
-inline umm get_hash(Uid a) {
+inline u64 get_hash(Uid const &a) {
 	return a.value;
 }
 

@@ -24,7 +24,7 @@ struct Scene {
 	void for_each_component(Fn &&fn) {
 		auto found_storage = component_storages.find(component_name_to_uid(Component::_t3d_component_name));
 		assert(found_storage);
-		found_storage->for_each([&](void *component) {
+		found_storage->value.for_each([&](void *component) {
 			return fn(*(Component *)component);
 		});
 	}
@@ -39,11 +39,12 @@ struct Scene {
 	}
 
 	void *get_component_data(ComponentIndex component) {
-		return component_storages.find(component.type_uid).get().get(component.storage_index);
+		return component_storages.find(component.type_uid)->value.get(component.storage_index);
 	}
 
 	void free() {
-		for_each(component_storages, [&](Uid uid, ComponentStorage &storage) {
+		for_each(component_storages, [&](auto &&kv) {
+			auto &[uid, storage] = kv;
 			::free(storage);
 		});
 	}

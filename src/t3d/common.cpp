@@ -15,6 +15,7 @@
 #include <tl/cpu.h>
 #include <tl/ram.h>
 #include <tl/time.h>
+#include <tgraphics/tgraphics.h>
 
 AppData *app;
 EditorData *editor;
@@ -40,6 +41,10 @@ void set_module_shared(void *module) {
 void initialize_thread() {
 	init_allocator();
 	current_printer = console_printer;
+}
+
+void end_frame() {
+	temporary_allocator.clear();
 }
 
 Optional<List<Token>> parse_tokens(Span<utf8> source) {
@@ -88,7 +93,7 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 
 			auto found = string_to_token_kind.find(token.string);
 			if (found) {
-				token.kind = *found;
+				token.kind = found->value;
 			} else {
 				token.kind = Token_identifier;
 			}
@@ -123,7 +128,7 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 					}
 
 					if (current_char_p == end) {
-						print(Print_error, "Unclosed string literal\n");
+						with(ConsoleColor::red, print("Unclosed string literal\n"));
 						return {};
 					}
 
@@ -150,7 +155,7 @@ Optional<List<Token>> parse_tokens(Span<utf8> source) {
 					break;
 				}
 				default: {
-					print(Print_error, "Parsing failed: invalid character '{}'\n", c);
+					with(ConsoleColor::red, print("Parsing failed: invalid character '{}'\n", c));
 					return {};
 				}
 			}

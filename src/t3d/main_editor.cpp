@@ -3,7 +3,8 @@
 #include <tl/main.h>
 #include <tl/common.h>
 #include <tl/bin2cpp.h>
-tl::umm get_hash(struct ManipulatorStateKey const &);
+template <>
+tl::u64 get_hash(struct ManipulatorStateKey const &);
 
 #include <tl/masked_block_list.h>
 #include <t3d/component.h>
@@ -31,6 +32,7 @@ tl::umm get_hash(struct ManipulatorStateKey const &);
 #include <tl/cpu.h>
 #include <tl/ram.h>
 #include <tl/opengl.h>
+#include <tl/msvc.h>
 
 #define NOMINMAX
 #include <Windows.h>
@@ -83,13 +85,19 @@ Span<utf8> project_name;
 Span<utf8> component_descs_getter_path;
 Span<utf8> project_directory;
 
-ListList<utf8> all_component_names;
+ListOfLists<utf8> all_component_names;
 
 HMODULE scripts_dll;
 void (*scripts_dll_initialize_thread)();
+void (*scripts_dll_end_frame)();
+
+List<utf8> visual_c_path;
+List<utf8> msvc_path;
+List<utf8> wkits_path;
+List<utf8> cl_path;
 
 void update_component_info(ComponentDesc const &desc) {
-	scoped_allocator(default_allocator);
+	scoped(default_allocator);
 
 	auto found_uid = app->component_name_to_uid.find(desc.name);
 
@@ -98,18 +106,18 @@ void update_component_info(ComponentDesc const &desc) {
 	Uid uid;
 
 	if (found_uid) {
-		uid = found_uid.get_unchecked();
+		uid = found_uid->value;
 		print("Re-registered component '{}' with uid '{}'\n", desc.name, uid);
 
 		auto found_info = app->component_infos.find(uid);
 		assert(found_info);
-		info = found_info.raw();
+		info = &found_info->value;
 
 		assert(info->name == desc.name);
 
 		if (desc.size != info->size || desc.alignment != info->alignment) {
 			for (auto scene : app->scenes) {
-				scene->component_storages.find(uid).get().reallocate(desc.size, desc.alignment);
+				scene->component_storages.find(uid)->value.reallocate(desc.size, desc.alignment);
 			}
 		}
 	} else {
@@ -169,13 +177,14 @@ void render_scene(SceneView *view) {
 
 		for (auto &request : manipulator_draw_requests) {
 			v3f camera_to_handle_direction = normalize(request.position - camera_entity.position);
+			auto size = request.size * distance(request.position, camera_entity.position);
 			app->tg->update_shader_constants(app->entity_constants, {
 				.local_to_camera_matrix =
 					camera.world_to_camera_matrix
 					* m4::translation(camera_entity.position + camera_to_handle_direction)
 					* (m4)request.rotation
-					* m4::scale(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1})),
-				.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(request.size * dot(camera_to_handle_direction, camera_entity.rotation * v3f{0,0,-1}))),
+					* m4::scale(0.25),
+				.local_to_world_normal_matrix = local_to_world_normal(request.rotation, V3f(1)),
 				.object_rotation_matrix = (m4)request.rotation,
 			});
 			app->tg->set_shader(app->handle_shader);
@@ -332,14 +341,14 @@ void render_scene(SceneView *view) {
 	debug_draw_lines();
 }
 
-void add_files_recursive(ListList<utf8> &result, Span<pathchar> directory) {
+void add_files_recursive(ListOfLists<utf8> &result, Span<utf8> directory) {
 	auto items = get_items_in_directory(directory);
 	for (auto &item : items) {
-		auto path16 = concatenate(directory, u'/', item.name);
+		auto path = concatenate(directory, u8'/', item.name);
 		if (item.kind == FileItem_directory) {
-			add_files_recursive(result, path16);
+			add_files_recursive(result, path);
 		} else {
-			result.add(to_utf8(path16));
+			result.add(path);
 		}
 	}
 }
@@ -353,17 +362,15 @@ auto query_performance_counter() {
 template <class Fn>
 bool invoke_msvc(Span<utf8> arguments, Fn &&what_to_do_while_compiling) {
 	auto prev_allocator = current_allocator;
-	scoped_allocator(temporary_allocator);
+	scoped(temporary_allocator);
 
 	create_directory(format(u8"{}build/"s, editor_directory));
 
-	constexpr auto cl_path = "C:\\Program Files (x86)\\Microsoft Visual Studio\\2019\\Community\\VC\\Tools\\MSVC\\14.29.30037\\bin\\Hostx64\\x64\\cl.exe"s;
-
 	StringBuilder bat_builder;
-	append(bat_builder, u8R"(
+	append_format(bat_builder, u8R"(
 @echo off
-call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x64
-cl )");
+call "{}\Auxiliary\Build\vcvarsall.bat" x64
+cl )", visual_c_path);
 	append_format(bat_builder, "/Fd\"{}temp/{}.pdb\" ", editor_directory, query_performance_counter());
 
 	append(bat_builder, arguments);
@@ -376,7 +383,7 @@ cl )");
 	auto process = start_process(bat_path);
 
 	if (!is_valid(process)) {
-		print(Print_error, "Cannot execute file '{}'\n", bat_path);
+		with(ConsoleColor::red, print("Cannot execute file '{}'\n", bat_path));
 		return false;
 	}
 
@@ -385,7 +392,7 @@ cl )");
 	print("cl {}\n", arguments);
 
 	{
-		scoped_allocator(prev_allocator);
+		scoped(prev_allocator);
 		what_to_do_while_compiling();
 	}
 
@@ -407,8 +414,8 @@ cl )");
 	wait(process);
 	auto exit_code = get_exit_code(process);
 	if (exit_code != 0) {
-		print(Print_error, "Build command failed\n");
-		print(as_utf8(read_entire_file(tl_file_string("build_log.txt"))));
+		with(ConsoleColor::red, print("Build command failed\n"));
+		print(as_utf8(read_entire_file("build_log.txt"s)));
 		return false;
 	}
 
@@ -420,16 +427,16 @@ bool invoke_msvc(Span<utf8> arguments) {
 	return invoke_msvc(arguments, []{});
 }
 
-ListList<utf8> project_h_files;
-ListList<utf8> project_cpp_files;
-ListList<utf8> editor_cpp_files;
+ListOfLists<utf8> project_h_files;
+ListOfLists<utf8> project_cpp_files;
+ListOfLists<utf8> editor_cpp_files;
 
 void update_scripts_paths() {
 	project_h_files.clear();
 	project_cpp_files.clear();
 
-	project_h_files.make_relative();
-	project_cpp_files.make_relative();
+	project_h_files.enable_writing();
+	project_cpp_files.enable_writing();
 
 	for_each_file_recursive(app->assets.directory, [] (Span<utf8> item) {
 		if (ends_with(item, u8".h"s)) {
@@ -440,22 +447,22 @@ void update_scripts_paths() {
 		}
 	});
 
-	project_h_files.make_absolute();
-	project_cpp_files.make_absolute();
+	project_h_files.enable_reading();
+	project_cpp_files.enable_reading();
 }
 
 #include <ImageHlp.h>
 #pragma comment(lib, "imagehlp.lib")
 #pragma comment(lib, "dbghelp.lib")
 
-ListList<ascii> get_exported_functions_in_dll(Span<utf8> dll_path) {
+ListOfLists<ascii> get_exported_functions_in_dll(Span<utf8> dll_path) {
     DWORD *name_rvas = 0;
     _IMAGE_EXPORT_DIRECTORY *ied;
     ULONG dir_size;
     _LOADED_IMAGE loaded_image;
 
-	ListList<ascii> result;
-    if (MapAndLoad((ascii *)temporary_null_terminate(dll_path).data, NULL, &loaded_image, TRUE, TRUE)) {
+	ListOfLists<ascii> result;
+    if (MapAndLoad(with(temporary_allocator, (ascii *)null_terminate(dll_path).data), NULL, &loaded_image, TRUE, TRUE)) {
 
         ied = (_IMAGE_EXPORT_DIRECTORY *)ImageDirectoryEntryToData(loaded_image.MappedAddress, false, IMAGE_DIRECTORY_ENTRY_EXPORT, &dir_size);
 
@@ -470,7 +477,7 @@ ListList<ascii> get_exported_functions_in_dll(Span<utf8> dll_path) {
         }
         UnMapAndLoad(&loaded_image);
     }
-	result.make_absolute();
+	result.enable_reading();
 	return result;
 }
 
@@ -488,9 +495,9 @@ Span<ascii> lib_dirs[] = {
 };
 
 void clear_build_directory() {
-	auto items = get_items_in_directory(to_pathchars(format(u8"{}build"s, editor_directory), true));
+	auto items = get_items_in_directory(format(u8"{}build"s, editor_directory));
 	for (auto item : items) {
-		delete_file(to_pathchars(format(u8"{}build/{}"s, editor_directory, item.name)));
+		delete_file(format(u8"{}build/{}"s, editor_directory, item.name));
 	}
 }
 
@@ -516,14 +523,14 @@ void append_editor_cpp_or_obj_files(StringBuilder &builder) {
 }
 
 void build_executable() {
-	scoped_allocator(temporary_allocator);
+	scoped(temporary_allocator);
 
 	auto build_assets = [&] {
 		StringBuilder asset_builder;
 
-		ListList<utf8> asset_paths;
-		add_files_recursive(asset_paths, to_pathchars(app->assets.directory));
-		asset_paths.make_absolute();
+		ListOfLists<utf8> asset_paths;
+		add_files_recursive(asset_paths, app->assets.directory);
+		asset_paths.enable_reading();
 
 		for (auto full_path : asset_paths) {
 			auto path = full_path.subspan(app->assets.directory.count + 1, full_path.count - app->assets.directory.count - 1);
@@ -580,7 +587,7 @@ void build_executable() {
 static u64 uid_generator = 0;
 
 void update_component_info(ComponentDesc const &desc) {
-	scoped_allocator(default_allocator);
+	scoped(default_allocator);
 
 	assert(!app->component_name_to_uid.find(desc.name));
 
@@ -685,13 +692,13 @@ void recompile_all_scripts() {
 		for (auto lib : lib_dirs) {
 			append_format(builder, "/LIBPATH:\"{}..\\{}\" ", editor_bin_directory, lib);
 		}
-		assert(invoke_msvc(as_utf8(to_string(builder))));
+		assert_always(invoke_msvc(as_utf8(to_string(builder))));
 	}
 
 }
 
 void reload_all_scripts(bool recompile) {
-	scoped_allocator(temporary_allocator);
+	scoped(temporary_allocator);
 
 
 	//
@@ -707,7 +714,7 @@ void reload_all_scripts(bool recompile) {
 			for (auto &component : entity.components) {
 				auto found_info = app->component_infos.find(component.type_uid);
 				assert(found_info);
-				auto &info = *found_info;
+				auto &info = found_info->value;
 				info.serialize(builder, app->current_scene->get_component_data(component), false);
 
 				append(builder, '}'); // deserialier need this to finish parsing
@@ -729,7 +736,9 @@ void reload_all_scripts(bool recompile) {
 	}
 
 	scripts_dll = LoadLibraryW(with(temporary_allocator, (wchar *)to_pathchars(scripts_dll_path, true).data));
-	scripts_dll_initialize_thread = ((void (*)())GetProcAddress(scripts_dll, "initialize_thread"));
+	scripts_dll_initialize_thread = autocast GetProcAddress(scripts_dll, "initialize_thread");
+	scripts_dll_end_frame = autocast GetProcAddress(scripts_dll, "end_frame");
+
 	scripts_dll_initialize_thread();
 
 	set_module_shared(scripts_dll);
@@ -741,7 +750,7 @@ void reload_all_scripts(bool recompile) {
 
 	List<ComponentDesc> descs;
 	descs.allocator = app->allocator;
-	all_component_names.make_relative();
+	all_component_names.enable_writing();
 	all_component_names.clear();
 	for (auto func_name : exported_funcs) {
 		auto prefix = u8"t3dcd"s;
@@ -751,7 +760,7 @@ void reload_all_scripts(bool recompile) {
 			descs.add(((GetComponentDesc)GetProcAddress(scripts_dll, func_name.data))());
 		}
 	}
-	all_component_names.make_absolute();
+	all_component_names.enable_reading();
 
 	for (auto &desc : descs) {
 		update_component_info(desc);
@@ -767,7 +776,7 @@ void reload_all_scripts(bool recompile) {
 		for (auto &component : components_to_update) {
 			auto found_info = app->component_infos.find(component.type_uid);
 			assert(found_info);
-			auto &info = *found_info;
+			auto &info = found_info->value;
 			auto data = app->current_scene->get_component_data(component);
 			info.construct(data);
 			info.deserialize_text(t, tokens.end(), data);
@@ -949,63 +958,72 @@ void split_test(Span<char> a, Span<char> b) {
 List<utf8> recent_list_path;
 
 void init_recent_projects() {
+	auto parse = [&] (Span<u8> content) {
+		u8 *cursor = content.data;
+		u8 *end = content.end();
+
+		while (cursor != end) {
+			RecentProject rp;
+
+			u32 path_size;
+			if (cursor + sizeof(u32) > end) {
+				with(ConsoleColor::red, print("Recent projects list file is corrupted ('{}' is past the end of buffer)", "path_size"));
+				return;
+			}
+			path_size = *(u32 *)cursor;
+			cursor += sizeof(u32);
+
+			if (cursor + path_size > end) {
+				with(ConsoleColor::red, print("Recent projects list file is corrupted ('{}' is past the end of buffer)", "path"));
+				return;
+			}
+			rp.path.set(Span((utf8 *)cursor, path_size));
+			cursor += path_size;
+
+
+			if (cursor + sizeof(Date) > end) {
+				with(ConsoleColor::red, print("Recent projects list file is corrupted ('{}' is past the end of buffer)", "date"));
+				return;
+			}
+			rp.date = *(Date *)cursor;
+			cursor += sizeof(Date);
+
+			recent_projects.add(rp);
+		}
+	};
+
 	recent_projects.allocator = default_allocator;
 	recent_list_path = format(u8"{}user/recent_projects", editor_directory);
 
-	Span<u8> recent_list;
 	if (!file_exists(recent_list_path)) {
 		create_directory(parent_directory(recent_list_path));
 		StringBuilder builder;
 		builder.allocator = temporary_allocator;
 
-		auto default_path = with(temporary_allocator, replace(as_span(format(u8"{}example/", editor_directory)), u8'\\', u8'/'));
+		auto default_path = with(temporary_allocator, replace(format(u8"{}example/", editor_directory).span(), u8'\\', u8'/'));
 
 		append_bytes(builder, (u32)default_path.count);
 		append_bytes(builder, default_path);
 
 		append_bytes(builder, get_date());
 
-		recent_list = (List<u8>)to_string(builder);
-		write_entire_file(recent_list_path, as_bytes(recent_list));
+		auto content = to_string(builder);
+		defer { free(content); };
+
+		write_entire_file(recent_list_path, as_bytes(content));
+
+		parse(content);
 	} else {
-		recent_list = with(temporary_allocator, read_entire_file(recent_list_path));
+		auto content = read_entire_file(recent_list_path);
+		defer { free(content); };
+
+		parse(content);
 	}
 
-	u8 *cursor = recent_list.data;
-	u8 *end = recent_list.end();
-
-	while (cursor != end) {
-		RecentProject rp;
-
-		u32 path_size;
-		if (cursor + sizeof(u32) > end) {
-			print(Print_error, "Recent projects list file is corrupted ('{}' is past the end of buffer)", "path_size");
-			return;
-		}
-		path_size = *(u32 *)cursor;
-		cursor += sizeof(u32);
-
-		if (cursor + path_size > end) {
-			print(Print_error, "Recent projects list file is corrupted ('{}' is past the end of buffer)", "path");
-			return;
-		}
-		rp.path.set(Span((utf8 *)cursor, path_size));
-		cursor += path_size;
-
-
-		if (cursor + sizeof(Date) > end) {
-			print(Print_error, "Recent projects list file is corrupted ('{}' is past the end of buffer)", "date");
-			return;
-		}
-		rp.date = *(Date *)cursor;
-		cursor += sizeof(Date);
-
-		recent_projects.add(rp);
-	}
 }
 
 void serialize_recent_projects() {
-	scoped_allocator(temporary_allocator);
+	scoped(temporary_allocator);
 	StringBuilder builder;
 
 	for (auto &p : recent_projects) {
@@ -1040,7 +1058,7 @@ void draw_project_selection() {
 
 	if (started(compile_project_task)) {
 		push_label_theme {
-			editor->label_theme.color.w = map<f32>(pow2(map<f32>(tl::sin(app->time*tau), -1, 1, 0, 1)), 1, 0, 0.25, 1);
+			editor->label_theme.color.w = map(pow2(map(tl::sin(app->time*tau), -1.0f, 1.0f, 0.0f, 1.0f)), 1.0f, 0.0f, 0.25f, 1.0f);
 			label(u8"Loading...", 64, {.align = Align_center});
 		}
 
@@ -1206,7 +1224,7 @@ void draw_editor() {
 			auto tab_info = *(DragDropTabInfo *)editor->drag_and_drop_data.data;
 			auto tab = tab_info.tab_view->tabs[tab_info.tab_index];
 
-			auto font = get_font_at_size(app->font_collection, font_size);
+			auto font = get_font_at_size(app->font, font_size);
 			ensure_all_chars_present(tab.window->name, font);
 			auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
 
@@ -1318,7 +1336,7 @@ void draw_editor() {
 			auto left = to;
 			auto right = new_tab_view;
 			if (swap_parts) {
-				swap(left, right);
+				Swap(left, right);
 			}
 
 			if (to->parent) {
@@ -1365,6 +1383,12 @@ void run() {
 	construct(manipulator_states);
 	construct(debug_lines);
 	construct(tab_moves);
+	
+	auto visual_studio_path = locate_visual_studio();
+	visual_c_path = locate_visual_c(visual_studio_path);
+	msvc_path = locate_msvc(visual_c_path);
+	wkits_path = locate_wkits();
+	cl_path = format(u8"{}\\bin\\Hostx64\\x64\\cl.exe"s, msvc_path);
 
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
@@ -1488,7 +1512,11 @@ void run() {
 			fps_counter = 0;
 		}
 
-		clear_temporary_storage();
+		temporary_allocator.clear();
+
+		if (scripts_dll_end_frame) {
+			scripts_dll_end_frame();
+		}
 	};
 	info.on_key_down = [](u8 key) {
 		editor->key_state[key].state = KeyState_down | KeyState_repeated | KeyState_held;
@@ -1509,7 +1537,7 @@ void run() {
 		state.state = KeyState_up | ((state.state & KeyState_drag) ? KeyState_end_drag : 0);
 	};
 	info.on_char = [](u32 ch) {
-		editor->input_string.add(encode_utf8(ch));
+		editor->input_string.add(encode_utf8(ch).span());
 	};
 	info.client_size = {1280, 720};
 	if (!create_window(info)) {
@@ -1574,9 +1602,9 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	auto log_file = open_file(tformat("{}bin/editor_log.txt"s, editor_directory), {.write = true});
 	defer { close(log_file); };
 	log_printer = Printer {
-		[](PrintKind kind, Span<utf8> string, void *data) {
-			console_printer(kind, string);
-			write({data}, as_bytes(string));
+		[](Span<utf8> string, void *data) {
+			console_printer(string);
+			write(File{data}, as_bytes(string));
 		},
 		log_file.handle
 	};
@@ -1594,7 +1622,7 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 			editor_cpp_files.add(item);
 		}
 	});
-	editor_cpp_files.make_absolute();
+	editor_cpp_files.enable_reading();
 
 	clear_build_directory();
 	defer { clear_build_directory(); };

@@ -9,9 +9,9 @@ void draw_property(Span<utf8> name, f32 &value, std::source_location location) {
 	push_viewport(line_viewport) {
 		s32 text_width = 0;
 
-		auto font = get_font_at_size(app->font_collection, font_size);
+		auto font = get_font_at_size(app->font, font_size);
 		ensure_all_chars_present(name, font);
-		auto placed_text = with(temporary_allocator, get_text_info(name, font, {.place_chars=true}).placed_chars);
+		auto placed_text = with(temporary_allocator, calculate_text(name, font, {.place_chars=true}).placed_chars);
 		text_width = placed_text.back().position.max.x;
 		label({}, placed_text, font, V4f(1));
 

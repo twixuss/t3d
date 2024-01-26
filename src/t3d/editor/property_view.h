@@ -39,7 +39,8 @@ struct PropertyView : EditorWindow {
 
 						s32 button_height_plus_padding = 16 + 2;
 
-						for_each(app->component_infos, [&](Uid component_type, ComponentInfo &info) {
+						for_each(app->component_infos, [&](auto &kv) {
+							auto &[component_type, info] = kv;
 							push_viewport(button_viewport) {
 								if (button(info.name, component_type.value)) {
 									adding_component = false;

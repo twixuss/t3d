@@ -132,7 +132,7 @@ void main() {
 								auto texel = texels[y*Exposure::min_texture_size+x];
 								f32 dist = distance(V2f(x,y), V2f(63)*0.5);
 
-								constexpr f32 inv_diagonal = 1 / max(1, tl::sqrt(pow2(Exposure::min_texture_size * 0.5f - 0.5f) * 2));
+								constexpr f32 inv_diagonal = 1.0f / max(1.0f, tl::sqrt(pow2(Exposure::min_texture_size * 0.5f - 0.5f) * 2));
 
 								f32 mask = map_clamped(dist * inv_diagonal, mask_radius, 0.0f, 0.0f, 1.0f);
 								sum_mask += mask;

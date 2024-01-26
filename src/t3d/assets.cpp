@@ -4,26 +4,26 @@
 Span<u8> Assets::get_asset_data(Span<utf8> local_path) {
 	if (app->is_editor) {
 		auto full_path = tconcatenate(directory, local_path);
-		auto buffer = with(temporary_allocator, read_entire_file(to_pathchars(full_path, true)));
+		auto buffer = read_entire_file(to_pathchars(full_path, true));
 		if (!buffer.data) {
-			print(Print_error, "Asset not found '{}'.\n", full_path);
+			with(ConsoleColor::red, print("Asset not found '{}'.\n", full_path));
 			return {};
 		}
 		return buffer;
 	} else {
 		auto found = asset_path_to_data.find(local_path);
 		assert_always(found, "Asset '{}' was not found", local_path);
-		return *found;
+		return found->value;
 	}
 }
 
 Texture2D *Assets::get_texture_2d(Span<utf8> path) {
 	auto found = textures_2d_by_path.find(path);
 	if (found) {
-		return *found;
+		return found->value;
 	}
 
-	print(Print_info, "Loading texture {}.\n", path);
+	print("Loading texture {}.\n", path);
 	auto result = app->tg->load_texture_2d(get_asset_data(path), {.generate_mipmaps = true});
 
 	if (!result) {
@@ -37,10 +37,10 @@ Texture2D *Assets::get_texture_2d(Span<utf8> path) {
 TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 	auto found = textures_cubes_by_path.find(path);
 	if (found) {
-		return *found;
+		return found->value;
 	}
 
-	print(Print_info, "Loading cubemap {}.\n", path);
+	print("Loading cubemap {}.\n", path);
 
 	auto cubemap_desc = as_utf8(get_asset_data(path));
 	if (!cubemap_desc.data) {
@@ -59,17 +59,17 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 
 	while (t < tokens.end()) {
 		if (t->kind != Token_identifier) {
-			print(Print_error, "Parsing failed. Expected identifier instead of '{}'.\n", t->string);
+			with(ConsoleColor::red, print("Parsing failed. Expected identifier instead of '{}'.\n", t->string));
 			return 0;
 		}
 		auto side = t->string;
 		++t;
 		if (t >= tokens.end()) {
-			print(Print_error, "Parsing failed. Unexpected end of file.\n");
+			with(ConsoleColor::red, print("Parsing failed. Unexpected end of file.\n"));
 			return 0;
 		}
 		if (t->kind != '"') {
-			print(Print_error, "Parsing failed. Expected string instead of '{}'.\n", t->string);
+			with(ConsoleColor::red, print("Parsing failed. Expected string instead of '{}'.\n", t->string));
 			return 0;
 		}
 		auto path = t->string;
@@ -82,7 +82,7 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 		else if (side == u8"front"s ) paths.front  = path;
 		else if (side == u8"back"s  ) paths.back   = path;
 		else {
-			print(Print_error, "Parsing failed. Expected left/right/top/bottom/front/back instead of '{}'.\n", t->string);
+			with(ConsoleColor::red, print("Parsing failed. Expected left/right/top/bottom/front/back instead of '{}'.\n", t->string));
 			return 0;
 		}
 	}
@@ -96,17 +96,17 @@ TextureCube *Assets::get_texture_cube(Span<utf8> path) {
 		pixels[i] = tg::load_pixels(get_asset_data(paths.paths[i]));
 		datas[i] = pixels[i].data;
 		if (pixels[i].size.x != pixels[i].size.y) {
-			print(Print_error, "Loading failed. Face sizes do not match.\n");
+			with(ConsoleColor::red, print("Loading failed. Face sizes do not match.\n"));
 			return 0;
 		}
 		if (size == 0) {
 			size = pixels[i].size.x;
 			format = pixels[i].format;
 		} else if (size != pixels[i].size.x) {
-			print(Print_error, "Loading failed. Face sizes do not match.\n");
+			with(ConsoleColor::red, print("Loading failed. Face sizes do not match.\n"));
 			return 0;
 		} else if (format != pixels[i].format) {
-			print(Print_error, "Loading failed. Face formats do not match.\n");
+			with(ConsoleColor::red, print("Loading failed. Face formats do not match.\n"));
 			return 0;
 		}
 	}
@@ -135,6 +135,7 @@ Mesh *Assets::create_mesh(tl::CommonMesh &mesh) {
 		{
 			tg::Element_f32x3, // position
 			tg::Element_f32x3, // normal
+			tg::Element_f32x4, // tangent
 			tg::Element_f32x4, // color
 			tg::Element_f32x2, // uv
 		}

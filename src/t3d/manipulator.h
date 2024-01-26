@@ -51,7 +51,7 @@ struct ManipulatorStateKey {
 };
 
 template <>
-umm get_hash(ManipulatorStateKey key) {
+umm get_hash(ManipulatorStateKey const &key) {
 	return key.id * (umm)954277 + key.location.column() * (umm)152753 + key.location.line() * (umm)57238693 + (umm)key.location.file_name() + (umm)key.camera;
 }
 inline bool operator==(ManipulatorStateKey const &a, ManipulatorStateKey const &b) {
@@ -83,7 +83,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 
 	auto camera_forward = camera_entity->rotation * v3f{0,0,-1};
 	auto camera_forward_dot_handle_direction = dot(position - camera_entity->position, camera_forward);
-	f32 handle_size_scaled_by_distance = handle_size * camera_forward_dot_handle_direction;
+	f32 handle_size_scaled_by_distance = handle_size * distance(position, camera_entity->position);
 
 	auto mouse_position = editor->get_mouse_position_in_current_viewport();
 
@@ -174,7 +174,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 				if (state.dragging_part_index < 3) {
 					v2f closest_in_viewport = closest_point(line_begin_end(handle_viewport_position.xy, handle_viewport_axis_tips[state.dragging_part_index]), (v2f)mouse_position);
 
-					v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, {}, (v2f)editor->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+					v4f end = camera_to_world_matrix * V4f(map(closest_in_viewport, v2f{}, (v2f)editor->current_viewport.size(), v2f{-1,-1}, v2f{1,1}), 1, 1);
 					ray<v3f> cursor_ray = ray_origin_end(camera_entity->position, end.xyz / end.w);
 
 					cursor_ray.direction = normalize(cursor_ray.direction);
@@ -182,7 +182,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 				} else {
 					v3f plane_normal = normalize(handle_world_axis_tips[state.dragging_part_index - 3] - position);
 
-					v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)editor->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+					v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, v2f{}, (v2f)editor->current_viewport.size(), v2f{-1,-1}, v2f{1,1}), 1, 1);
 					ray<v3f> cursor_ray = ray_origin_end(camera_entity->position, end.xyz / end.w);
 
 					new_position = intersect(cursor_ray, plane_point_normal(position, plane_normal));
@@ -223,7 +223,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 			v3f closest_intersect_position = {};
 
 			for (u32 part_index = 0; part_index < 3; ++part_index) {
-				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)editor->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, v2f{}, (v2f)editor->current_viewport.size(), v2f{-1,-1}, v2f{1,1}), 1, 1);
 				ray<v3f> cursor_ray = ray_origin_end(camera_entity->position, end.xyz / end.w);
 				cursor_ray.direction = normalize(cursor_ray.direction);
 
@@ -262,7 +262,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 
 			}
 			if (state.dragging_part_index != null_manipulator_part) {
-				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, {}, (v2f)editor->current_viewport.size(), {-1,-1}, {1,1}), 1, 1);
+				v4f end = camera_to_world_matrix * V4f(map((v2f)mouse_position, v2f{}, (v2f)editor->current_viewport.size(), v2f{-1,-1}, v2f{1,1}), 1, 1);
 				ray<v3f> cursor_ray = ray_origin_end(camera_entity->position, end.xyz / end.w);
 
 				if (begin_drag) {
@@ -324,7 +324,7 @@ inline ManipulatedTransform manipulate_transform(v3f position, quaternion rotati
 	draw_request.highlighted_part_index = in_bounds(app->current_mouse_position, editor->current_viewport) ? ((state.dragging_part_index != null_manipulator_part) ? state.dragging_part_index : closest_element) : -1;
 	draw_request.position = position;
 	draw_request.rotation = rotation;
-	draw_request.size = handle_size;
+	draw_request.size = 1;
 
 	manipulator_draw_requests.add(draw_request);
 

@@ -21,14 +21,14 @@ struct FileView : EditorWindow {
 	s32 tab = 0;
 
 	void add_files(Entry &parent, bool append_directory) {
-		auto children = get_items_in_directory(with(temporary_allocator, to_pathchars(parent.path, true)));
+		auto children = get_items_in_directory(parent.path);
 		for (auto &child : children) {
 			Entry result;
 			result.is_directory = child.kind == FileItem_directory;
 			if (append_directory) {
-				result.path = concatenate(parent.path, u8'/', to_utf8(child.name));
+				result.path = concatenate(parent.path, u8'/', child.name);
 			} else {
-				result.path = to_utf8(child.name);
+				result.path = to_list(child.name);
 			}
 			result.name = parse_path(result.path).name;
 
@@ -68,7 +68,7 @@ struct FileView : EditorWindow {
 
 					Texture2D *texture = 0;
 					if (found) {
-						texture = *found;
+						texture = found->value;
 					} else {
 						texture = app->assets.get_texture_2d(entry.path);
 					}

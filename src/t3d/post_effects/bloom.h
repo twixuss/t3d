@@ -167,7 +167,7 @@ void main() {
 			app->tg->update_shader_constants(constants, {.texel_size = 1.0f / (v2f)sample_from->color->size, .threshold = threshold});
 			app->tg->draw(3);
 
-			swap(target.source, target.destination);
+			Swap(target.source, target.destination);
 
 			sample_from = target.source;
 
@@ -181,7 +181,7 @@ void main() {
 			app->tg->set_viewport(target.destination->color->size);
 			app->tg->set_texture(target.source->color, 0);
 			app->tg->draw(3);
-			swap(target.source, target.destination);
+			Swap(target.source, target.destination);
 		}
 
 		app->tg->set_shader(blur_y_shader);
@@ -190,7 +190,7 @@ void main() {
 			app->tg->set_viewport(target.destination->color->size);
 			app->tg->set_texture(target.source->color, 0);
 			app->tg->draw(3);
-			swap(target.source, target.destination);
+			Swap(target.source, target.destination);
 		}
 
 		app->tg->set_shader(app->blit_texture_shader);

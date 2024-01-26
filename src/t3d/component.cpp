@@ -102,7 +102,7 @@ void free(ComponentStorage &storage) {
 }
 
 ComponentInfo &get_component_info(Uid uid) {
-	return app->component_infos.find(uid).get();
+	return app->component_infos.find(uid)->value;
 }
 
 ComponentInfo &component_infos_get_or_insert(Uid uid) {
@@ -110,5 +110,5 @@ ComponentInfo &component_infos_get_or_insert(Uid uid) {
 }
 
 Uid component_name_to_uid(Span<utf8> name) {
-	return app->component_name_to_uid.find(name).get();
+	return app->component_name_to_uid.find(name)->value;
 }

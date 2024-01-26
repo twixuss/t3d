@@ -44,7 +44,7 @@ bool deserialize_binary(Mesh *&value, u8 *&from, u8 *end);
 
 #if 0
 EditorWindow *deserialize_editor_window(Stream &stream) {
-#define read_bytes(value) if (!stream.read(value_as_bytes(value))) { print(Print_error, "Failed to deserialize editor window: no data for field '" #value "'\n"); return 0; }
+#define read_bytes(value) if (!stream.read(value_as_bytes(value))) { with(ConsoleColor::red, print("Failed to deserialize editor window: no data for field '" #value "'\n")); return 0; }
 
 	EditorWindowKind kind;
 	read_bytes(kind);
@@ -62,7 +62,7 @@ EditorWindow *deserialize_editor_window(Stream &stream) {
 		case EditorWindow_split_view:     window = create_editor_window<SplitView>(kind, window_id); break;
 		case EditorWindow_tab_view:       window = create_editor_window<TabView>(kind, window_id); break;
 		default: {
-			print(Print_error, "Failed to deserialize editor window: invalid kind ({})\n", (u32)kind);
+			with(ConsoleColor::red, print("Failed to deserialize editor window: invalid kind ({})\n", (u32)kind));
 			return 0;
 		}
 	}
@@ -73,7 +73,7 @@ EditorWindow *deserialize_editor_window(Stream &stream) {
 	if (parent_id != (EditorWindowId)-1) {
 		auto found = editor_windows.find(parent_id);
 		if (!found) {
-			print(Print_error, "Failed to deserialize editor window: parent_id is invalid ({})\n", parent_id);
+			with(ConsoleColor::red, print("Failed to deserialize editor window: parent_id is invalid ({})\n", parent_id));
 			return 0;
 		}
 		window->parent = *found;
@@ -101,7 +101,7 @@ void serialize_window_layout() {
 bool deserialize_window_layout() {
 	auto buffer = with(temporary_allocator, read_entire_file(window_layout_path));
 	if (!buffer.data) {
-		print(Print_error, "Failed to deserialize window layout: file {} does not exist\n", window_layout_path);
+		with(ConsoleColor::red, print("Failed to deserialize window layout: file {} does not exist\n", window_layout_path));
 		return false;
 	}
 

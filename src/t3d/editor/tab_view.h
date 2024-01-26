@@ -27,7 +27,7 @@ struct TabView : EditorWindow {
 	};
 
 	List<Tab> tabs;
-	u32 selected_tab;
+	umm selected_tab;
 	v2u get_min_size() {
 		return tabs[selected_tab].window->get_min_size() + v2u{0, (u32)tab_height};
 	}
@@ -74,8 +74,8 @@ struct TabView : EditorWindow {
 
 			s32 tab_start_x = 2;
 
-			auto font = get_font_at_size(app->font_collection, font_size);
-			for (u32 tab_index = 0; tab_index < tabs.count; tab_index += 1) {
+			auto font = get_font_at_size(app->font, font_size);
+			for (umm tab_index = 0; tab_index < tabs.count; tab_index += 1) {
 				auto &tab = tabs[tab_index];
 				ensure_all_chars_present(tab.window->name, font);
 				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));

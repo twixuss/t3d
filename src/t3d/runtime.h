@@ -568,8 +568,9 @@ void pixel_main(in V2P input, out float4 color : SV_Target) {
 // Called once after runtime_init()
 //
 void runtime_start() {
-	for_each(app->current_scene->component_storages, [&](Uid uid, ComponentStorage &storage) {
-		auto &info = app->component_infos.find(uid).get();
+	for_each(app->current_scene->component_storages, [&](auto &kv) {
+		auto &[uid, storage] = kv;
+		auto &info = app->component_infos.find(uid)->value;
 		if (info.start) {
 			storage.for_each([&](void *data) {
 				info.start(data);
@@ -579,8 +580,9 @@ void runtime_start() {
 }
 
 void runtime_update() {
-	for_each(app->current_scene->component_storages, [&](Uid uid, ComponentStorage &storage) {
-		auto &info = app->component_infos.find(uid).get();
+	for_each(app->current_scene->component_storages, [&](auto &kv) {
+		auto &[uid, storage] = kv;
+		auto &info = app->component_infos.find(uid)->value;
 		if (info.update) {
 			storage.for_each([&](void *data) {
 				info.update(data);
@@ -738,13 +740,13 @@ void render_camera(Camera &camera, Entity &camera_entity) {
 		app->tg->enable_depth_clip();
 	}
 
-	swap(camera.source_target, camera.destination_target);
+	Swap(camera.source_target, camera.destination_target);
 
 	{
 		timed_block("Post effects"s);
 		for (auto &effect : camera.post_effects) {
 			effect.render(camera.source_target, camera.destination_target);
-			swap(camera.source_target, camera.destination_target);
+			Swap(camera.source_target, camera.destination_target);
 		}
 	}
 

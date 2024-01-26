@@ -80,14 +80,14 @@ struct ComponentStorage {
 					if (mask & ((Mask)1 << bit_index)) {
 						auto value = (u8 *)block->values + bytes_per_entry * (mask_index * bits_in_mask + bit_index);
 
-						if constexpr (is_same<FnRet, void>) {
+						if constexpr (std::is_same_v<FnRet, void>) {
 							fn(value);
-						} else if constexpr (is_same<FnRet, ForEachDirective>) {
+						} else if constexpr (std::is_same_v<FnRet, ForEachDirective>) {
 							if (fn(value) == ForEach_break) {
 								return;
 							}
 						} else {
-							static_assert(false, "iteration function must return either void or ForEachDirective (use for_each_continue/for_each_break macros for that)");
+							static_error_t(Fn, "iteration function must return either void or ForEachDirective (use for_each_continue/for_each_break macros for that)");
 						}
 					}
 				}
@@ -219,7 +219,7 @@ template <class T>
 bool deserialize_text(Token *&from, Token *end, T &value, Span<utf8> name) {
 	from += 1;
 	if (from == end) {
-		print(Print_error, "Unexpected end of file while parsing property '{}'\n", name);
+		with(ConsoleColor::red, print("Unexpected end of file while parsing property '{}'\n", name));
 		return false;
 	}
 	if (!::deserialize_text(value, from, end))
@@ -271,14 +271,14 @@ struct ComponentBase<ComponentT> : Component { \
 	bool deserialize_text(Token *&from, Token *end) { \
 		while (from->kind != '}') { \
 			if (from->kind != Token_identifier) { \
-				print(Print_error, "Expected an identifier while parsing " #ComponentT "'s properties, but got '{}'\n", from->string); \
+				with(ConsoleColor::red, print("Expected an identifier while parsing " #ComponentT "'s properties, but got '{}'\n", from->string)); \
 				return false; \
 			} \
 			auto started_from = from; \
 			if (false) {} \
 			FIELDS(DESERIALIZE_FIELD_TEXT) \
 			else { \
-				print(Print_warning, "Got unknown field while parsing " #ComponentT "'s properties: '{}'\n", from->string); \
+				with(ConsoleColor::yellow, print("Got unknown field while parsing " #ComponentT "'s properties: '{}'\n", from->string)); \
 				go_to_next_property(started_from, from, end); \
 			} \
 		} \

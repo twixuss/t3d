@@ -123,6 +123,7 @@ struct AppData {
 
 
 	FontCollection *font_collection;
+	Font *font;
 	tg::VertexBuffer *text_vertex_buffer;
 	tg::Shader *text_shader;
 	tg::TypedShaderConstants<TextShaderConstants> text_shader_constants;
@@ -141,7 +142,7 @@ struct AppData {
 };
 
 inline void update_time() {
-	app->frame_time = min(app->max_frame_time, reset(app->frame_timer));
+	app->frame_time = min(app->max_frame_time, (f32)reset(app->frame_timer));
 	app->time += app->frame_time;
 	app->frame_index += 1;
 }

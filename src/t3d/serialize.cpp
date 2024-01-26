@@ -45,7 +45,7 @@ List<u8> serialize_scene_binary(Scene *scene, HashMap<Uid, Uid> component_type_u
 
 		append_bytes(builder, (u32)entity.components.count);
 		for (auto &component : entity.components) {
-			append_bytes(builder, component_type_uid_remap.find(component.type_uid).get());
+			append_bytes(builder, component_type_uid_remap.find(component.type_uid)->value);
 			auto &info = get_component_info(component.type_uid);
 			info.serialize(builder, app->current_scene->get_component_data(component), true);
 		}
@@ -146,7 +146,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 	auto source = (Span<utf8>)with(temporary_allocator, read_entire_file(to_pathchars(path, true)));
 
 	if (!source.data) {
-		print(Print_error, "Failed to read scene file '{}'\n", path);
+		with(ConsoleColor::red, print("Failed to read scene file '{}'\n", path));
 		return 0;
 	}
 
@@ -174,24 +174,24 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 	while (t != end) {
 
 		if (t->string != u8"entity"s) {
-			print(Print_error, "Expected 'entity' keyword, but got '{}'\n", t->string);
+			with(ConsoleColor::red, print("Expected 'entity' keyword, but got '{}'\n", t->string));
 			return 0;
 		}
 
 		t += 1;
 
 		if (t == end) {
-			print(Print_error, "Expected entity name in quotes after 'entity' keyword, but got end of file\n");
+			with(ConsoleColor::red, print("Expected entity name in quotes after 'entity' keyword, but got end of file\n"));
 			return 0;
 		}
 		if (t->kind != '"') {
-			print(Print_error, "Expected entity name in quotes, but got '{}'\n", t->string);
+			with(ConsoleColor::red, print("Expected entity name in quotes, but got '{}'\n", t->string));
 			return 0;
 		}
 
 		auto successfully_unescaped_name = with(temporary_allocator, unescape_string(t->string));
 		if (!successfully_unescaped_name) {
-			print(Print_error, "Failed to unescape string '{}'\n", t->string);
+			with(ConsoleColor::red, print("Failed to unescape string '{}'\n", t->string));
 			return 0;
 		}
 		List<utf8> unescaped_name = successfully_unescaped_name.value();
@@ -199,11 +199,11 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 		++t;
 
 		if (t == end) {
-			print(Print_error, "Expected '{' after entity name, but got end of file\n");
+			with(ConsoleColor::red, print("Expected '{' after entity name, but got end of file\n"));
 			return 0;
 		}
 		if (t->kind != '{') {
-			print(Print_error, "Expected '{' after entity name, but got '{}'\n", t->string);
+			with(ConsoleColor::red, print("Expected '{' after entity name, but got '{}'\n", t->string));
 			return 0;
 		}
 		++t;
@@ -215,23 +215,23 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 
 		while (t != end && t->kind != '}') {
 			if (t->kind != Token_identifier) {
-				print(Print_error, "Expected position, rotation, scale or component name, but got '{}'\n", t->string);
+				with(ConsoleColor::red, print("Expected position, rotation, scale or component name, but got '{}'\n", t->string));
 				return 0;
 			}
 
 			auto parse_float = [&] (f32 &result) {
 				if (t == end) {
-					print(Print_error, "Expected a number after position, but got end of file\n");
+					with(ConsoleColor::red, print("Expected a number after position, but got end of file\n"));
 					return false;
 				}
 				if (t->kind != Token_number) {
-					print(Print_error, "Expected a number after position, but got '{}'\n", t->string);
+					with(ConsoleColor::red, print("Expected a number after position, but got '{}'\n", t->string));
 					return false;
 				}
 				auto parsed = parse_f32(t->string);
 
 				if (!parsed) {
-					print(Print_error, "Failed to parse a number\n");
+					with(ConsoleColor::red, print("Failed to parse a number\n"));
 					return false;
 				}
 				t += 1;
@@ -250,7 +250,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				if (t->kind == ';') {
 					++t;
 				} else {
-					print(Print_error, "Error while parsing \"{}\"'s position. Expected ';' at the end of line instead of {}.", t->string);
+					with(ConsoleColor::red, print("Error while parsing \"{}\"'s position. Expected ';' at the end of line instead of {}.", t->string));
 					go_to_next_property(started_from, t, end);
 				}
 			} else if (t->string == u8"rotation"s) {
@@ -263,7 +263,7 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				if (t->kind == ';') {
 					++t;
 				} else {
-					print(Print_error, "Error while parsing \"{}\"'s rotation. Expected ';' at the end of line instead of {}.", t->string);
+					with(ConsoleColor::red, print("Error while parsing \"{}\"'s rotation. Expected ';' at the end of line instead of {}.", t->string));
 					go_to_next_property(started_from, t, end);
 				}
 			} else if (t->string == u8"scale"s) {
@@ -274,19 +274,20 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 				if (t->kind == ';') {
 					++t;
 				} else {
-					print(Print_error, "Error while parsing \"{}\"'s scale. Expected ';' at the end of line instead of {}.", t->string);
+					with(ConsoleColor::red, print("Error while parsing \"{}\"'s scale. Expected ';' at the end of line instead of {}.", t->string));
 					go_to_next_property(started_from, t, end);
 				}
 			} else {
 				ComponentInfo *found_info = 0;
 				Uid component_type_uid;
-				for_each(app->component_infos, [&](Uid uid, ComponentInfo &info) {
+				for_each(app->component_infos, [&](auto &kv) {
+					auto &[uid, info] = kv;
 					if (info.name == t->string) {
 						found_info = &info;
 						component_type_uid = uid;
-						for_each_break;
+						return ForEach_break;
 					}
-					for_each_continue;
+					return ForEach_continue;
 				});
 
 				if (found_info) {
@@ -296,16 +297,16 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 
 					t += 1;
 					if (t == end) {
-						print(Print_error, "Expected '{' after component name, but got end of file\n");
+						with(ConsoleColor::red, print("Expected '{' after component name, but got end of file\n"));
 						return 0;
 					}
 					if (t->kind != '{') {
-						print(Print_error, "Expected '{' after component name, but got '{}'\n",  t->string);
+						with(ConsoleColor::red, print("Expected '{' after component name, but got '{}'\n",  t->string));
 						return 0;
 					}
 					t += 1;
 					if (t == end) {
-						print(Print_error, "Unclosed body of {} component\n", component_name);
+						with(ConsoleColor::red, print("Unclosed body of {} component\n", component_name));
 						return 0;
 					}
 
@@ -328,14 +329,14 @@ Scene *deserialize_scene_text(Span<utf8> path) {
 						info.init(added.pointer);
 					}
 				} else {
-					print(Print_error, "Unexpected token '{}'. There is no component with this name.\n", t->string);
+					with(ConsoleColor::red, print("Unexpected token '{}'. There is no component with this name.\n", t->string));
 					return 0;
 				}
 			}
 		}
 
 		if (t == end) {
-			print(Print_error, "Unclosed entity block body\n");
+			with(ConsoleColor::red, print("Unclosed entity block body\n"));
 			return 0;
 		}
 
@@ -355,7 +356,7 @@ bool deserialize_text(f32 &value, Token *&from, Token *end) {
 	auto parsed = parse_f32(from->string);
 
 	if (!parsed) {
-		print(Print_error, "Failed to parse a number\n");
+		with(ConsoleColor::red, print("Failed to parse a number\n"));
 		return false;
 	}
 	from += 1;
@@ -421,7 +422,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 		u32 name_size;
 		if (cursor + sizeof(name_size) > end) {
-			print(Print_error, "Failed to deserialize scene: reached data end too soon (name_size)\n");
+			with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (name_size)\n"));
 			return 0;
 		}
 		name_size = *(u32 *)cursor;
@@ -429,7 +430,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 
 		if (cursor + name_size > end) {
-			print(Print_error, "Failed to deserialize scene: reached data end too soon (name)\n");
+			with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (name)\n"));
 			return 0;
 		}
 		entity.name.set({(utf8 *)cursor, name_size});
@@ -437,7 +438,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 
 		if (cursor + sizeof(entity.position) > end) {
-			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.position)\n");
+			with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (entity.position)\n"));
 			return 0;
 		}
 		entity.position = *(v3f *)cursor;
@@ -445,7 +446,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 
 		if (cursor + sizeof(entity.rotation) > end) {
-			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.rotation)\n");
+			with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (entity.rotation)\n"));
 			return 0;
 		}
 		entity.rotation = *(quaternion *)cursor;
@@ -453,7 +454,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 
 		if (cursor + sizeof(entity.scale) > end) {
-			print(Print_error, "Failed to deserialize scene: reached data end too soon (entity.scale)\n");
+			with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (entity.scale)\n"));
 			return 0;
 		}
 		entity.scale = *(v3f *)cursor;
@@ -462,7 +463,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 
 		u32 component_count;
 		if (cursor + sizeof(component_count) > end) {
-			print(Print_error, "Failed to deserialize scene: reached data end too soon (component_count)\n");
+			with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (component_count)\n"));
 			return 0;
 		}
 		component_count = *(u32 *)cursor;
@@ -471,14 +472,14 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 		for (u32 component_index = 0; component_index < component_count; component_index += 1) {
 			Uid component_type_uid;
 			if (cursor + sizeof(component_type_uid) > end) {
-				print(Print_error, "Failed to deserialize scene: reached data end too soon (component_type_uid)\n");
+				with(ConsoleColor::red, print("Failed to deserialize scene: reached data end too soon (component_type_uid)\n"));
 				return 0;
 			}
 			component_type_uid = *(Uid *)cursor;
 			cursor += sizeof(component_type_uid);
 
 			if (!app->component_infos.find(component_type_uid)) {
-				print(Print_error, "Failed to deserialize scene: component type uid is not present ({})\n", component_type_uid);
+				with(ConsoleColor::red, print("Failed to deserialize scene: component type uid is not present ({})\n", component_type_uid));
 				return 0;
 			}
 
@@ -510,7 +511,7 @@ Scene *deserialize_scene_binary(Span<u8> data) {
 }
 bool deserialize_binary(f32 &value, u8 *&from, u8 *end) {
 	if (from + sizeof(value) > end) {
-		print(Print_error, "Failed to deserialize `f32`: reached data end too soon\n");
+		with(ConsoleColor::red, print("Failed to deserialize `f32`: reached data end too soon\n"));
 		return false;
 	}
 
@@ -521,7 +522,7 @@ bool deserialize_binary(f32 &value, u8 *&from, u8 *end) {
 
 bool deserialize_binary(v3f &value, u8 *&from, u8 *end) {
 	if (from + sizeof(value) > end) {
-		print(Print_error, "Failed to deserialize `v3f`: reached data end too soon\n");
+		with(ConsoleColor::red, print("Failed to deserialize `v3f`: reached data end too soon\n"));
 		return false;
 	}
 
@@ -533,7 +534,7 @@ bool deserialize_binary(v3f &value, u8 *&from, u8 *end) {
 bool deserialize_binary(Texture2D *&value, u8 *&from, u8 *end) {
 	u32 path_size;
 	if (from + sizeof(path_size) > end) {
-		print(Print_error, "Failed to deserialize `Texture2D *`: reached data end too soon (path_size)\n");
+		with(ConsoleColor::red, print("Failed to deserialize `Texture2D *`: reached data end too soon (path_size)\n"));
 		return false;
 	}
 	path_size = *(u32 *)from;
@@ -545,7 +546,7 @@ bool deserialize_binary(Texture2D *&value, u8 *&from, u8 *end) {
 	}
 
 	if (from + path_size > end) {
-		print(Print_error, "Failed to deserialize `Texture2D *`: reached data end too soon (path)\n");
+		with(ConsoleColor::red, print("Failed to deserialize `Texture2D *`: reached data end too soon (path)\n"));
 		return false;
 	}
 
@@ -558,7 +559,7 @@ bool deserialize_binary(Texture2D *&value, u8 *&from, u8 *end) {
 bool deserialize_binary(Mesh *&value, u8 *&from, u8 *end) {
 	u32 path_size;
 	if (from + sizeof(path_size) > end) {
-		print(Print_error, "Failed to deserialize `Mesh *`: reached data end too soon (path_size)\n");
+		with(ConsoleColor::red, print("Failed to deserialize `Mesh *`: reached data end too soon (path_size)\n"));
 		return false;
 	}
 	path_size = *(u32 *)from;
@@ -570,7 +571,7 @@ bool deserialize_binary(Mesh *&value, u8 *&from, u8 *end) {
 	}
 
 	if (from + path_size > end) {
-		print(Print_error, "Failed to deserialize `Mesh *`: reached data end too soon (path)\n");
+		with(ConsoleColor::red, print("Failed to deserialize `Mesh *`: reached data end too soon (path)\n"));
 		return false;
 	}
 

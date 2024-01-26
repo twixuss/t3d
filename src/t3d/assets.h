@@ -24,7 +24,7 @@ struct Assets {
 	Mesh *get_mesh(Span<utf8> path) {
 		auto found = meshes_by_name.find(path);
 		if (found) {
-			return found.get_unchecked();
+			return found->value;
 		} else {
 			auto submesh_separator = find(path, u8':');
 			if (submesh_separator) {
@@ -39,7 +39,7 @@ struct Assets {
 					scene = scenes3d.add().pointer;
 					auto parsed = parse_glb_from_memory(scene_data);
 					//if (!parsed) {
-					//	print(Print_error, "Failed to parse scene file '{}'\n", scene_path);
+					//	with(ConsoleColor::red, print("Failed to parse scene file '{}'\n", scene_path));
 					//	return 0;
 					//}
 					//*scene = parsed.value;
@@ -51,7 +51,7 @@ struct Assets {
 
 				auto node = scene->get_node(submesh_name);
 				if (!node) {
-					print(Print_error, "Failed to get node '{}' from scene '{}'\n", submesh_name, scene_path);
+					with(ConsoleColor::red, print("Failed to get node '{}' from scene '{}'\n", submesh_name, scene_path));
 					return 0;
 				}
 
@@ -75,7 +75,7 @@ struct Assets {
 				defer { free(parse_result); };
 
 				if (parse_result.meshes.count == 0) {
-					print(Print_error, "Failed to load mesh '{}' because there is no submeshes in the file\n", path);
+					with(ConsoleColor::red, print("Failed to load mesh '{}' because there is no submeshes in the file\n", path));
 					return 0;
 				}
 

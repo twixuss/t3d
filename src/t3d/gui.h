@@ -65,6 +65,14 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 	bool stop_edit = false;
 	bool apply_input = false;
 	bool set_caret_from_mouse = false;
+
+	auto get_selection_range = [&] {
+		u32 sel_min = state.caret_position;
+		u32 sel_max = state.selection_start;
+		sort_values(sel_min, sel_max);
+		return std::pair(sel_min, sel_max);
+	};
+
 	if (state.editing) {
 		if ((editor->key_state[256 + 0].state & KeyState_down)) {
 			if (in_bounds(app->current_mouse_position, editor->current_scissor)) {
@@ -179,8 +187,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 					break;
 				}
 				case 3: { // Control + C
-					u32 sel_min, sel_max;
-					minmax(state.caret_position, state.selection_start, sel_min, sel_max);
+					auto [sel_min, sel_max] = get_selection_range();
 					if (sel_max == sel_min) {
 						sel_min = 0;
 						sel_max = state.string.count;
@@ -199,8 +206,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 						state.string.insert_at(clipboard, state.caret_position);
 						new_caret_position = state.caret_position + clipboard.count;
 					} else {
-						u32 sel_min, sel_max;
-						minmax(state.caret_position, state.selection_start, sel_min, sel_max);
+						auto [sel_min, sel_max] = get_selection_range();
 						state.string.replace({state.string.data + sel_min, sel_max - sel_min}, clipboard);
 						new_caret_position = sel_min + clipboard.count;
 					}
@@ -238,8 +244,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 						//if (!key_held(Key_shift))
 						state.selection_start = state.caret_position;
 					} else {
-						u32 sel_min, sel_max;
-						minmax(state.caret_position, state.selection_start, sel_min, sel_max);
+						auto [sel_min, sel_max] = get_selection_range();
 						state.string.replace({state.string.data + sel_min, sel_max - sel_min}, c);
 						state.caret_position = state.selection_start = sel_min + 1;
 					}
@@ -272,8 +277,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 				}
 			} else {
 				// Remove selection
-				u32 sel_min, sel_max;
-				minmax(state.caret_position, state.selection_start, sel_min, sel_max);
+				auto [sel_min, sel_max] = get_selection_range();
 
 				state.string.erase({state.string.data + sel_min, sel_max - sel_min});
 				state.caret_blink_time = 0;
@@ -315,9 +319,9 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 
 
 		if (state.string.count) {
-			auto font = get_font_at_size(app->font_collection, font_size);
+			auto font = get_font_at_size(app->font, font_size);
 			ensure_all_chars_present(state.string, font);
-			auto placed_chars = with(temporary_allocator, get_text_info(state.string, font, {.place_chars=true}).placed_chars);
+			auto placed_chars = with(temporary_allocator, calculate_text(state.string, font, {.place_chars=true}).placed_chars);
 
 			if (set_caret_from_mouse) {
 				u32 new_caret_position = placed_chars.count;
@@ -370,8 +374,7 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 			caret_viewport.max.x += caret_x - state.text_offset;
 
 			if (state.caret_position != state.selection_start) {
-				u32 sel_min, sel_max;
-				minmax(state.caret_position, state.selection_start, sel_min, sel_max);
+				auto [sel_min, sel_max] = get_selection_range();
 
 				u32 min_x = placed_chars[sel_min    ].position.min.x;
 				u32 max_x = placed_chars[sel_max - 1].position.max.x;
@@ -653,9 +656,9 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, umm id, std::source_l
 	push_viewport(line_viewport) {
 		s32 text_width;
 
-		auto font = get_font_at_size(app->font_collection, font_size);
+		auto font = get_font_at_size(app->font, font_size);
 		ensure_all_chars_present(name, font);
-		auto placed_text = with(temporary_allocator, get_text_info(name, font, {.place_chars=true}).placed_chars);
+		auto placed_text = with(temporary_allocator, calculate_text(name, font, {.place_chars=true}).placed_chars);
 		text_width = placed_text.back().position.max.x;
 		label(name, font_size);
 

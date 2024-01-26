@@ -9,13 +9,11 @@
 struct GuiKey {
 	umm id;
 	std::source_location location;
-	bool operator==(GuiKey const &that) {
-		return id == that.id && location == that.location;
-	}
+	constexpr auto operator<=>(GuiKey const &) const = default;
 };
 
 template <>
-inline umm get_hash(GuiKey key) {
+inline u64 get_hash(GuiKey const &key) {
 	return key.id * (umm)954277 + key.location.column() * (umm)152753 + key.location.line() * (umm)57238693 + (umm)key.location.file_name();
 }
 

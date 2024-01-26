@@ -8,9 +8,9 @@ using namespace tl;
 
 s32 tl_main(Span<Span<utf8>> arguments) {
 	current_printer = Printer {
-		.func = [](PrintKind kind, Span<utf8> span, void *state) {
-			write({state}, as_bytes(span));
-			console_printer(kind, span);
+		.func = [](Span<utf8> span, void *state) {
+			write(File{state}, as_bytes(span));
+			console_printer(span);
 		},
 		.state = open_file("after_build_log.txt", {.write = true}).handle,
 	};
@@ -20,13 +20,13 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		exe_dir.count --;
 	}
 
-	ListList<utf8> editor_cpp_files;
+	ListOfLists<utf8> editor_cpp_files;
 	for_each_file_recursive(tformat(u8"{}../../src/t3d/", exe_dir), [&] (Span<utf8> item) {
 		if (ends_with(item, u8".cpp"s)/* && parse_path(parent_directory(item)).name != u8"components"s*/) {
 			editor_cpp_files.add(item);
 		}
 	});
-	editor_cpp_files.make_absolute();
+	editor_cpp_files.enable_reading();
 
 	create_directory(concatenate(exe_dir, u8"../../data/obj"s));
 

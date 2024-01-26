@@ -2,10 +2,8 @@
 #include <t3d/app.h>
 
 void init_font() {
-	Span<utf8> font_paths[] = {
-		u8"../data/segoeui.ttf"ts,
-	};
-	app->font_collection = create_font_collection(font_paths);
+	app->font_collection = create_font_collection();
+	app->font = add_font(app->font_collection, u8"../data/segoeui.ttf"ts);
 	app->font_collection->update_atlas = [](TL_FONT_TEXTURE_HANDLE texture, void *data, v2u size) -> TL_FONT_TEXTURE_HANDLE {
 		if (texture) {
 			app->tg->update_texture(texture, size, data);
