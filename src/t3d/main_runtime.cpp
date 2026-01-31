@@ -1,8 +1,8 @@
-#define TL_MAIN
-
 #include "common.h"
 #include "runtime.h"
 #include "assets.h"
+
+#include <tl/main.h>
 
 Camera *main_camera;
 
@@ -38,7 +38,7 @@ void load_assets() {
 
 		Span<u8> asset;
 		asset.data = cursor;
-		asset.size = asset_size;
+		asset.count = asset_size;
 
 		cursor += asset_size;
 
@@ -54,8 +54,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	auto log_file = open_file(tl_file_string("runtime_log.txt"s), {.write = true});
 	defer { close(log_file); };
 	auto log_printer = Printer {
-		[](PrintKind kind, Span<utf8> string, void *data) {
-			console_printer(kind, string);
+		[](Span<utf8> string, void *data) {
+			console_printer(string);
 			write({data}, as_bytes(string));
 		},
 		log_file.handle
@@ -63,8 +63,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 	current_printer = log_printer;
 
-	Profiler::init();
-	defer { Profiler::deinit(); };
+	// Profiler::init();
+	// defer { Profiler::deinit(); };
 
 	allocate_app();
 
@@ -85,7 +85,8 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 	CreateWindowInfo info;
 	info.on_create = [](Window &window) {
 		print("Initializing runtime ...\n");
-		runtime_init(window);
+		app->window = &window;
+		runtime_init();
 
 		List<ComponentDesc> descs;
 		t3d_get_component_descs(descs);
@@ -103,15 +104,15 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 
 		app->current_scene->for_each_component<Camera>([&](Camera &camera) {
 			main_camera = &camera;
-			for_each_break;
+			return ForEach_break;
 		});
 	};
 
-	info.on_draw = [](Window &window) {
+	info.on_update = [](Window &window) {
 		static v2u old_window_size;
-		if (any_true(old_window_size != window.client_size)) {
+		if (any(old_window_size != window.client_size)) {
 			old_window_size = window.client_size;
-			app->tg->resize_render_targets(window.client_size);
+			app->tg->on_window_resize(window.client_size);
 			main_camera->resize_targets(window.client_size);
 		}
 
@@ -119,12 +120,12 @@ s32 tl_main(Span<Span<utf8>> arguments) {
 		runtime_render();
 
 		app->tg->clear(app->tg->back_buffer, tg::ClearFlags_color | tg::ClearFlags_depth, {}, 1);
-		app->current_viewport = aabb_min_max({}, (v2s)window.client_size);
+		//app->current_viewport = aabb_min_max({}, (v2s)window.client_size);
 		app->tg->set_viewport(window.client_size);
 		render_camera(*main_camera, main_camera->entity());
 
 		app->tg->set_render_target(app->tg->back_buffer);
-		app->tg->set_viewport(app->current_viewport);
+		app->tg->set_viewport(window.client_size);
 		blit(main_camera->source_target->color);
 
 		app->tg->present();

@@ -200,7 +200,7 @@ struct SceneView : EditorWindow {
 	}
 	bool deserialize(Stream &stream) {
 
-#define read_bytes(value) if (!stream.read(value_as_bytes(value))) { with(ConsoleColor::red, print("Failed to deserialize editor window: no data for field '" #value "'\n")); return 0; }
+#define read_bytes(value) if (!stream.read(value_as_bytes(value))) { with(ConsoleColor::red, print("Failed to deserialize editor window: no data for field '" #value "'\n")); return false; }
 
 		read_bytes(camera_entity->position);
 		read_bytes(camera_entity->rotation);
@@ -208,6 +208,7 @@ struct SceneView : EditorWindow {
 
 #undef read_bytes
 
+		return true;
 	}
 };
 

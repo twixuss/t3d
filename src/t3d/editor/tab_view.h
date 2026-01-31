@@ -78,7 +78,7 @@ struct TabView : EditorWindow {
 			for (umm tab_index = 0; tab_index < tabs.count; tab_index += 1) {
 				auto &tab = tabs[tab_index];
 				ensure_all_chars_present(tab.window->name, font);
-				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
+				auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font).chars);
 
 				auto tab_viewport = bar_viewport;
 				tab_viewport.min.x += tab_start_x;

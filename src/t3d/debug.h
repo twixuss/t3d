@@ -54,7 +54,7 @@ inline void debug_frame() {
 		auto &line = debug_lines[line_index];
 		line.time -= app->frame_time;
 		if (line.time <= 0) {
-			erase_unordered_at(debug_lines, line_index);
+			debug_lines.erase_unordered_at(line_index);
 			--line_index;
 		}
 	}

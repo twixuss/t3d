@@ -40,7 +40,7 @@ void set_module_shared(void *module) {
 
 void initialize_thread() {
 	init_allocator();
-	current_printer = console_printer;
+	init_printer();
 }
 
 void end_frame() {

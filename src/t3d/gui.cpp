@@ -45,48 +45,11 @@ void label(Span<utf8> string, u32 font_size, DrawTextParams params) {
 	auto font = with(temporary_allocator, get_font_at_size(app->font, font_size));
 	ensure_all_chars_present(string, font);
 
-	auto info = calculate_text(string, font, {.place_chars=true,.bounds=true});
-	v2s offset = {
-		editor->current_viewport.size().x - info.bounds.size().x,
-		editor->current_viewport.size().y - font_size * info.line_count,
-	};
-	switch (params.align) {
-		case Align_top_left:
-			break;
-		case Align_top:
-			params.position.x += offset.x / 2;
-			break;
-		case Align_top_right:
-			params.position.x += offset.x;
-			break;
+	auto info = place_text(string, font);
 
-		case Align_left:
-			params.position.y += offset.y / 2;
-			break;
-		case Align_center:
-			params.position.x += offset.x / 2;
-			params.position.y += offset.y / 2;
-			break;
-		case Align_right:
-			params.position.x += offset.x;
-			params.position.y += offset.y / 2;
-			break;
+	v2s position = align_text_position(params.position, editor->current_viewport.size(), info.bounds.size(), font_size, info.line_count, params.alignment);
 
-		case Align_bottom_left:
-			params.position.y += offset.y;
-			break;
-		case Align_bottom:
-			params.position.x += offset.x / 2;
-			params.position.y += offset.y;
-			break;
-		case Align_bottom_right:
-			params.position.x += offset.x;
-			params.position.y += offset.y;
-			break;
-		default: invalid_code_path("not implemented");
-	}
-
-	label(params.position, info.placed_chars, font, theme.color);
+	label(position, info.chars, font, theme.color);
 }
 
 //

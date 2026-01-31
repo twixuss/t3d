@@ -122,9 +122,9 @@ inline static constexpr u32 editor_window_type_id = type_index<Window,
 	ENUMERATE_WINDOWS
 >(0);
 
-inline static constexpr u32 editor_window_type_count = type_count<
+inline static constexpr u32 editor_window_type_count = type_count_of<
 	ENUMERATE_WINDOWS
->();
+>;
 
 #undef sep
 #undef c

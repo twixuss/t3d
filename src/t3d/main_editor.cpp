@@ -362,11 +362,12 @@ auto query_performance_counter() {
 template <class Fn>
 bool invoke_msvc(Span<utf8> arguments, Fn &&what_to_do_while_compiling) {
 	auto prev_allocator = current_allocator;
-	scoped(temporary_allocator);
 
-	create_directory(format(u8"{}build/"s, editor_directory));
+	create_directory(tformat(u8"{}build/"s, editor_directory));
 
 	StringBuilder bat_builder;
+	defer { free(bat_builder); };
+
 	append_format(bat_builder, u8R"(
 @echo off
 call "{}\Auxiliary\Build\vcvarsall.bat" x64
@@ -374,9 +375,10 @@ cl )", visual_c_path);
 	append_format(bat_builder, "/Fd\"{}temp/{}.pdb\" ", editor_directory, query_performance_counter());
 
 	append(bat_builder, arguments);
+	append(bat_builder, "\nexit /b 0");
 	//append_format(bat_builder, " | \"{}bin/stdin_duplicator.exe\" \"stdout\" \"{}build/build_log.txt\"", editor_directory, editor_directory);
 
-	auto bat_path = format(u8"{}build/build.bat"s, editor_directory);
+	auto bat_path = tformat(u8"{}build/build.bat"s, editor_directory);
 
 	write_entire_file(bat_path, as_bytes(to_string(bat_builder)));
 
@@ -398,6 +400,7 @@ cl )", visual_c_path);
 
 
 	StringBuilder log_builder;
+	defer { free(log_builder); };
 	while (1) {
 		u8 buf[256];
 		auto bytes_read = process.standard_out->read(array_as_span(buf));
@@ -414,7 +417,7 @@ cl )", visual_c_path);
 	wait(process);
 	auto exit_code = get_exit_code(process);
 	if (exit_code != 0) {
-		with(ConsoleColor::red, print("Build command failed\n"));
+		with(ConsoleColor::red, print("Build command failed with exit code {}\n", exit_code));
 		print(as_utf8(read_entire_file("build_log.txt"s)));
 		return false;
 	}
@@ -523,12 +526,13 @@ void append_editor_cpp_or_obj_files(StringBuilder &builder) {
 }
 
 void build_executable() {
-	scoped(temporary_allocator);
-
 	auto build_assets = [&] {
 		StringBuilder asset_builder;
+		defer { free(asset_builder); };
 
 		ListOfLists<utf8> asset_paths;
+		defer { free(asset_paths); };
+
 		add_files_recursive(asset_paths, app->assets.directory);
 		asset_paths.enable_reading();
 
@@ -543,7 +547,7 @@ void build_executable() {
 			append_bytes(asset_builder, as_span(data));
 		}
 
-		auto data_path = format(u8"{}build/data.bin", project_directory);
+		auto data_path = tformat(u8"{}build/data.bin", project_directory);
 		create_directory(parse_path(data_path).directory);
 		auto data_file = open_file(data_path, {.write = true});
 		defer { close(data_file); };
@@ -559,6 +563,8 @@ void build_executable() {
 
 
 		HashMap<Uid, Uid> uid_remap;
+		defer { free(uid_remap); };
+
 		u64 uid_counter = 0;
 		for (auto name : all_component_names) {
 			uid_remap.get_or_insert(component_name_to_uid(name)).value = uid_counter++;
@@ -577,6 +583,7 @@ void build_executable() {
 	// Generate source
 	{
 		StringBuilder builder;
+		defer { free(builder); };
 		append(builder, u8R"(#pragma once
 #include <t3d/component.h>
 #include <t3d/serialize.h>
@@ -630,11 +637,12 @@ void update_component_info(ComponentDesc const &desc) {
 		append(builder, u8"}"s);
 
 
-		create_directory(format("{}build", editor_directory));
+		create_directory(tformat("{}build", editor_directory));
 		write_entire_file(to_pathchars(component_descs_getter_path), as_bytes(to_string(builder)));
 	}
 
 	StringBuilder builder;
+	defer { free(builder); };
 
 	append_editor_cpp_or_obj_files(builder);
 
@@ -1059,7 +1067,7 @@ void draw_project_selection() {
 	if (started(compile_project_task)) {
 		push_label_theme {
 			editor->label_theme.color.w = map(pow2(map(tl::sin(app->time*tau), -1.0f, 1.0f, 0.0f, 1.0f)), 1.0f, 0.0f, 0.25f, 1.0f);
-			label(u8"Loading...", 64, {.align = Align_center});
+			label(u8"Loading...", 64, {.alignment = Align_center});
 		}
 
 		if (finished(compile_project_task)) {
@@ -1149,11 +1157,11 @@ void draw_project_selection() {
 								selected_project = &p;
 							}
 
-							label(parse_path(p.path).name, 20, {.align = Align_center});
+							label(parse_path(p.path).name, 20, {.alignment = Align_center});
 							push_label_theme {
 								editor->label_theme.color.w = 0.5f;
-								label(p.path, font_size, {.align = Align_left});
-								label(to_string(p.date), font_size, {.align = Align_right});
+								label(p.path, font_size, {.alignment = Align_left});
+								label(to_string(p.date), font_size, {.alignment = Align_right});
 							}
 						}
 
@@ -1226,7 +1234,7 @@ void draw_editor() {
 
 			auto font = get_font_at_size(app->font, font_size);
 			ensure_all_chars_present(tab.window->name, font);
-			auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font));
+			auto placed_chars = with(temporary_allocator, place_text(tab.window->name, font).chars);
 
 			tg::Rect tab_viewport;
 			tab_viewport.min = tab_viewport.max = app->current_mouse_position;
@@ -1430,7 +1438,7 @@ void run() {
 
 		static v2u old_window_size;
 		app->did_resize = false;
-		if (any_true(old_window_size != app->window->client_size)) {
+		if (any(old_window_size != app->window->client_size)) {
 			old_window_size = app->window->client_size;
 			app->tg->on_window_resize(app->window->client_size);
 			app->did_resize = true;

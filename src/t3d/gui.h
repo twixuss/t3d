@@ -19,20 +19,22 @@ u32 const font_size = 12;
 void gui_panel(v4f color);
 void gui_image(tg::Texture2D *texture);
 
-enum Align {
-	Align_top_left,
-	Align_top,
-	Align_top_right,
-	Align_left,
-	Align_center,
-	Align_right,
-	Align_bottom_left,
-	Align_bottom,
-	Align_bottom_right,
-};
+constexpr v2f Align_center = {0.5f, 0.5f};
+constexpr v2f Align_left   = {0.0f, 0.5f};
+constexpr v2f Align_right  = {1.0f, 0.5f};
+
+inline v2s align_text_position(v2s position, v2s viewport_size, v2s font_bounds_size, s32 font_size, s32 line_count, v2f alignment) {
+	v2s offset = {
+		viewport_size.x - font_bounds_size.x,
+		viewport_size.y - font_size * line_count,
+	};
+
+	return position + (v2s)((v2f)offset * alignment);
+}
+
 struct DrawTextParams {
 	v2s position = {};
-	Align align = Align_left;
+	v2f alignment = {0, 0.5f};
 };
 
 u32 get_font_size(u32 font_size);
@@ -321,7 +323,8 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 		if (state.string.count) {
 			auto font = get_font_at_size(app->font, font_size);
 			ensure_all_chars_present(state.string, font);
-			auto placed_chars = with(temporary_allocator, calculate_text(state.string, font, {.place_chars=true}).placed_chars);
+			auto info = with(temporary_allocator, place_text(state.string, font));
+			auto placed_chars = info.chars;
 
 			if (set_caret_from_mouse) {
 				u32 new_caret_position = placed_chars.count;
@@ -386,8 +389,9 @@ bool input_field(InputFieldCallbacks callbacks, auto &state, auto &value, umm id
 				push_viewport(selection_viewport) gui_panel({0.25f,0.25f,0.5f,1});
 			}
 
-			label((List<utf8>)to_string(value), font_size, {.position = {-state.text_offset, 0}});
-			//label(placed_chars, font, {.position = {-state.text_offset, 0}}, id, location, V4f(1));
+			//label((List<utf8>)to_string(value), font_size, {.position = {-state.text_offset, 0}});
+			v2s position = align_text_position(v2s{-state.text_offset, 0}, editor->current_viewport.size(), info.bounds.size(), font_size, info.line_count, Align_left);
+			label(position, placed_chars, font, V4f(1));
 		}
 
 
@@ -658,7 +662,7 @@ void draw_asset_property(Span<utf8> name, Span<utf8> path, umm id, std::source_l
 
 		auto font = get_font_at_size(app->font, font_size);
 		ensure_all_chars_present(name, font);
-		auto placed_text = with(temporary_allocator, calculate_text(name, font, {.place_chars=true}).placed_chars);
+		auto placed_text = with(temporary_allocator, place_text(name, font).chars);
 		text_width = placed_text.back().position.max.x;
 		label(name, font_size);
 

@@ -5,6 +5,7 @@
 #include <t3d/editor/input.h>
 #include <t3d/scene.h>
 #include <tl/font.h>
+#include <tl/math_random.h>
 
 struct GuiKey {
 	umm id;
@@ -14,7 +15,11 @@ struct GuiKey {
 
 template <>
 inline u64 get_hash(GuiKey const &key) {
-	return key.id * (umm)954277 + key.location.column() * (umm)152753 + key.location.line() * (umm)57238693 + (umm)key.location.file_name();
+	return 
+		key.id * random_primes_u32[0] + 
+		key.location.column() * random_primes_u32[1] +
+		key.location.line() * random_primes_u32[2] +
+		get_hash(as_span(key.location.file_name())) * random_primes_u32[3];
 }
 
 struct PanelState {
